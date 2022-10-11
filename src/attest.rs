@@ -3,11 +3,14 @@ use warp::{Filter, http::Response};
 use std::ffi::CString;
 use std::fmt;
 
-use super::do_epid_ra;
 use serde_json::{json};
 use serde_derive::{Deserialize, Serialize};
+use ecies::PublicKey as EthPublicKey;
+use ecies::SecretKey as EthSecretKey;
+
 
 use crate::keys;
+use super::do_epid_ra;
 
 #[derive(Serialize, Debug)]
 pub struct AttestationProof {
@@ -17,7 +20,7 @@ pub struct AttestationProof {
 }
 
 impl AttestationProof {
-    pub fn new(data: [u8; 48]) -> AttestationProof {
+    pub fn new(data: [u8; 33]) -> AttestationProof {
 
         // sufficient sized buffers
         let a = [1_u8; 5000].to_vec();
@@ -71,16 +74,15 @@ impl fmt::Display for AttestationProof {
     }
 }
 
-
 pub fn epid_remote_attestation(pk_hex: &String) {
-    let sk = keys::read_key(pk_hex).expect("bad pk_hex");
+    let sk = keys::read_eth_key(pk_hex);
     let proof = AttestationProof::new(
-        sk.sk_to_pk().compress()
+        EthPublicKey::from_secret_key(&sk).serialize_compressed()
     );
     println!("{:?}", proof.signed_report);
 }
 
-
+/// TODO
 pub fn epid_remote_attestation_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     let hi = warp::path("world")
     .and(warp::path::param())

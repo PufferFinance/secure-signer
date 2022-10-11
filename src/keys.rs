@@ -5,10 +5,100 @@ use blst::BLST_ERROR;
 use std::path::PathBuf;
 use std::fs;
 
+use ecies::{decrypt, encrypt, utils::generate_keypair};
+use ecies::PublicKey as EthPublicKey;
+use ecies::SecretKey as EthSecretKey;
+use sha3::{Digest, Keccak256};
+
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 
 pub const CIPHER_SUITE: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_";
+
+pub fn eth_key_gen() -> EthPublicKey {
+    let (sk, pk) = new_eth_key();
+    save_eth_key(sk, pk)
+}
+
+pub fn new_eth_key() -> (EthSecretKey, EthPublicKey) {
+    generate_keypair()
+}
+
+pub fn keccak(bytes: &[u8]) -> [u8; 32] {
+    // create a Keccak256 object
+    let mut hasher = Keccak256::new();
+
+    // write input message
+    hasher.update(bytes);
+
+    // read hash digest
+    let digest: [u8; 32] = hasher.finalize()
+        .as_slice()
+        .try_into()
+        .expect("Couldn't convert digest to AesKey");
+
+    digest
+}
+
+pub fn pk_to_eth_addr(pk: &EthPublicKey) -> String {
+    // get the uncompressed PK in bytes (should be 65)
+    let pk_bytes = pk.serialize();
+    assert!(pk_bytes.len() == 65);
+
+    // hash of PK bytes (skip the 1st byte)
+    let digest: [u8; 32] = keccak(&pk_bytes[1..]);
+
+    // keep the last 20 bytes
+    let last = &digest[12..];
+
+    // encode the bytes as a hex string
+    let hex_str = hex::encode(last);
+
+    // Convert to eth checksum address
+    checksum(hex_str.as_str())
+}
+
+// Adapted from: https://github.com/miguelmota/rust-eth-checksum/
+pub fn checksum(address: &str) -> String {
+    let address = address.trim_start_matches("0x").to_lowercase();
+
+    let hash_bytes = keccak(address.as_bytes());
+    let address_hash_string = hex::encode(&hash_bytes);
+    let address_hash = address_hash_string.as_str();
+
+
+    address
+        .char_indices()
+        .fold(String::from("0x"), |mut acc, (index, address_char)| {
+            // this cannot fail since it's Keccak256 hashed
+            let n = u16::from_str_radix(&address_hash[index..index + 1], 16).unwrap();
+
+            if n > 7 {
+                // make char uppercase if ith character is 9..f
+                acc.push_str(&address_char.to_uppercase().to_string())
+            } else {
+                // already lowercased
+                acc.push(address_char)
+            }
+
+            acc
+        })
+}
+
+/// write the Eth SECP256K1 secret key to a secure file using the derived 
+/// Eth wallet address as the file name
+fn save_eth_key(sk: EthSecretKey, pk: EthPublicKey) -> EthPublicKey {
+    // convert the pk to an eth address
+    let addr = pk_to_eth_addr(&pk);
+    println!("new enclave address: {}", addr);
+
+    let sk_hex = hex::encode(sk.serialize());
+    println!("debug sk_hex: {:?}", sk_hex);
+
+    assert!(write_key(&addr, &sk_hex).is_ok());
+
+    pk
+}
 
 /// Generates a new BLS secret key from randomness
 pub fn new_bls_key() -> SecretKey {
@@ -85,7 +175,7 @@ fn bls_sign(pk_hex: &String, msg: &[u8]) -> Signature {
     let pk = PublicKey::from_bytes(&pk_bytes).expect("bad pk bytes");
 
     // read sk
-    let sk = read_key(&pk_hex).expect("Unable to read key");
+    let sk = read_bls_key(&pk_hex).expect("Unable to read key");
 
     // valid keypair
     assert!(sk.sk_to_pk() == pk);
@@ -101,21 +191,29 @@ fn bls_sign(pk_hex: &String, msg: &[u8]) -> Signature {
     sig
 }
 
-/// Writes the hex-encoded secret key to a file named from `pk_hex`
-pub fn write_key(pk_hex: &String, sk_hex: &String) -> std::io::Result<()> {
-    let file_path: PathBuf = ["./etc/keys/", pk_hex.as_str()].iter().collect();
+/// Writes the hex-encoded secret key to a file named from `fname`
+pub fn write_key(fname: &String, sk_hex: &String) -> std::io::Result<()> {
+    let file_path: PathBuf = ["./etc/keys/", fname.as_str()].iter().collect();
     if let Some(p) = file_path.parent() { 
         fs::create_dir_all(p)?
     }; 
     fs::write(&file_path, sk_hex)
 }
 
-/// Reads hex-encoded secret key from a file named from `pk_hex` and converts it to SecretKey
-pub fn read_key(pk_hex: &String) -> Result<SecretKey, BLST_ERROR> {
+/// Reads hex-encoded secret key from a file named from `pk_hex` and converts it to  a BLS SecretKey
+pub fn read_bls_key(pk_hex: &String) -> Result<SecretKey, BLST_ERROR> {
     let file_path: PathBuf = ["./etc/keys/", pk_hex.as_str()].iter().collect();
     let sk_rec_bytes = fs::read(&file_path).expect("Unable to read key");
     let sk_rec_dec = hex::decode(sk_rec_bytes).expect("Unable to decode hex");
     SecretKey::from_bytes(&sk_rec_dec)
+}
+
+/// Reads hex-encoded secret key from a file named from `pk_hex` and converts it to an Eth SecretKey
+pub fn read_eth_key(fname: &String) -> EthSecretKey {
+    let file_path: PathBuf = ["./etc/keys/", fname.as_str()].iter().collect();
+    let sk_rec_bytes = fs::read(&file_path).expect("Unable to read key");
+    let sk_rec_dec = hex::decode(sk_rec_bytes).expect("Unable to decode hex");
+    EthSecretKey::parse_slice(&sk_rec_dec).expect("couldn't parse eth sk_bytes")
 }
 
 /// todo error handling
@@ -127,7 +225,6 @@ pub fn list_keys() -> Vec<String> {
         pk_hex.to_os_string().into_string().unwrap()
     }).collect()
 }
-
 
 #[derive(Deserialize, Serialize)]
 pub struct KeyGenResponseInner {
@@ -277,6 +374,52 @@ mod tests {
         let msg = b"yadayada";
         let sig = bls_sign(&pk_hex, msg);
         assert!(verify_bls_sig(sig, pk, msg));
+    }
+
+    #[test]
+    fn eth_key_gen_encryption_works() {
+        let (sk, pk) = new_eth_key();
+        let msg = b"yadayada";
+
+        // encrypt msg
+        let ct = match encrypt(&pk.serialize(), msg) {
+            Ok(ct) => ct,
+            Err(_) => panic!("Couldn't encrypt msg")
+        };
+
+        // decrpyt msg
+        let data = match decrypt(&sk.serialize(), &ct) {
+            Ok(pt) => pt,
+            Err(_) => panic!("Couldn't decrypt msg")
+        };
+
+        assert_eq!(msg.to_vec(), data);
+    }
+
+    #[test]
+    fn eth_key_gen_key_management() {
+        // gen key and save it to file
+        let pk = eth_key_gen();
+        // rederive eth wallet address filename
+        let addr = pk_to_eth_addr(&pk);
+        // read sk from file
+        let sk = read_eth_key(&addr);
+
+        let msg = b"yadayada";
+
+        // encrypt msg
+        let ct = match encrypt(&pk.serialize(), msg) {
+            Ok(ct) => ct,
+            Err(_) => panic!("Couldn't encrypt msg")
+        };
+
+        // decrpyt msg
+        let data = match decrypt(&sk.serialize(), &ct) {
+            Ok(pt) => pt,
+            Err(_) => panic!("Couldn't decrypt msg")
+        };
+
+        assert_eq!(msg.to_vec(), data);
     }
 
     #[test]
@@ -431,5 +574,51 @@ mod tests {
 
         // should panic
         aggregate_non_uniform_bls_sigs(sigs_refs, pks_refs, msgs_refs);
+    }
+
+    #[test]
+    fn test_distribute_encrypted_bls_keys() {
+        // number of nodes
+        const n: usize = 10;
+
+        // generate n eth keys
+        let eth_pks: Vec<EthPublicKey> = (0..n).into_iter()
+            .map(|_| eth_key_gen()).collect();
+
+        // derive n eth wallet addresses
+        let eth_addrs: Vec<String> = eth_pks.iter()
+            .map(|pk| pk_to_eth_addr(pk)).collect();
+
+        // lookup n eth secret keys
+        let eth_sks: Vec<EthSecretKey> = eth_addrs.iter()
+            .map(|addr| read_eth_key(addr)).collect();
+
+        // generate n BLS keys
+        let (agg_pk, bls_sks) = dist_bls_key_gen(n);
+
+        // encrypt each bls sk
+        let ct_bls_sks: Vec<Vec<u8>> = eth_pks
+            .iter()
+            .zip(bls_sks.iter())
+            .map(|(eth_pk, bls_sk)| {
+                encrypt(&eth_pk.serialize(), &bls_sk.serialize()).expect("Could not encrpyt bls sk")
+            }).collect();
+
+        // decrypt each encrypted bls sk
+        let pt_bls_sks: Vec<SecretKey> = eth_sks
+            .iter()
+            .zip(ct_bls_sks.iter())
+            .map(|(eth_sk, ct_bls_sk)| {
+                let sk_bytes = decrypt(&eth_sk.serialize(), &ct_bls_sk).expect("Could not encrpyt bls sk");
+                SecretKey::from_bytes(&sk_bytes).expect("couldnt convert to BLS key")
+            }).collect();
+        
+        // verify we decrypted the correct BLS secret key
+        pt_bls_sks
+            .iter()
+            .zip(bls_sks.iter())
+            .for_each(|(sk_got, sk_exp)| {
+                assert_eq!(sk_got.serialize(), sk_exp.serialize())
+            });
     }
 }
