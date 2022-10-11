@@ -10,6 +10,7 @@ use rand_chacha::ChaCha20Rng;
 
 pub const CIPHER_SUITE: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_";
 
+/// Generates a new BLS secret key from randomness
 pub fn new_bls_key() -> SecretKey {
     // rng
     let mut rng = ChaCha20Rng::from_entropy();
@@ -20,6 +21,7 @@ pub fn new_bls_key() -> SecretKey {
     SecretKey::key_gen(&ikm, &[]).expect("Unable to generate SecretKey")
 }
 
+/// Generates and saves BLS secret key, using derived pk_hex as file identifier (omitting '0x' prefix)
 pub fn bls_key_gen() -> PublicKey {
     let sk = new_bls_key();
     let pk = sk.sk_to_pk();
@@ -36,6 +38,34 @@ pub fn bls_key_gen() -> PublicKey {
     pk
 }
 
+/// Generates `n` BLS secret keys and derives one `n/n` aggregate public key from it
+pub fn dist_bls_key_gen(n: usize) -> (AggregatePublicKey, Vec<SecretKey>) {
+    // generate n sks
+    let sks: Vec<SecretKey> = (0..n).map(|_| {
+        let sk = new_bls_key();
+        println!("sk: {:?}", hex::encode(sk.to_bytes()));
+        sk
+    }).collect();
+
+    // derive n pks
+    let pks: Vec<PublicKey> = sks.iter().map(|sk| {
+        let pk = sk.sk_to_pk();
+        println!("pk: {:?}", hex::encode(pk.to_bytes()));
+        pk
+    }).collect();
+    let pks_refs: Vec<&PublicKey> = pks.iter().map(|pk| pk) .collect();
+
+    // aggregate the n BLS public keys into 1 aggregate pk
+    let agg_pk = match AggregatePublicKey::aggregate(&pks_refs, true) {
+        Ok(agg) => agg,
+        Err(err) => panic!("aggregate failure: {:?}", err),
+    };
+    println!("agg_pk: {:?}", hex::encode(agg_pk.to_public_key().to_bytes()));
+
+    (agg_pk, sks)
+}
+
+/// Returns true if `sig` is a valid BLS signature 
 pub fn verify_bls_sig(sig: Signature, pk: PublicKey, msg: &[u8]) -> bool {
     let err = sig.verify(
         true, // sig_groupcheck
@@ -43,11 +73,12 @@ pub fn verify_bls_sig(sig: Signature, pk: PublicKey, msg: &[u8]) -> bool {
         CIPHER_SUITE, // dst
         &[], // aug
         &pk, // pk
-        false); // pk_validate 
-
+        true); // pk_validate 
     err == BLST_ERROR::BLST_SUCCESS
 }
 
+/// Performs BLS signnature on `msg` using the BLS secret key looked up from memory
+/// with pk_hex as the file identifier. 
 fn bls_sign(pk_hex: &String, msg: &[u8]) -> Signature {
     // read pk
     let pk_bytes = hex::decode(pk_hex).expect("bad pk hex string");
@@ -70,6 +101,7 @@ fn bls_sign(pk_hex: &String, msg: &[u8]) -> Signature {
     sig
 }
 
+/// Writes the hex-encoded secret key to a file named from `pk_hex`
 pub fn write_key(pk_hex: &String, sk_hex: &String) -> std::io::Result<()> {
     let file_path: PathBuf = ["./etc/keys/", pk_hex.as_str()].iter().collect();
     if let Some(p) = file_path.parent() { 
@@ -78,6 +110,7 @@ pub fn write_key(pk_hex: &String, sk_hex: &String) -> std::io::Result<()> {
     fs::write(&file_path, sk_hex)
 }
 
+/// Reads hex-encoded secret key from a file named from `pk_hex` and converts it to SecretKey
 pub fn read_key(pk_hex: &String) -> Result<SecretKey, BLST_ERROR> {
     let file_path: PathBuf = ["./etc/keys/", pk_hex.as_str()].iter().collect();
     let sk_rec_bytes = fs::read(&file_path).expect("Unable to read key");
@@ -94,7 +127,6 @@ pub fn list_keys() -> Vec<String> {
         pk_hex.to_os_string().into_string().unwrap()
     }).collect()
 }
-
 
 
 #[derive(Deserialize, Serialize)]
@@ -173,6 +205,65 @@ pub fn list_keys_route() -> impl Filter<Extract = impl warp::Reply, Error = warp
     key_gen
 }
 
+pub fn aggregate_uniform_bls_sigs(agg_pk: AggregatePublicKey, sigs: Vec<&Signature>, 
+    msg: &[u8]) -> BLST_ERROR {
+    let n = sigs.len();
+    assert!(n > 0);
+
+    // aggregate the n signatures into 1 
+    let agg = match AggregateSignature::aggregate(&sigs, true) {
+        Ok(agg) => agg,
+        Err(err) => return err,
+    };
+    let agg_sig = agg.to_signature();
+    println!("agg_sig: {:?}", hex::encode(agg_sig.to_bytes()));
+
+    // verify the aggregate signature using the aggregate pk
+    // (ASSUMES msgs are identical)
+    agg_sig.verify(false, msg, CIPHER_SUITE, &[], &agg_pk.to_public_key(), false)
+}
+
+pub fn aggregate_non_uniform_bls_sigs(sigs: Vec<&Signature>, pks: Vec<&PublicKey>, 
+    msgs: Vec<&[u8]>) -> BLST_ERROR {
+    let n = sigs.len();
+    assert!(n > 0);
+    assert_eq!(n, pks.len());
+    assert_eq!(n, msgs.len());
+
+    // verify each signature against the public key in order
+    let errs = sigs
+        .iter()
+        .zip(msgs.iter())
+        .zip(pks.iter())
+        .map(|((s, m), pk)| {
+            s.verify(
+                true,
+                m, 
+                CIPHER_SUITE, 
+                &[], 
+                pk, 
+                true)
+        })
+        .collect::<Vec<BLST_ERROR>>();
+
+    // check any errors
+    if errs != vec![BLST_ERROR::BLST_SUCCESS; n] {
+        return BLST_ERROR::BLST_VERIFY_FAIL;
+    }
+
+    // aggregate the n signatures into 1 
+    let agg = match AggregateSignature::aggregate(&sigs, true) {
+        Ok(agg) => agg,
+        Err(err) => return err,
+    };
+    let agg_sig = agg.to_signature();
+    println!("agg_sig: {:?}", hex::encode(agg_sig.to_bytes()));
+
+    // verify the aggregate sig using aggregate_verify
+    agg_sig
+        .aggregate_verify(false, &msgs, CIPHER_SUITE, &pks, false)
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -189,30 +280,100 @@ mod tests {
     }
 
     #[test]
-    fn test_aggregate() {
+    fn test_aggregate_uniform_msgs() {
         // number of nodes
         const n: usize = 10;
 
-        // n identical msgs
-        let msgs = vec![b"yadayada"; n];
-        let msgs_refs: Vec<&[u8]> = msgs.iter().map(|m| m.as_slice()).collect();
+        let mut rng = ChaCha20Rng::from_entropy();
+        let mut msg =[0u8; 256 as usize];
+        rng.fill_bytes(&mut msg);
+        println!("msg: {:?}", msg);
 
-        // generate n sks
-        let sks: Vec<SecretKey> = (0..n).map(|_| {
-            let sk = new_bls_key();
-            println!("sk: {:?}", hex::encode(sk.to_bytes()));
-            sk
-        }).collect();
+        let (agg_pk, sks) = dist_bls_key_gen(n);
 
         // derive n pks
         let pks: Vec<PublicKey> = sks.iter().map(|sk| {
             let pk = sk.sk_to_pk();
-            println!("pk: {:?}", hex::encode(pk.to_bytes()));
+            // println!("pk: {:?}", hex::encode(pk.to_bytes()));
+            pk
+        }).collect();
+
+        // each node signs identical msg
+        let sigs: Vec<Signature> = sks
+            .iter()
+            .map(|sk| {
+            let sig = sk.sign(&msg, CIPHER_SUITE, &[]);
+            println!("sig: {:?}", hex::encode(sig.to_bytes()));
+            sig
+        }).collect();
+        let sigs_refs = sigs.iter().map(|s| s).collect::<Vec<&Signature>>();
+
+        assert_eq!(aggregate_uniform_bls_sigs(agg_pk, sigs_refs, &msg), BLST_ERROR::BLST_SUCCESS);
+    }
+
+    #[test]
+    fn test_aggregate_uniform_msgs_fails_if_less_than_n_sigs() {
+        // number of nodes
+        const n: usize = 10;
+
+        let mut rng = ChaCha20Rng::from_entropy();
+        let mut msg =[0u8; 256 as usize];
+        rng.fill_bytes(&mut msg);
+        println!("msg: {:?}", msg);
+
+        let (agg_pk, sks) = dist_bls_key_gen(n);
+
+        // derive n pks
+        let pks: Vec<PublicKey> = sks.iter().map(|sk| {
+            let pk = sk.sk_to_pk();
+            // println!("pk: {:?}", hex::encode(pk.to_bytes()));
+            pk
+        }).collect();
+
+        // each node signs identical msg
+        let sigs: Vec<Signature> = sks
+            .iter()
+            .map(|sk| {
+            let sig = sk.sign(&msg, CIPHER_SUITE, &[]);
+            println!("sig: {:?}", hex::encode(sig.to_bytes()));
+            sig
+        }).collect();
+        let mut sigs_refs = sigs.iter().map(|s| s).collect::<Vec<&Signature>>();
+
+        // Drop the last signature to force a failure
+        sigs_refs.truncate(n - 1);
+        assert_eq!(sigs_refs.len(), n - 1);
+
+        assert_eq!(aggregate_uniform_bls_sigs(agg_pk, sigs_refs, &msg), BLST_ERROR::BLST_VERIFY_FAIL);
+    }
+
+    #[test]
+    fn test_aggregate_non_uniform_bls_sigs() {
+        // number of nodes
+        const n: usize = 10;
+
+        let mut rng = ChaCha20Rng::from_entropy();
+        let mut msgs: Vec<Vec<u8>> = vec![vec![]; n];
+        for i in 0..n {
+            let msg_len = (rng.next_u64() & 0x3F) + 1;
+            msgs[i] = vec![0u8; msg_len as usize];
+            rng.fill_bytes(&mut msgs[i]);
+            println!("msg: {:?}", msgs[i]);
+        }
+
+        let msgs_refs: Vec<&[u8]> = msgs.iter().map(|m| m.as_slice()).collect();
+
+        let (agg_pk, sks) = dist_bls_key_gen(n);
+
+        // derive n pks
+        let pks: Vec<PublicKey> = sks.iter().map(|sk| {
+            let pk = sk.sk_to_pk();
+            // println!("pk: {:?}", hex::encode(pk.to_bytes()));
             pk
         }).collect();
         let pks_refs: Vec<&PublicKey> = pks.iter().map(|pk| pk) .collect();
 
-        // each node signs identical msg
+        // each node signs different msg
         let sigs: Vec<Signature> = sks
             .iter()
             .zip(msgs.clone().into_iter())
@@ -223,38 +384,52 @@ mod tests {
         }).collect();
         let sigs_refs = sigs.iter().map(|s| s).collect::<Vec<&Signature>>();
 
-        // verify signatures
-        let errs = sigs
+        assert_eq!(aggregate_non_uniform_bls_sigs(sigs_refs, pks_refs, msgs_refs), BLST_ERROR::BLST_SUCCESS);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_aggregate_non_uniform_bls_sigs_fails_if_less_than_n_sigs() {
+        // number of nodes
+        const n: usize = 10;
+
+        let mut rng = ChaCha20Rng::from_entropy();
+        let mut msgs: Vec<Vec<u8>> = vec![vec![]; n];
+        for i in 0..n {
+            let msg_len = (rng.next_u64() & 0x3F) + 1;
+            msgs[i] = vec![0u8; msg_len as usize];
+            rng.fill_bytes(&mut msgs[i]);
+            println!("msg: {:?}", msgs[i]);
+        }
+
+        let msgs_refs: Vec<&[u8]> = msgs.iter().map(|m| m.as_slice()).collect();
+
+        let (agg_pk, sks) = dist_bls_key_gen(n);
+
+        // derive n pks
+        let pks: Vec<PublicKey> = sks.iter().map(|sk| {
+            let pk = sk.sk_to_pk();
+            // println!("pk: {:?}", hex::encode(pk.to_bytes()));
+            pk
+        }).collect();
+        let pks_refs: Vec<&PublicKey> = pks.iter().map(|pk| pk) .collect();
+
+        // each node signs different msg
+        let sigs: Vec<Signature> = sks
             .iter()
-            .zip(msgs.into_iter())
-            .zip(pks.iter())
-            .map(|((s, m), pk)| (s.verify(true, m, CIPHER_SUITE, &[], pk, true)))
-            .collect::<Vec<BLST_ERROR>>();
-                assert_eq!(errs, vec![BLST_ERROR::BLST_SUCCESS; n]);
+            .zip(msgs.clone().into_iter())
+            .map(|(sk, msg)| {
+            let sig = sk.sign(msg.as_slice(), CIPHER_SUITE, &[]);
+            println!("sig: {:?}", hex::encode(sig.to_bytes()));
+            sig
+        }).collect();
+        let mut sigs_refs = sigs.iter().map(|s| s).collect::<Vec<&Signature>>();
 
-        // aggregate the n BLS public keys into 1 aggregate pk
-        let agg_pk = match AggregatePublicKey::aggregate(&pks_refs, true) {
-            Ok(agg) => agg,
-            Err(err) => panic!("aggregate failure: {:?}", err),
-        };
-        println!("agg_pk: {:?}", hex::encode(agg_pk.to_public_key().to_bytes()));
-        
-        // aggregate the n signatures into 1 
-        let agg = match AggregateSignature::aggregate(&sigs_refs, true) {
-            Ok(agg) => agg,
-            Err(err) => panic!("aggregate failure: {:?}", err),
-        };
+        // Drop the last signature to force a failure
+        sigs_refs.truncate(n - 1);
+        assert_eq!(sigs_refs.len(), n - 1);
 
-        let agg_sig = agg.to_signature();
-        println!("agg_sig: {:?}", hex::encode(agg_sig.to_bytes()));
-
-        // verify the aggregate sig using aggregate_verify
-        let mut result = agg_sig
-            .aggregate_verify(false, &msgs_refs, CIPHER_SUITE, &pks_refs, false);
-        assert_eq!(result, BLST_ERROR::BLST_SUCCESS);
-
-        // verify the aggregate signature using the aggregate pk
-        result = agg_sig.verify(false, msgs_refs[0], CIPHER_SUITE, &[], &agg_pk.to_public_key(), false);
-        assert_eq!(result, BLST_ERROR::BLST_SUCCESS);
+        // should panic
+        aggregate_non_uniform_bls_sigs(sigs_refs, pks_refs, msgs_refs);
     }
 }
