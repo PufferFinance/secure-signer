@@ -1,17 +1,3 @@
-extern crate libc;
-extern crate serde;
-extern crate serde_json;
-extern crate serde_derive;
-extern crate hex;
-extern crate blst;
-extern crate rand;
-extern crate warp;
-extern crate tokio;
-extern crate ethabi;
-extern crate ethereum_tx_sign;
-extern crate ecies;
-extern crate sha3;
-
 mod attest;
 mod keys;
 
@@ -31,7 +17,7 @@ use blst::BLST_ERROR;
 //}
 
 // Use this func sig for local development
-fn do_epid_ra(data: *const u8, report: *mut c_char, signature: *mut c_char, signing_cert: *mut c_char) {}
+pub fn do_epid_ra(data: *const u8, report: *mut c_char, signature: *mut c_char, signing_cert: *mut c_char) {}
 
 
 

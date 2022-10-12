@@ -10,7 +10,7 @@ use ecies::SecretKey as EthSecretKey;
 
 
 use crate::keys;
-use super::do_epid_ra;
+// use super::do_epid_ra;
 
 #[derive(Serialize, Debug)]
 pub struct AttestationProof {
@@ -42,7 +42,7 @@ impl AttestationProof {
 
         unsafe {
             // call cpp EPID remote attestation lib
-            do_epid_ra(&data as *const u8, raw_rpt, raw_sig, raw_cert);
+            // do_epid_ra(&data as *const u8, raw_rpt, raw_sig, raw_cert);
             rpt = CString::from_raw(raw_rpt);
             sig = CString::from_raw(raw_sig);
             cert = CString::from_raw(raw_cert);
