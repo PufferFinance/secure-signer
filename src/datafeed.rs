@@ -1,11 +1,16 @@
-use crate::errors::*;
-
 use reqwest;
+
+use anyhow::{Result, Context, bail};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-pub fn get_request(url: String) -> Result<reqwest::blocking::Response> {
-    Ok(reqwest::blocking::get(url)?)
+pub fn get_request(url: &String) -> Result<reqwest::blocking::Response> {
+    reqwest::blocking::get(url).with_context(|| "Failed GET reqwest")
+}
+
+pub fn post_request_no_body(url: &String) -> Result<reqwest::blocking::Response> {
+    let client = reqwest::blocking::Client::new();
+    client.post(url).send().with_context(|| "Failed POST reqwest with no body")
 }
 
 #[derive(Debug)]
@@ -36,10 +41,10 @@ pub struct PriceInfo {
 }
 
 pub fn coindesk_usd_feed(url: String) -> Result<f64> {
-    let resp = get_request(url)
-        .chain_err(|| "failed GET request")?
+    let resp = get_request(&url)
+        .with_context(|| format!("failed GET request to URL: {}", url))?
         .json::<CoinDeskResp>()
-        .chain_err(|| "could not parse json response")?;
+        .with_context(|| format!("could not parse json response from  URL: {}", url))?;
     println!("{:#?}", resp);
 
     let rate = resp.bpi["USD"].rate_float;
@@ -48,35 +53,10 @@ pub fn coindesk_usd_feed(url: String) -> Result<f64> {
 
 pub fn get_btc_price_feed() -> Result<()> {
     let url = format!("https://api.coindesk.com/v1/bpi/currentprice.json");
-    let rate = coindesk_usd_feed(url).chain_err(|| "could not fetch rate")?;
+    let rate = coindesk_usd_feed(url.clone()).with_context(|| format!("could not fetch rate from url: {}", url))?;
     println!("Got rate: {}", rate);
     Ok(())
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 fn get_data(url: String) -> String {
     String::from("Here is some data")

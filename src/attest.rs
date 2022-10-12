@@ -2,6 +2,7 @@ use warp::{Filter, http::Response};
 
 use std::ffi::CString;
 use std::fmt;
+use anyhow::{Result, Context, bail};
 
 use serde_json::{json};
 use serde_derive::{Deserialize, Serialize};
@@ -74,12 +75,14 @@ impl fmt::Display for AttestationProof {
     }
 }
 
-pub fn epid_remote_attestation(pk_hex: &String) {
-    let sk = keys::read_eth_key(pk_hex);
+pub fn epid_remote_attestation(pk_hex: &String) -> Result<()> {
+    let sk = keys::read_eth_key(pk_hex)?;
     let proof = AttestationProof::new(
         EthPublicKey::from_secret_key(&sk).serialize_compressed()
     );
     println!("{:?}", proof.signed_report);
+    // todo 
+    unimplemented!()
 }
 
 /// TODO
