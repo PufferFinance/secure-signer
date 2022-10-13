@@ -1,16 +1,17 @@
 use reqwest;
+use warp::{Filter, http::Response, http::StatusCode};
 
 use anyhow::{Result, Context, bail};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-pub fn get_request(url: &String) -> Result<reqwest::blocking::Response> {
-    reqwest::blocking::get(url).with_context(|| "Failed GET reqwest")
+pub async fn get_request(url: &String) -> Result<reqwest::Response> {
+    reqwest::get(url).await.with_context(|| "Failed GET reqwest")
 }
 
-pub fn post_request_no_body(url: &String) -> Result<reqwest::blocking::Response> {
-    let client = reqwest::blocking::Client::new();
-    client.post(url).send().with_context(|| "Failed POST reqwest with no body")
+pub async fn post_request_no_body(url: &String) -> Result<reqwest::Response> {
+    let client = reqwest::Client::new();
+    client.post(url).send().await.with_context(|| "Failed POST reqwest with no body")
 }
 
 #[derive(Debug)]
@@ -40,10 +41,13 @@ pub struct PriceInfo {
     pub rate_float: f64,
 }
 
-pub fn coindesk_usd_feed(url: String) -> Result<f64> {
+/// makes a GET reqwest to coin
+pub async fn coindesk_usd_feed(url: String) -> Result<f64> {
     let resp = get_request(&url)
+        .await
         .with_context(|| format!("failed GET request to URL: {}", url))?
         .json::<CoinDeskResp>()
+        .await
         .with_context(|| format!("could not parse json response from  URL: {}", url))?;
     println!("{:#?}", resp);
 
@@ -51,11 +55,20 @@ pub fn coindesk_usd_feed(url: String) -> Result<f64> {
     Ok(rate)
 }
 
-pub fn get_btc_price_feed() -> Result<()> {
+pub async fn get_btc_price_feed() -> Result<impl warp::Reply, warp::Rejection> {
     let url = format!("https://api.coindesk.com/v1/bpi/currentprice.json");
-    let rate = coindesk_usd_feed(url.clone()).with_context(|| format!("could not fetch rate from url: {}", url))?;
-    println!("Got rate: {}", rate);
-    Ok(())
+    match coindesk_usd_feed(url.clone()).await {
+        Ok((price)) => {
+            let mut resp = HashMap::new();
+            resp.insert("price", price);
+            Ok(warp::reply::with_status(warp::reply::json(&resp), warp::http::StatusCode::OK))
+        }
+        Err(e) => {
+            let mut resp = HashMap::new();
+            resp.insert("error", e.to_string());
+            Ok(warp::reply::with_status(warp::reply::json(&resp), warp::http::StatusCode::INTERNAL_SERVER_ERROR))
+        }
+    }
 }
 
 fn get_data(url: String) -> String {

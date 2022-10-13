@@ -13,7 +13,11 @@ use ecies::SecretKey as EthSecretKey;
 use crate::keys;
 // use super::do_epid_ra;
 
-#[derive(Serialize, Debug)]
+// Use this func sig for local development
+use std::os::raw::c_char;
+pub fn do_epid_ra(data: *const u8, report: *mut c_char, signature: *mut c_char, signing_cert: *mut c_char) {}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct AttestationProof {
     pub raw_report:    String,
     pub signed_report: String,
@@ -43,7 +47,7 @@ impl AttestationProof {
 
         unsafe {
             // call cpp EPID remote attestation lib
-            // do_epid_ra(&data as *const u8, raw_rpt, raw_sig, raw_cert);
+            do_epid_ra(&data as *const u8, raw_rpt, raw_sig, raw_cert);
             rpt = CString::from_raw(raw_rpt);
             sig = CString::from_raw(raw_sig);
             cert = CString::from_raw(raw_cert);

@@ -16,13 +16,6 @@ use blst::BLST_ERROR;
 //    fn do_epid_ra(data: *const u8, report: *mut c_char, signature: *mut c_char, signing_cert: *mut c_char);
 //}
 
-// Use this func sig for local development
-pub fn do_epid_ra(data: *const u8, report: *mut c_char, signature: *mut c_char, signing_cert: *mut c_char) {}
-
-
-
-
-
 
 
 #[tokio::main]
