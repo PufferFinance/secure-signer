@@ -1,6 +1,4 @@
 use anyhow::{Result, Context, bail};
-use serde_derive::{Deserialize, Serialize};
-use warp::{Filter, http::Response};
 
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
@@ -255,7 +253,7 @@ pub fn read_eth_key(fname: &String) -> Result<EthSecretKey> {
 
 /// Returns the file names of each of the saved secret keys, where each fname
 /// is assumed to be the compressed public key in hex without the `0x` prefix.
-pub fn list_keys() -> Result<Vec<String>> {
+pub fn list_bls_keys() -> Result<Vec<String>> {
     let paths = fs::read_dir("./etc/keys/").with_context(|| "No keys saved in dir")?;
 
     let mut keys: Vec<String> = Vec::new();
@@ -275,87 +273,6 @@ pub fn list_keys() -> Result<Vec<String>> {
         }
     }
     Ok(keys)
-}
-
-#[derive(Debug)]
-#[derive(Deserialize, Serialize)]
-pub struct KeyGenResponseInner {
-    pub status: String,
-    pub message: String,
-}
-
-#[derive(Debug)]
-#[derive(Deserialize, Serialize)]
-pub struct KeyGenResponse {
-    pub data: [KeyGenResponseInner; 1],
-}
-
-pub fn key_gen_service() -> Result<KeyGenResponse> {
-    let pk = bls_key_gen()?;
-    let pk_hex = hex::encode(pk.compress());
-    let data = KeyGenResponseInner { status: "imported".to_string(), message: pk_hex};
-    Ok(KeyGenResponse { data: [data] })
-}
-
-/// Generates a new BLS private key in Enclave. To remain compatible with web3signer POST /eth/v1/keystores, the JSON body is not parsed. The BLS public key is returned 
-pub fn key_gen_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    let key_gen = warp::post()
-        .and(warp::path("portal"))
-        .and(warp::path("v1"))
-        .and(warp::path("keystores"))
-        .map(|| {
-            /// TODOOO
-            let resp = key_gen_service().expect("TODO HANDLE ERROR-CHAIN in routes");
-            warp::reply::with_status(warp::reply::json(&resp), warp::http::StatusCode::OK)
-
-            // todo add unhappy cases
-    });
-    key_gen
-}
-
-
-#[derive(Debug)]
-#[derive(Deserialize, Serialize)]
-pub struct ListKeysResponseInner {
-    pub pubkey: String,
-}
-
-#[derive(Debug)]
-#[derive(Deserialize, Serialize)]
-pub struct ListKeysResponse {
-    pub data: Vec<ListKeysResponseInner>,
-}
-
-impl ListKeysResponse {
-    pub fn new(keys: Vec<String>) -> ListKeysResponse {
-        let inners = keys.iter().map(|pk| {
-            ListKeysResponseInner {
-                pubkey: format!("0x{}", pk),
-            }
-        }).collect();
-
-        ListKeysResponse {
-            data: inners
-        }
-    }
-}
-
-/// Returns the hex-encoded BLS public keys that have their corresponding secret keys safeguarded in Enclave memory. 
-pub fn list_keys_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    let key_gen = warp::get()
-        .and(warp::path("portal"))
-        .and(warp::path("v1"))
-        .and(warp::path("keystores"))
-        .map(|| {
-            let pks = list_keys().unwrap(); // TODOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO use anyhow error
-            let resp = ListKeysResponse::new(pks);
-            warp::reply::with_status(warp::reply::json(&resp), warp::http::StatusCode::OK)
-
-            // todo add unhappy cases
-
-            // todo add derivation_path
-    });
-    key_gen
 }
 
 pub fn aggregate_uniform_bls_sigs(agg_pk: AggregatePublicKey, sigs: Vec<&Signature>, 

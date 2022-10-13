@@ -1,13 +1,11 @@
 mod attest;
 mod keys;
+mod common_api;
 
 // deps
 use std::os::raw::c_char;
-use keys::list_keys;
 use serde_derive::{Deserialize, Serialize};
 use warp::{Filter, http::Response};
-use blst::min_pk::{SecretKey, PublicKey, Signature};
-use blst::BLST_ERROR;
 
 
 //#[link(name = "epid")]
@@ -16,18 +14,16 @@ use blst::BLST_ERROR;
 //    fn do_epid_ra(data: *const u8, report: *mut c_char, signature: *mut c_char, signing_cert: *mut c_char);
 //}
 
+const LEADER_PORT: u16 = 3030;
 
 
 #[tokio::main]
 async fn main() {
-    let port = 3030;
-    println!("Starting leader enclave HTTP server");
-    let routes = keys::key_gen_route()
-        .or(keys::list_keys_route())
-        .or(attest::epid_remote_attestation_route());
-    warp::serve(routes).run(([127, 0, 0, 1], port)).await
-
-    // let url = String::from("http://google.com");
+    println!("Starting leader enclave HTTP server on port {}", LEADER_PORT);
+    let routes = common_api::bls_key_gen_route()
+        .or(common_api::list_bls_keys_route())
+        .or(common_api::epid_remote_attestation_route());
+    warp::serve(routes).run(([127, 0, 0, 1], LEADER_PORT)).await
 }
 
 #[cfg(test)]
@@ -36,7 +32,7 @@ mod tests {
 
     #[test]
     fn run_key_gen_route() {
-        let keys = keys::list_keys();
+        // let keys = k::list_keys();
         //todo
         assert!(false);
     }

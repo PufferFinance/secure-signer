@@ -1,13 +1,10 @@
-use warp::{Filter, http::Response};
+
+use anyhow::{Result, Context, bail};
+use serde_derive::{Deserialize, Serialize};
+use ecies::PublicKey as EthPublicKey;
 
 use std::ffi::CString;
 use std::fmt;
-use anyhow::{Result, Context, bail};
-
-use serde_json::{json};
-use serde_derive::{Deserialize, Serialize};
-use ecies::PublicKey as EthPublicKey;
-use ecies::SecretKey as EthSecretKey;
 
 
 use crate::keys;
@@ -18,14 +15,15 @@ use std::os::raw::c_char;
 pub fn do_epid_ra(data: *const u8, report: *mut c_char, signature: *mut c_char, signing_cert: *mut c_char) {}
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct AttestationProof {
+pub struct AttestationEvidence {
     pub raw_report:    String,
     pub signed_report: String,
     pub signing_cert:  String,
 }
 
-impl AttestationProof {
-    pub fn new(data: [u8; 33]) -> AttestationProof {
+impl AttestationEvidence {
+    /// currently accepts a compressed pk (33B) as the data to commit to the report
+    pub fn new(data: [u8; 33]) -> Result<Self> {
 
         // sufficient sized buffers
         let a = [1_u8; 5000].to_vec();
@@ -57,45 +55,19 @@ impl AttestationProof {
         let signed_report  = String::from_utf8(sig.to_bytes().to_vec()).expect("failed to conv to String");
         let signing_cert = String::from_utf8(cert.to_bytes().to_vec()).expect("failed to conv to String");
         
-        AttestationProof {
+        Ok(AttestationEvidence {
             raw_report,
             signed_report,
             signing_cert
-        }
-    }
-
-    pub fn as_json_string(&self) -> String {
-        serde_json::to_string_pretty(&json!({
-            "raw_report": self.raw_report.clone(),
-            "signed_report":  self.signed_report.clone(),
-            "signing_cert": self.signing_cert.clone(),
-        })).expect("fail to turn reports into pretty json")//.to_string()
+        })
     }
 }
 
-impl fmt::Display for AttestationProof {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.as_json_string())
-    }
-}
-
-pub fn epid_remote_attestation(pk_hex: &String) -> Result<()> {
+pub fn epid_remote_attestation(pk_hex: &String) -> Result<AttestationEvidence> {
     let sk = keys::read_eth_key(pk_hex)?;
-    let proof = AttestationProof::new(
+    let proof = AttestationEvidence::new(
         EthPublicKey::from_secret_key(&sk).serialize_compressed()
-    );
+    )?;
     println!("{:?}", proof.signed_report);
-    // todo 
-    unimplemented!()
-}
-
-/// TODO
-pub fn epid_remote_attestation_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    let hi = warp::path("world")
-    .and(warp::path::param())
-    .and(warp::header("user-agent"))
-    .map(|param: String, agent: String| {
-        format!("Hello {}, whose agent is {}", param, agent)
-    });
-    hi
+    Ok(proof)
 }

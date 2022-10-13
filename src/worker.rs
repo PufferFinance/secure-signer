@@ -5,46 +5,22 @@ mod keys;
 mod datafeed;
 mod attest;
 mod worker_api;
+mod common_api;
 
 use anyhow::{Result, Context, bail};
-use datafeed::{get_btc_price_feed, get_request, post_request_no_body};
-use keys::ListKeysResponse;
-
-use warp::{Filter, http::Response};
+use warp::Filter;
 
 
-pub async fn list_keys_request() -> Result<()> {
-    let url = format!("http://localhost:3030/portal/v1/keystores");
-    let resp = get_request(&url)
-        .await
-        .with_context(|| format!("failed GET request to URL: {}", url))?
-        .json::<ListKeysResponse>()
-        .await
-        .with_context(|| format!("could not parse json response from  URL: {}", url))?;
-    println!("{:#?}", resp);
-    Ok(())
-}
+const WORKER_PORT: u16 = 3031;
 
-pub async fn key_gen_request() -> Result<()> {
-    let url = format!("http://localhost:3030/portal/v1/keystores");
-    let resp = post_request_no_body(&url)
-        .await
-        .with_context(|| format!("failed GET request to URL: {}", url))?
-        .json::<keys::KeyGenResponse>()
-        .await
-        .with_context(|| format!("could not parse json response from  URL: {}", url))?;
-    println!("{:#?}", resp);
-    Ok(())
-}
-
-use worker_api::*;
 
 #[tokio::main]
 async fn main() {
-    // list_keys_request().await?;
-    // key_gen_request()?;
-    let port = 3030;
-    println!("Starting worker enclave HTTP server");
-    let route = worker_api::btc_pricefeed_route();
-    warp::serve(route).run(([127, 0, 0, 1], port)).await;
+    println!("Starting worker enclave HTTP server on port {}", WORKER_PORT);
+    let routes = common_api::list_bls_keys_route()
+        .or(common_api::epid_remote_attestation_route())
+        .or(worker_api::btc_pricefeed_route())
+        .or(worker_api::request_list_bls_keys_route())
+        .or(worker_api::request_bls_key_gen_route());
+    warp::serve(routes).run(([127, 0, 0, 1], WORKER_PORT)).await;
 }
