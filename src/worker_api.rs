@@ -16,7 +16,7 @@ pub async fn list_bls_keys_get_request() -> Result<ListKeysResponse> {
         .await
         .with_context(|| format!("could not parse json response from  URL: {}", url))?;
     println!("{:#?}", resp);
-    Ok((resp))
+    Ok(resp)
 }
 
 /// Handles errors and prepares an http response for running `list_bls_keys_get_request`

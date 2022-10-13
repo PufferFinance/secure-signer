@@ -124,7 +124,7 @@ pub fn new_bls_key() -> Result<SecretKey> {
 }
 
 /// Generates and saves BLS secret key, using derived pk_hex as file identifier (omitting '0x' prefix)
-pub fn bls_key_gen() -> Result<PublicKey> {
+pub fn bls_key_gen(save_key: bool) -> Result<PublicKey> {
     let sk = new_bls_key()?;
     let pk = sk.sk_to_pk();
     let pk_bytes: [u8; 48] = sk.sk_to_pk().compress();
@@ -134,9 +134,27 @@ pub fn bls_key_gen() -> Result<PublicKey> {
     let sk_hex: String = hex::encode(sk.to_bytes());
 
     // save secret key using pk_hex as file identifier (omitting '0x' prefix)
-    write_key(&pk_hex, &sk_hex).with_context(|| "failed to save bls key")?;
+    if save_key {
+        write_key(&pk_hex, &sk_hex).with_context(|| "failed to save bls key")?;
+    }
 
     Ok(pk)
+}
+
+/// Generates a BLS secret key then encrypts via ECDH using pk_hex
+// pub fn bls_key_provision(eth_pk_hex: &String) -> Result<(Vec<u8>, PublicKey)> {
+pub fn bls_key_provision(eth_pk_hex: &String) -> Result<(String, PublicKey)> {
+    let sk = new_bls_key()?;
+    let pk = sk.sk_to_pk();
+    let receiver_pub = hex::decode(eth_pk_hex)
+        .with_context(|| format!("couldnt decode eth_pk_hex in bls_key_provision: {}", eth_pk_hex))?;
+
+    let ct_sk_bytes = encrypt(&receiver_pub, &sk.serialize())
+        .with_context(|| format!("Couldn't encrypt bls sk with pk {}", eth_pk_hex))?;
+
+    let ct_sk_hex = hex::encode(ct_sk_bytes);
+
+    Ok((ct_sk_hex, pk))
 }
 
 /// Generates `n` BLS secret keys and derives one `n/n` aggregate public key from it
@@ -343,14 +361,15 @@ pub fn aggregate_non_uniform_bls_sigs(sigs: Vec<&Signature>, pks: Vec<&PublicKey
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ecies::PublicKey as EthPublicKey;
+    use ecies::SecretKey as EthSecretKey;
 
     #[test]
     fn bls_key_gen_produces_valid_keys_and_sig() -> Result<()> {
-        let pk: PublicKey = bls_key_gen()?;
+        let pk: PublicKey = bls_key_gen(true)?;
         let pk_hex = hex::encode(pk.compress());
         let msg = b"yadayada";
         let sig = bls_sign(&pk_hex, msg)?;
-        println!("here");
         verify_bls_sig(sig, pk, msg)?;
         Ok(())
     }
@@ -402,6 +421,31 @@ mod tests {
 
         assert_eq!(msg.to_vec(), data);
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_bls_key_provision() -> Result<()> {
+        // new eth key pair (assumed the requester knows sk)
+        let (sk, pk) = new_eth_key()?;
+
+        let pk_hex = hex::encode(pk.serialize());
+
+        // provision a bls key that is encrypted using ecies and bls_pk
+        let (ct_bls_sk_hex, bls_pk) = bls_key_provision(&pk_hex)?;
+
+        // hex decode
+        let ct_bls_sk = hex::decode(ct_bls_sk_hex)?;
+
+        // requester can decrypt ct_bls_sk
+        let bls_sk_bytes = decrypt(&sk.serialize(), &ct_bls_sk)?;
+
+        // the BLS sk can be recovered from bytes
+        let bls_sk = SecretKey::from_bytes(&bls_sk_bytes).unwrap();
+
+        // assert this recovered bls sk derives the expected bls pk
+        assert_eq!(bls_sk.sk_to_pk(), bls_pk);
+        
         Ok(())
     }
 

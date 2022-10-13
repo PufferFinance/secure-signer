@@ -14,7 +14,7 @@ use crate::keys;
 use std::os::raw::c_char;
 pub fn do_epid_ra(data: *const u8, report: *mut c_char, signature: *mut c_char, signing_cert: *mut c_char) {}
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct AttestationEvidence {
     pub raw_report:    String,
     pub signed_report: String,

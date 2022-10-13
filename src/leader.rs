@@ -23,6 +23,7 @@ async fn main() {
     println!("Starting leader enclave HTTP server on port {}", LEADER_PORT);
     let routes = leader_api::bls_key_gen_route()
         .or(leader_api::list_bls_keys_route())
+        .or(leader_api::bls_key_provision_route())
         .or(common_api::epid_remote_attestation_route());
     warp::serve(routes).run(([127, 0, 0, 1], LEADER_PORT)).await
 }
