@@ -1,5 +1,6 @@
 
 use anyhow::{Result, Context, bail};
+use rand::AsByteSliceMut;
 use serde_derive::{Deserialize, Serialize};
 use ecies::PublicKey as EthPublicKey;
 
@@ -62,6 +63,13 @@ impl AttestationEvidence {
             signing_cert
         })
     }
+
+    /// Verifies attestation evidence IAS signatures
+    pub fn verify_signature(&self) -> Result<()> {
+        unimplemented!()
+    }
+
+
 }
 
 pub fn epid_remote_attestation(pk_hex: &String) -> Result<AttestationEvidence> {
@@ -71,4 +79,107 @@ pub fn epid_remote_attestation(pk_hex: &String) -> Result<AttestationEvidence> {
     )?;
     println!("{:?}", proof.signed_report);
     Ok(proof)
+}
+
+
+#[derive(Serialize, Deserialize, Debug, Default)]
+pub struct AttestationReport {
+    pub id: String,
+    pub timestamp: String,
+    pub version: u32,
+    pub epidPseudonym: String,
+    pub advisoryURL: String,
+    pub advisoryIDs: Vec<String>,
+    pub isvEnclaveQuoteStatus: String,
+    pub isvEnclaveQuoteBody: String,
+}
+
+#[derive(Debug)]
+pub struct QuoteBody {
+    pub VERSION        : u16,
+    pub SIGNATURE_TYPE : u16,
+    pub GID            : u32,
+    pub ISVSVN_QE      : u16,
+    pub ISVSVN_PCE     : u16,
+    pub BASENAME       : Vec<u8>,
+    pub CPUSVN         : Vec<u8>,
+    pub MISCSELECT     : u32,
+    pub ATTRIBUTES     : Vec<u8>,
+    pub MRENCLAVE      : String,
+    pub MRSIGNER       : String,
+    pub ISVPRODID      : u16,
+    pub ISVSVN         : u16,
+    pub REPORTDATA     : Vec<u8>,
+}
+
+impl AttestationReport {
+    /// Follows the API to decode https://api.trustedservices.intel.com/documents/sgx-attestation-api-spec.pdf
+    pub fn deserialize_quote_body(&self) -> Result<QuoteBody> {
+        let body = &self.isvEnclaveQuoteBody;
+        let body_decoded = base64::decode(body)?;
+
+        if body_decoded.len() != 432 {
+            bail!("base64 decoded quote body was not the right length of 432B!")
+        }
+
+        Ok(QuoteBody {
+            VERSION:        u16::from_le_bytes(body_decoded[0..2].try_into()?),
+            SIGNATURE_TYPE: u16::from_le_bytes(body_decoded[2..4].try_into()?) & 1,
+            GID:            u32::from_le_bytes(body_decoded[4..8].try_into()?),
+            ISVSVN_QE:      u16::from_le_bytes(body_decoded[8..10].try_into()?),
+            ISVSVN_PCE:     u16::from_le_bytes(body_decoded[10..12].try_into()?),
+                                         // RESERVED bytes [12..16]
+            BASENAME:                          body_decoded[16..48].to_vec(),
+            CPUSVN:                            body_decoded[48..64].to_vec(),
+            MISCSELECT:     u32::from_le_bytes(body_decoded[64..68].try_into()?),
+                                         // RESERVED bytes [68..96]
+            ATTRIBUTES:                        body_decoded[96..112].to_vec(),
+            MRENCLAVE:      hex::encode(&body_decoded[112..144]),
+            MRSIGNER:       hex::encode(&body_decoded[176..208]),
+                                         // RESERVED bytes [208..304]
+            ISVPRODID:      u16::from_le_bytes(body_decoded[304..306].try_into()?),
+            ISVSVN:         u16::from_le_bytes(body_decoded[306..308].try_into()?),
+                                         // RESERVED bytes [308..368]
+            REPORTDATA:                        body_decoded[368..432].to_vec(),
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    fn fetch_dummy_evidence() -> AttestationEvidence {
+        let data = fs::read_to_string("./attestation_evidence.json").expect("Unable to read file");
+
+        let evidence: AttestationEvidence = serde_json::from_slice(data.as_bytes()).unwrap();
+
+        // println!("{:?}", evidence);
+        evidence
+    }
+
+    #[test]
+    fn test_deserialize_report() -> Result<()>{
+        let evidence = fetch_dummy_evidence();
+        
+        println!("{:?}", evidence.raw_report);
+
+        let report: AttestationReport = serde_json::from_slice(evidence.raw_report.as_bytes()).unwrap();
+
+        println!("{:?}", report);
+
+        let body = report.deserialize_quote_body()?;
+        println!("{:?}", body);
+
+        let pk_bytes = &body.REPORTDATA[0..33];
+
+        // let pk = EthPublicKey::from(pk_bytes);
+        let pk = EthPublicKey::parse_slice(pk_bytes, None)?;
+
+        println!("recovered mrenclave from quote {:?}", body.MRENCLAVE);
+        println!("recovered mrsigner from quote {:?}", body.MRSIGNER);
+        println!("recovered pk from report data {:?}", pk);
+        Ok(())
+    }
 }

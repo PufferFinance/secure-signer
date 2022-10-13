@@ -158,6 +158,16 @@ mod tests {
     use crate::attest::{AttestationEvidence};
     use ecies::{decrypt};
     use blst::min_pk::{SecretKey, PublicKey, Signature};
+    use std::fs;
+
+    fn fetch_dummy_evidence() -> AttestationEvidence {
+        let data = fs::read_to_string("./attestation_evidence.json").expect("Unable to read file");
+
+        let evidence: AttestationEvidence = serde_json::from_slice(data.as_bytes()).unwrap();
+
+        println!("{:?}", evidence);
+        evidence
+    }
 
     #[tokio::test]
     async fn test_bls_key_provision_route() {
@@ -168,7 +178,8 @@ mod tests {
 
         let eth_pk_hex = hex::encode(pk.serialize());
 
-        let evidence = AttestationEvidence::default();
+        // let evidence = AttestationEvidence::default();
+        let evidence = fetch_dummy_evidence();
 
         let req = KeyProvisionRequest {
             eth_pk_hex,
