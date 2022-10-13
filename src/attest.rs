@@ -22,6 +22,7 @@ pub struct AttestationEvidence {
 }
 
 impl AttestationEvidence {
+    /// TODO clean up expects with anyhow crate
     /// currently accepts a compressed pk (33B) as the data to commit to the report
     pub fn new(data: [u8; 33]) -> Result<Self> {
 

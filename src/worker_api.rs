@@ -1,7 +1,7 @@
 use anyhow::{Result, Context, bail};
 use warp::{reply, Filter, http::Response, http::StatusCode};
 use crate::datafeed::{get_btc_price_feed, get_request, post_request_no_body};
-use crate::common_api::{ListKeysResponse, KeyGenResponse};
+use crate::leader_api::{ListKeysResponse, KeyGenResponse};
 
 use std::collections::HashMap;
 
@@ -28,7 +28,7 @@ pub async fn list_bls_keys_request() -> Result<impl warp::Reply, warp::Rejection
         Err(e) => {
             let mut resp = HashMap::new();
             resp.insert("error", e.to_string());
-            Ok(warp::reply::with_status(warp::reply::json(&resp), warp::http::StatusCode::INTERNAL_SERVER_ERROR))
+            Ok(reply::with_status(reply::json(&resp), StatusCode::INTERNAL_SERVER_ERROR))
         }
     }
 }
@@ -56,7 +56,7 @@ pub async fn bls_key_gen_get_request() -> Result<KeyGenResponse> {
 }
 
 pub async fn bls_key_gen_request() -> Result<impl warp::Reply, warp::Rejection> {
-    match list_bls_keys_get_request().await {
+    match bls_key_gen_get_request().await {
         Ok(resp) => {
             Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
         }
@@ -91,11 +91,37 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn tesssst() {
+    async fn test_btc_pricefeed_route() {
         let filter = btc_pricefeed_route();
 
         let res = warp::test::request()
             .path("/portal/v1/datafeed")
+            .reply(&filter)
+            .await;
+        assert_eq!(res.status(), 200);
+        println!{"{:?}", res.body()};
+    }
+
+    #[tokio::test]
+    async fn test_request_bls_key_gen_route() {
+        let filter = request_bls_key_gen_route();
+
+        let res = warp::test::request()
+            .method("POST")
+            .path("/portal/v1/keystores")
+            .reply(&filter)
+            .await;
+        println!{"{:?}", res.body()};
+        assert_eq!(res.status(), 200);
+    }
+
+    #[tokio::test]
+    async fn test_request_list_bls_keys_route() {
+        let filter = request_list_bls_keys_route();
+
+        let res = warp::test::request()
+            .method("GET")
+            .path("/portal/v1/keystores")
             .reply(&filter)
             .await;
         assert_eq!(res.status(), 200);

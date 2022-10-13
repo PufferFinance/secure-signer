@@ -1,5 +1,6 @@
 mod attest;
 mod keys;
+mod leader_api;
 mod common_api;
 
 // deps
@@ -20,8 +21,8 @@ const LEADER_PORT: u16 = 3030;
 #[tokio::main]
 async fn main() {
     println!("Starting leader enclave HTTP server on port {}", LEADER_PORT);
-    let routes = common_api::bls_key_gen_route()
-        .or(common_api::list_bls_keys_route())
+    let routes = leader_api::bls_key_gen_route()
+        .or(leader_api::list_bls_keys_route())
         .or(common_api::epid_remote_attestation_route());
     warp::serve(routes).run(([127, 0, 0, 1], LEADER_PORT)).await
 }
