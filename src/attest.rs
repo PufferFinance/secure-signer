@@ -1,11 +1,14 @@
 
 use anyhow::{Result, Context, bail};
+use openssl::stack::{Stack, StackRef};
+use openssl::x509::{X509, X509StoreContext};
+use openssl::x509::store::X509StoreBuilder;
 use rand::AsByteSliceMut;
 use serde_derive::{Deserialize, Serialize};
 use ecies::PublicKey as EthPublicKey;
 
 use std::ffi::CString;
-use std::fmt;
+use std::{fmt, fs};
 
 
 use crate::keys;
@@ -14,6 +17,8 @@ use crate::keys;
 // Use this func sig for local development
 use std::os::raw::c_char;
 pub fn do_epid_ra(data: *const u8, report: *mut c_char, signature: *mut c_char, signing_cert: *mut c_char) {}
+
+const INTEL_CA_CERT_PEM_URL: &str = "https://certificates.trustedservices.intel.com/Intel_SGX_Attestation_RootCA.pem";
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct AttestationEvidence {
@@ -64,9 +69,64 @@ impl AttestationEvidence {
         })
     }
 
-    /// Verifies attestation evidence IAS signatures
-    pub fn verify_signature(&self) -> Result<()> {
-        unimplemented!()
+    /// Verifies attestation evidence IAS signatures. During remote attestation
+    /// IAS returns their signing certificate and root CA as concatenated PEMs.
+    /// This function verifies that the signing certificate is rooted in Intel's root CA.
+    pub fn verify_intel_signing_certificate(&self) -> Result<()> {
+        println!("{}", self.signing_cert);
+        let x509s = X509::stack_from_pem(&self.signing_cert.as_bytes())?;
+
+        // Extract intel's signing certificate
+        let signing_x509 = match x509s.get(0) {
+            Some(x) => x.to_owned(),
+            None => bail!("Couldn't extract signing certificate pem!")
+        };
+
+        // Extract intel's root ca
+        let root_x509 = match x509s.get(1) {
+            Some(x) => x.to_owned(),
+            None => bail!("Couldn't extract intel root CA pem!")
+        };
+
+        // Verify the common name is valid
+        match signing_x509.subject_name().entries_by_nid(openssl::nid::Nid::COMMONNAME).into_iter().last() {
+            Some(name) => {
+                let n = name.data().as_utf8().with_context(|| "Couldn't convert x509 name data to string")?.to_string();
+                if n != "Intel SGX Attestation Report Signing".to_string() {
+                    bail!("The x509 certificate has an invalid common name: {}", n)
+                }
+            },
+            None => bail!("Couldn't extract COMMONNAME from intel x509 cert")
+        }
+
+        // Verify the common name is valid
+        match root_x509.subject_name().entries_by_nid(openssl::nid::Nid::COMMONNAME).into_iter().last() {
+            Some(name) => {
+                let n = name.data().as_utf8().with_context(|| "Couldn't convert x509 name data to string")?.to_string();
+                if n != "Intel SGX Attestation Report Signing CA".to_string() {
+                    bail!("The x509 certificate has an invalid common name: {}", n)
+                }
+            },
+            None => bail!("Couldn't extract COMMONNAME from intel x509 cert")
+        }
+
+        let mut builder = X509StoreBuilder::new()?;
+        let _ = builder.add_cert(root_x509.clone());
+        let trust = builder.build();
+
+        let mut cert_chain: Stack<X509> = Stack::new()?;
+        cert_chain.push(root_x509).with_context(|| "could not push to cert chain")?;
+
+        // Verify the signing_x509 is valid
+        let mut store = X509StoreContext::new()?;
+        match store.init(
+            trust.as_ref(), 
+            signing_x509.as_ref(), 
+            cert_chain.as_ref(),
+            |c| c.verify_cert()) {
+                Ok(true) => Ok(()),
+                _ => bail!("Failed to verify the intel signing certificate")
+            }
     }
 
 
@@ -116,7 +176,7 @@ impl AttestationReport {
     /// Follows the API to decode https://api.trustedservices.intel.com/documents/sgx-attestation-api-spec.pdf
     pub fn deserialize_quote_body(&self) -> Result<QuoteBody> {
         let body = &self.isvEnclaveQuoteBody;
-        let body_decoded = base64::decode(body)?;
+        let body_decoded = openssl::base64::decode_block(body)?;
 
         if body_decoded.len() != 432 {
             bail!("base64 decoded quote body was not the right length of 432B!")
@@ -148,7 +208,6 @@ impl AttestationReport {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
 
     fn fetch_dummy_evidence() -> AttestationEvidence {
         let data = fs::read_to_string("./attestation_evidence.json").expect("Unable to read file");
@@ -182,4 +241,13 @@ mod tests {
         println!("recovered pk from report data {:?}", pk);
         Ok(())
     }
+
+    #[test]
+    fn test_verify_intel_signing_certificate() -> Result<()>{
+        let evidence = fetch_dummy_evidence();
+
+        evidence.verify_intel_signing_certificate()
+    }
+
+
 }

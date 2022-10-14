@@ -23,7 +23,8 @@ rand_chacha = "0.2"
 hex = "0.4.3"
 ecies = {version = "0.2.2", default-features = false, features = ["pure"]}
 sha3 = "0.10.1"
-base64 = "0.13.0"
+# base64 = "0.13.0"
+openssl = "0.10.42"
 
 # web3 deps
 ethabi = { version = "17.1.0", default-features = false }
