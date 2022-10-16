@@ -1,5 +1,5 @@
-
 use anyhow::{Result, Context, bail};
+use blst::min_pk::PublicKey;
 use openssl::stack::{Stack, StackRef};
 use openssl::x509::{X509, X509StoreContext};
 use openssl::x509::store::X509StoreBuilder;
@@ -17,8 +17,6 @@ use crate::keys;
 // Use this func sig for local development
 use std::os::raw::c_char;
 pub fn do_epid_ra(data: *const u8, report: *mut c_char, signature: *mut c_char, signing_cert: *mut c_char) {}
-
-const INTEL_CA_CERT_PEM_URL: &str = "https://certificates.trustedservices.intel.com/Intel_SGX_Attestation_RootCA.pem";
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct AttestationEvidence {
@@ -73,7 +71,7 @@ impl AttestationEvidence {
     /// IAS returns their signing certificate and root CA as concatenated PEMs.
     /// This function verifies that the signing certificate is rooted in Intel's root CA.
     pub fn verify_intel_signing_certificate(&self) -> Result<()> {
-        println!("{}", self.signing_cert);
+        // println!("{}", self.signing_cert);
         let x509s = X509::stack_from_pem(&self.signing_cert.as_bytes())?;
 
         // Extract intel's signing certificate
@@ -127,6 +125,27 @@ impl AttestationEvidence {
                 Ok(true) => Ok(()),
                 _ => bail!("Failed to verify the intel signing certificate")
             }
+    }
+
+            
+    pub fn get_bls_pk(&self) -> Result<PublicKey> {
+        let report: AttestationReport = serde_json::from_slice(self.raw_report.as_bytes()).with_context(|| "Couldn't get AttestationReport from AttestationEvidence.raw_report")?;
+        let body = report.deserialize_quote_body()?;
+        println!("{:?}", body);
+        let pk_bytes = &body.REPORTDATA[0..48];
+        match PublicKey::deserialize(pk_bytes) {
+            Ok(pk) => Ok(pk),
+            Err(e) => bail!("bad pk_bytes embedded in attestation evidence, could not recover BLS public key: {:?}", e)
+        }
+    }
+
+    pub fn get_eth_pk(&self) -> Result<EthPublicKey> {
+        let report: AttestationReport = serde_json::from_slice(self.raw_report.as_bytes()).with_context(|| "Couldn't get AttestationReport from AttestationEvidence.raw_report")?;
+        let body = report.deserialize_quote_body()?;
+        // println!("{:?}", body);
+        let pk_bytes = &body.REPORTDATA[0..33];
+        let pk = EthPublicKey::parse_slice(pk_bytes, None)?;
+        Ok(pk)
     }
 
 
@@ -205,18 +224,19 @@ impl AttestationReport {
     }
 }
 
+pub fn fetch_dummy_evidence() -> AttestationEvidence {
+    let data = fs::read_to_string("./attestation_evidence.json").expect("Unable to read file");
+
+    let evidence: AttestationEvidence = serde_json::from_slice(data.as_bytes()).unwrap();
+
+    // println!("{:?}", evidence);
+    evidence
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn fetch_dummy_evidence() -> AttestationEvidence {
-        let data = fs::read_to_string("./attestation_evidence.json").expect("Unable to read file");
-
-        let evidence: AttestationEvidence = serde_json::from_slice(data.as_bytes()).unwrap();
-
-        // println!("{:?}", evidence);
-        evidence
-    }
 
     #[test]
     fn test_deserialize_report() -> Result<()>{
@@ -231,13 +251,15 @@ mod tests {
         let body = report.deserialize_quote_body()?;
         println!("{:?}", body);
 
-        let pk_bytes = &body.REPORTDATA[0..33];
-
-        // let pk = EthPublicKey::from(pk_bytes);
-        let pk = EthPublicKey::parse_slice(pk_bytes, None)?;
-
         println!("recovered mrenclave from quote {:?}", body.MRENCLAVE);
         println!("recovered mrsigner from quote {:?}", body.MRSIGNER);
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_eth_pk() -> Result<()>{
+        let evidence = fetch_dummy_evidence();
+        let pk = evidence.get_eth_pk()?;
         println!("recovered pk from report data {:?}", pk);
         Ok(())
     }

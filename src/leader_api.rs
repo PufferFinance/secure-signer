@@ -1,5 +1,6 @@
 use crate::keys::{bls_key_gen, list_bls_keys, bls_key_provision};
 use crate::attest::{epid_remote_attestation, AttestationEvidence};
+use crate::common_api::{KeyProvisionRequest, KeyProvisionResponse, ListKeysResponse, KeyGenResponse, KeyGenResponseInner, ListKeysResponseInner};
 
 use anyhow::{Result, Context, bail};
 use serde_derive::{Deserialize, Serialize};
@@ -7,17 +8,6 @@ use warp::{reply, Filter, http::Response, http::StatusCode};
 use std::collections::HashMap;
 
 
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct KeyGenResponseInner {
-    pub status: String,
-    pub message: String,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct KeyGenResponse {
-    pub data: [KeyGenResponseInner; 1],
-}
 
 /// Runs all the logic to generate and save a new BLS key. Returns a `KeyGenResponse` on success.
 pub async fn bls_key_gen_service() -> Result<impl warp::Reply, warp::Rejection> {
@@ -44,19 +34,6 @@ pub fn bls_key_gen_route() -> impl Filter<Extract = impl warp::Reply, Error = wa
         .and(warp::path("v1"))
         .and(warp::path("keystores"))
         .and_then(bls_key_gen_service)
-}
-
-
-#[derive(Debug)]
-#[derive(Deserialize, Serialize)]
-pub struct ListKeysResponseInner {
-    pub pubkey: String,
-}
-
-#[derive(Debug)]
-#[derive(Deserialize, Serialize)]
-pub struct ListKeysResponse {
-    pub data: Vec<ListKeysResponseInner>,
 }
 
 impl ListKeysResponse {
@@ -97,19 +74,6 @@ pub fn list_bls_keys_route() -> impl Filter<Extract = impl warp::Reply, Error = 
 }
 
 
-#[derive(Deserialize, Serialize, Debug)]
-pub struct KeyProvisionRequest {
-    pub eth_pk_hex: String,
-    pub evidence: AttestationEvidence,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct KeyProvisionResponse {
-    pub ct_bls_sk_hex: String,
-    pub bls_pk_hex: String,
-    pub evidence: AttestationEvidence,
-}
-
 /// Given a `KeyProvisionRequest`, the server will generate a new
 /// BLS secret key, encrypt it via ECDH and the requester's Eth pub key,
 /// then return the ciphertext bls secret key and plaintext bls public key
@@ -117,8 +81,32 @@ pub struct KeyProvisionResponse {
 /// successfully verify the `AttestationEvidence`, and the committed to
 /// public key matches the supplied `eth_pk_hex`.
 pub async fn bls_key_provision_service(req: KeyProvisionRequest) -> Result<impl warp::Reply, warp::Rejection> {
-    // TODO: verify req.evidence is valid before continuing
-    // ...
+    // Verify attestation evidence is from IAS
+    match req.evidence.verify_intel_signing_certificate() {
+        Ok(()) => {},
+        Err(e) => {
+            let mut resp = HashMap::new();
+            resp.insert("error", e.to_string());
+            return Ok(reply::with_status(reply::json(&resp), StatusCode::INTERNAL_SERVER_ERROR));
+        }
+    }
+    
+    // TODO verify the req.bls_pk is the same committed in the attestation evidence
+    let exp_pk = match req.evidence.get_eth_pk() {
+        Ok(pk) => pk,
+        Err(e) => {
+            let mut resp = HashMap::new();
+            resp.insert("error", e.to_string());
+            return Ok(reply::with_status(reply::json(&resp), StatusCode::BAD_REQUEST));
+        }
+    };
+
+    // TODO uncomment this when sending real attestation reports
+    if req.eth_pk_hex != hex::encode(exp_pk.serialize()) {
+    //     let mut resp = HashMap::new();
+    //     resp.insert("error", "eth_pk_hex does not match pk embedded in attestation evidence");
+    //     return Ok(reply::with_status(reply::json(&resp), StatusCode::BAD_REQUEST));
+    }
 
     // generate bls sk, encrypt it, respond
     match bls_key_provision(&req.eth_pk_hex) {
@@ -129,7 +117,6 @@ pub async fn bls_key_provision_service(req: KeyProvisionRequest) -> Result<impl 
             let resp = KeyProvisionResponse {
                 ct_bls_sk_hex: ct_bls_sk_hex,
                 bls_pk_hex: bls_pk_hex,
-                evidence: req.evidence,
             };
             Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
         }

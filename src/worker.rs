@@ -21,6 +21,7 @@ async fn main() {
     let routes = common_api::epid_remote_attestation_route()
         .or(worker_api::btc_pricefeed_route())
         .or(worker_api::request_list_bls_keys_route())
-        .or(worker_api::request_bls_key_gen_route());
+        .or(worker_api::request_bls_key_gen_route())
+        .or(worker_api::request_bls_key_provision_route());
     warp::serve(routes).run(([127, 0, 0, 1], WORKER_PORT)).await;
 }

@@ -1,8 +1,10 @@
 use reqwest;
+use serde::Serialize;
 use warp::{Filter, http::Response, http::StatusCode};
 
 use anyhow::{Result, Context, bail};
-use serde_derive::{Deserialize, Serialize};
+use serde_derive::{Deserialize};
+// use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub async fn get_request(url: &String) -> Result<reqwest::Response> {
@@ -12,6 +14,11 @@ pub async fn get_request(url: &String) -> Result<reqwest::Response> {
 pub async fn post_request_no_body(url: &String) -> Result<reqwest::Response> {
     let client = reqwest::Client::new();
     client.post(url).send().await.with_context(|| "Failed POST reqwest with no body")
+}
+
+pub async fn post_request<T: Serialize>(url: &String, body: T) -> Result<reqwest::Response> {
+    let client = reqwest::Client::new();
+    client.post(url).json(&body).send().await.with_context(|| "Failed POST reqwest with body")
 }
 
 #[derive(Debug)]

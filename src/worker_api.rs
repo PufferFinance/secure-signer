@@ -1,7 +1,11 @@
 use anyhow::{Result, Context, bail};
+use blst::min_pk::SecretKey;
+use ecies::decrypt;
 use warp::{reply, Filter, http::Response, http::StatusCode};
-use crate::datafeed::{get_btc_price_feed, get_request, post_request_no_body};
-use crate::leader_api::{ListKeysResponse, KeyGenResponse};
+use crate::attest::fetch_dummy_evidence;
+use crate::datafeed::{get_btc_price_feed, get_request, post_request, post_request_no_body};
+use crate::common_api::{KeyProvisionRequest, KeyProvisionResponse, ListKeysResponse, KeyGenResponse};
+use crate::keys::{eth_key_gen, pk_to_eth_addr, read_eth_key, new_eth_key, write_key};
 
 use std::collections::HashMap;
 
@@ -84,6 +88,72 @@ pub fn btc_pricefeed_route() -> impl Filter<Extract = impl warp::Reply, Error = 
         .and(warp::path("v1"))
         .and(warp::path("datafeed"))
         .and_then(get_btc_price_feed)
+}
+
+pub async fn bls_key_gen_provision_post_request(body: KeyProvisionRequest) -> Result<KeyProvisionResponse> {
+    let url = format!("http://localhost:3030/portal/v1/provision");
+    let resp = post_request(&url, body)
+        .await
+        .with_context(|| format!("failed POST request to URL: {}", url))?
+        .json::<KeyProvisionResponse>()
+        .await
+        .with_context(|| format!("could not parse json response from  URL: {}", url))?;
+    println!("{:#?}", resp);
+    Ok(resp)
+}
+
+pub async fn bls_key_gen_provision_request() -> Result<impl warp::Reply, warp::Rejection> {
+    // generate and save a new ETH pk/sk
+    let (eth_sk, eth_pk) = match new_eth_key() {
+        Ok((sk, pk)) => (sk, pk),
+        Err(e) =>  {
+            let mut resp = HashMap::new();
+            resp.insert("error", e.to_string());
+            return Ok(warp::reply::with_status(warp::reply::json(&resp), warp::http::StatusCode::INTERNAL_SERVER_ERROR))
+        }
+    };
+    // get the ETH wallet addr from pk
+    // let addr = pk_to_eth_addr(&eth_pk).with_context(|| "couldnt convert pk to eth addr to use as file name")?;
+    let eth_pk_hex = hex::encode(eth_pk.serialize());
+
+    // TODO perform real remote attestation
+    let evidence = fetch_dummy_evidence();
+    let req_body = KeyProvisionRequest { eth_pk_hex, evidence };
+
+    match bls_key_gen_provision_post_request(req_body).await {
+        Ok(resp) => {
+            // hex decode the ciphertext bls secret key
+            let ct_bls_sk = hex::decode(&resp.ct_bls_sk_hex).unwrap();
+
+            // decrypt ct_bls_sk using ephemeral eth_sk
+            let bls_sk_bytes = decrypt(&eth_sk.serialize(), &ct_bls_sk).unwrap();
+
+            // recover the bls secret key
+            let bls_sk = SecretKey::from_bytes(&bls_sk_bytes).unwrap();
+
+            let bls_sk_hex = hex::encode(bls_sk.to_bytes());
+
+            // save the secret key
+            write_key(&resp.bls_pk_hex, &bls_sk_hex);
+            println!("got bls_sk: {:?}", bls_sk);
+
+            Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
+        },
+
+        Err(e) => {
+            let mut resp = HashMap::new();
+            resp.insert("error", e.to_string());
+            Ok(warp::reply::with_status(warp::reply::json(&resp), warp::http::StatusCode::INTERNAL_SERVER_ERROR))
+        }
+    }
+}
+
+pub fn request_bls_key_provision_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    warp::post()
+        .and(warp::path("portal"))
+        .and(warp::path("v1"))
+        .and(warp::path("provision"))
+        .and_then(bls_key_gen_provision_request)
 }
 
 #[cfg(test)]

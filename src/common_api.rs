@@ -1,5 +1,5 @@
 use crate::keys::{bls_key_gen, list_bls_keys};
-use crate::attest::{epid_remote_attestation};
+use crate::attest::{epid_remote_attestation, AttestationEvidence};
 
 use anyhow::{Result, Context, bail};
 use serde_derive::{Deserialize, Serialize};
@@ -34,4 +34,41 @@ pub fn epid_remote_attestation_route() -> impl Filter<Extract = impl warp::Reply
         .and(warp::path("remote-attestation"))
         .and(warp::body::json::<AttestationRequest>())
         .and_then(epid_remote_attestation_service)
+}
+
+
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct KeyProvisionRequest {
+    pub eth_pk_hex: String,
+    pub evidence: AttestationEvidence,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct KeyProvisionResponse {
+    pub ct_bls_sk_hex: String,
+    pub bls_pk_hex: String,
+}
+
+#[derive(Debug)]
+#[derive(Deserialize, Serialize)]
+pub struct ListKeysResponseInner {
+    pub pubkey: String,
+}
+
+#[derive(Debug)]
+#[derive(Deserialize, Serialize)]
+pub struct ListKeysResponse {
+    pub data: Vec<ListKeysResponseInner>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct KeyGenResponseInner {
+    pub status: String,
+    pub message: String,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct KeyGenResponse {
+    pub data: [KeyGenResponseInner; 1],
 }
