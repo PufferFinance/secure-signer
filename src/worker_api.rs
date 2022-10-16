@@ -102,44 +102,54 @@ pub async fn bls_key_gen_provision_post_request(body: KeyProvisionRequest) -> Re
     Ok(resp)
 }
 
+pub fn decrypt_and_save_bls_key(resp: &KeyProvisionResponse, eth_sk_bytes: &[u8]) -> Result<()> {
+    // hex decode the ciphertext bls secret key
+    let ct_bls_sk = hex::decode(&resp.ct_bls_sk_hex)?;
+
+    // decrypt ct_bls_sk using ephemeral eth_sk
+    let bls_sk_bytes = decrypt(eth_sk_bytes, &ct_bls_sk)?;
+
+    // recover the bls secret key
+    let bls_sk = match SecretKey::from_bytes(&bls_sk_bytes) {
+        Ok(sk) => sk,
+        Err(e) => bail!("Couldn't recover bls_sk after decryption: {:?}", e),
+    };
+
+    let bls_sk_hex = hex::encode(bls_sk.to_bytes());
+
+    // save the secret key
+    write_key(&resp.bls_pk_hex, &bls_sk_hex)?;
+    println!("got bls_sk: {:?}", bls_sk);
+    Ok(())
+}
+
 pub async fn bls_key_gen_provision_request() -> Result<impl warp::Reply, warp::Rejection> {
     // generate and save a new ETH pk/sk
-    let (eth_sk, eth_pk) = match new_eth_key() {
-        Ok((sk, pk)) => (sk, pk),
+    let (eth_sk, eth_pk_hex) = match new_eth_key() {
+        Ok((sk, pk)) => (sk, hex::encode(pk.serialize())),
         Err(e) =>  {
             let mut resp = HashMap::new();
             resp.insert("error", e.to_string());
             return Ok(warp::reply::with_status(warp::reply::json(&resp), warp::http::StatusCode::INTERNAL_SERVER_ERROR))
         }
     };
-    // get the ETH wallet addr from pk
-    // let addr = pk_to_eth_addr(&eth_pk).with_context(|| "couldnt convert pk to eth addr to use as file name")?;
-    let eth_pk_hex = hex::encode(eth_pk.serialize());
 
     // TODO perform real remote attestation
     let evidence = fetch_dummy_evidence();
     let req_body = KeyProvisionRequest { eth_pk_hex, evidence };
 
+    // decrypt the returned BLS secret key and save it
     match bls_key_gen_provision_post_request(req_body).await {
         Ok(resp) => {
-            // hex decode the ciphertext bls secret key
-            let ct_bls_sk = hex::decode(&resp.ct_bls_sk_hex).unwrap();
-
-            // decrypt ct_bls_sk using ephemeral eth_sk
-            let bls_sk_bytes = decrypt(&eth_sk.serialize(), &ct_bls_sk).unwrap();
-
-            // recover the bls secret key
-            let bls_sk = SecretKey::from_bytes(&bls_sk_bytes).unwrap();
-
-            let bls_sk_hex = hex::encode(bls_sk.to_bytes());
-
-            // save the secret key
-            write_key(&resp.bls_pk_hex, &bls_sk_hex);
-            println!("got bls_sk: {:?}", bls_sk);
-
-            Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
+            match decrypt_and_save_bls_key(&resp, &eth_sk.serialize()) {
+                Ok(()) => Ok(reply::with_status(reply::json(&resp), StatusCode::OK)),
+                Err(e) => {
+                    let mut resp = HashMap::new();
+                    resp.insert("error", e.to_string());
+                    Ok(warp::reply::with_status(warp::reply::json(&resp), warp::http::StatusCode::INTERNAL_SERVER_ERROR)) 
+                }
+            }
         },
-
         Err(e) => {
             let mut resp = HashMap::new();
             resp.insert("error", e.to_string());

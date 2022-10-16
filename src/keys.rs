@@ -102,7 +102,7 @@ fn save_eth_key(sk: EthSecretKey, pk: EthPublicKey) -> Result<EthPublicKey> {
     let sk_hex = hex::encode(sk.serialize());
     println!("debug sk_hex: {:?}", sk_hex);
 
-    write_key(&addr, &sk_hex).with_context(|| "eth sk failed to save")?;
+    write_key(&format!("eth_keys/{}", addr), &sk_hex).with_context(|| "eth sk failed to save")?;
 
     Ok(pk)
 }
@@ -135,7 +135,7 @@ pub fn bls_key_gen(save_key: bool) -> Result<PublicKey> {
 
     // save secret key using pk_hex as file identifier (omitting '0x' prefix)
     if save_key {
-        write_key(&pk_hex, &sk_hex).with_context(|| "failed to save bls key")?;
+        write_key(&format!("bls_keys/{}", pk_hex), &sk_hex).with_context(|| "failed to save bls key")?;
     }
 
     Ok(pk)
