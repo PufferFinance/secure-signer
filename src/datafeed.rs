@@ -1,11 +1,13 @@
 use reqwest;
 use serde::Serialize;
-use warp::{Filter, http::Response, http::StatusCode};
+use warp::{Filter, http::Response, http::StatusCode, reply};
 
 use anyhow::{Result, Context, bail};
 use serde_derive::{Deserialize};
 // use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+use crate::keys::bls_sign;
 
 pub async fn get_request(url: &String) -> Result<reqwest::Response> {
     reqwest::get(url).await.with_context(|| "Failed GET reqwest")
@@ -62,18 +64,50 @@ pub async fn coindesk_usd_feed(url: String) -> Result<f64> {
     Ok(rate)
 }
 
-pub async fn get_btc_price_feed() -> Result<impl warp::Reply, warp::Rejection> {
-    let url = format!("https://api.coindesk.com/v1/bpi/currentprice.json");
-    match coindesk_usd_feed(url.clone()).await {
+
+#[derive(Debug)]
+#[derive(Serialize, Deserialize)]
+pub struct PriceFeedReq {
+    pub url: String,
+    pub bls_pk_hex: String,
+}
+
+#[derive(Debug)]
+#[derive(Serialize, Deserialize)]
+pub struct PriceFeedResp {
+    pub price: String,
+    pub url: String,
+    pub bls_pk_hex: String,
+    pub bls_sig_hex: String,
+}
+
+pub async fn get_btc_price_feed(req: PriceFeedReq) -> Result<impl warp::Reply, warp::Rejection> {
+    match coindesk_usd_feed(req.url.clone()).await {
         Ok(price) => {
-            let mut resp = HashMap::new();
-            resp.insert("price", price);
-            Ok(warp::reply::with_status(warp::reply::json(&resp), warp::http::StatusCode::OK))
+            let s_price = price.to_string();
+            // Sign off on price 
+            let sig = match bls_sign(&req.bls_pk_hex, s_price.as_bytes()) {
+                Ok(sig) => sig,
+                Err(e) => {
+                    let mut resp = HashMap::new();
+                    resp.insert("error", e.to_string());
+                    return Ok(reply::with_status(reply::json(&resp), StatusCode::INTERNAL_SERVER_ERROR))
+                }
+            };
+
+            let resp = PriceFeedResp {
+                price: s_price,
+                url: req.url,
+                bls_pk_hex: req.bls_pk_hex,
+                bls_sig_hex: hex::encode(sig.serialize())
+            };
+
+            Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
         }
         Err(e) => {
             let mut resp = HashMap::new();
             resp.insert("error", e.to_string());
-            Ok(warp::reply::with_status(warp::reply::json(&resp), warp::http::StatusCode::INTERNAL_SERVER_ERROR))
+            Ok(reply::with_status(reply::json(&resp), StatusCode::INTERNAL_SERVER_ERROR))
         }
     }
 }

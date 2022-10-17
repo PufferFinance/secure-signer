@@ -113,13 +113,13 @@ pub fn request_bls_key_gen_route() -> impl Filter<Extract = impl warp::Reply, Er
 /// @WORKER ROUTE
 /// Sample worker route for getting a specific datafeed
 pub fn btc_pricefeed_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    warp::get()
+    warp::post()
         .and(warp::path("portal"))
         .and(warp::path("v1"))
         .and(warp::path("datafeed"))
+        .and(warp::body::json())
         .and_then(get_btc_price_feed)
 }
-
 
 /// @WORKER ROUTE
 /// Worker generates ephemeral ETH key for envelope encryption, commits it to quote, 

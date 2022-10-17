@@ -46,7 +46,9 @@ async fn main() {
         .or(routes::bls_sign_route())
 
         // Endpoint to make a pricefeed request
+        // curl -X POST localhost:3031/portal/v1/datafeed -H "Content-Type: application/json"  -d '{"url": "https://api.coindesk.com/v1/bpi/currentprice.json", "bls_pk_hex": "..."}'  
         .or(routes::btc_pricefeed_route());
+
         // .or(routes::request_bls_key_import_route())
         // .or(routes::request_bls_key_provision_route());
 
