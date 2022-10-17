@@ -131,7 +131,7 @@ impl AttestationEvidence {
     pub fn get_bls_pk(&self) -> Result<PublicKey> {
         let report: AttestationReport = serde_json::from_slice(self.raw_report.as_bytes()).with_context(|| "Couldn't get AttestationReport from AttestationEvidence.raw_report")?;
         let body = report.deserialize_quote_body()?;
-        println!("{:?}", body);
+        // println!("{:?}", body);
         let pk_bytes = &body.REPORTDATA[0..48];
         match PublicKey::deserialize(pk_bytes) {
             Ok(pk) => Ok(pk),
@@ -156,7 +156,7 @@ pub fn epid_remote_attestation(pk_hex: &String) -> Result<AttestationEvidence> {
     let proof = AttestationEvidence::new(
         EthPublicKey::from_secret_key(&sk).serialize_compressed()
     )?;
-    println!("{:?}", proof.signed_report);
+    // println!("{:?}", proof.signed_report);
     Ok(proof)
 }
 

@@ -6,7 +6,7 @@ use crate::attest::fetch_dummy_evidence;
 use crate::datafeed::{get_btc_price_feed, get_request, post_request, post_request_no_body};
 use crate::common_api::{KeyProvisionRequest, KeyProvisionResponse, ListKeysResponse, KeyGenResponse, KeyImportRequest, KeyImportResponse, epid_remote_attestation_service, AttestationRequest, eth_key_gen_service, list_eth_keys_service, bls_key_gen_service, list_generated_bls_keys_service, bls_key_import_service, list_imported_bls_keys_service, bls_sign_data};
 use crate::keys::{eth_key_gen, pk_to_eth_addr, read_eth_key, new_eth_key, write_key};
-use crate::leader_api::{bls_key_provision_service, bls_key_aggregator_service};
+use crate::leader_api::{bls_key_provision_service, bls_key_aggregator_service, batch_provision_service};
 use crate::worker_api::{list_generated_bls_keys_request, bls_key_gen_request, bls_key_gen_provision_request, bls_key_import_request};
 
 
@@ -166,4 +166,17 @@ pub fn bls_key_aggregator_route() -> impl Filter<Extract = impl warp::Reply, Err
         .and(warp::path("v1"))
         .and(warp::path("aggregate"))
         .and_then(bls_key_aggregator_service)
+}
+
+
+/// @LEADER ROUTE
+/// the route to call `batch_provision_service`
+pub fn bls_key_batch_provisioner_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    warp::post()
+        .and(warp::path("portal"))
+        .and(warp::path("v1"))
+        .and(warp::path("provision"))
+        .and(warp::path("batch"))
+        .and(warp::body::json())
+        .and_then(batch_provision_service)
 }

@@ -165,7 +165,8 @@ pub async fn bls_key_import_request(req: KeyImportRequest) -> Result<impl warp::
 #[cfg(test)]
 mod tests {
     use ecies::encrypt;
-    use crate::keys::new_bls_key;
+    use crate::datafeed::{PriceFeedReq, PriceFeedResp};
+    use crate::keys::{new_bls_key, bls_key_gen};
     use crate::routes::*;
     use super::*;
 
@@ -173,15 +174,34 @@ mod tests {
     async fn test_btc_pricefeed_route() {
         let filter = btc_pricefeed_route();
 
+        // generate and save new bls key
+        let save_key = true;
+        let bls_pk = bls_key_gen(save_key).unwrap();
+        let bls_pk_hex = hex::encode(bls_pk.compress());
+
+        let url = "https://api.coindesk.com/v1/bpi/currentprice.json".into();
+
+        let req = PriceFeedReq {
+            url,
+            bls_pk_hex,
+        };
+
         let res = warp::test::request()
+            .method("POST")
+            .header("accept", "application/json")
             .path("/portal/v1/datafeed")
+            .json(&req)
             .reply(&filter)
             .await;
+
         assert_eq!(res.status(), 200);
-        println!{"{:?}", res.body()};
+
+        let resp: PriceFeedResp = serde_json::from_slice(&res.body()).unwrap();
+        println!{"{:?}", resp};
     }
 
     #[tokio::test]
+    /// REQUIRES Leader to be running!!!
     async fn test_request_bls_key_gen_route() {
         let filter = request_bls_key_gen_route();
 
@@ -195,6 +215,7 @@ mod tests {
     }
 
     #[tokio::test]
+    /// REQUIRES Leader to be running!!!
     async fn test_request_list_bls_keys_route() {
         let filter = request_list_bls_keys_route();
 
@@ -208,6 +229,7 @@ mod tests {
     }
 
     #[tokio::test]
+    /// REQUIRES Leader to be running!!!
     async fn test_request_bls_key_import_route() {
         let filter = request_bls_key_import_route();
 

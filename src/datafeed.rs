@@ -85,6 +85,7 @@ pub async fn get_btc_price_feed(req: PriceFeedReq) -> Result<impl warp::Reply, w
     match coindesk_usd_feed(req.url.clone()).await {
         Ok(price) => {
             let s_price = price.to_string();
+            println!("Got price: {}", s_price);
             // Sign off on price 
             let sig = match bls_sign(&req.bls_pk_hex, s_price.as_bytes()) {
                 Ok(sig) => sig,
