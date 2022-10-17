@@ -1,4 +1,4 @@
-use crate::keys::{bls_key_gen, list_bls_keys, eth_key_gen, read_eth_key, pk_to_eth_addr, write_key};
+use crate::keys::{bls_key_gen, eth_key_gen, read_eth_key, pk_to_eth_addr, write_key, list_eth_keys, list_imported_bls_keys, list_generated_bls_keys};
 use crate::attest::{epid_remote_attestation, AttestationEvidence};
 
 use anyhow::{Result, Context, bail};
@@ -145,8 +145,8 @@ pub fn eth_key_gen_route() -> impl Filter<Extract = impl warp::Reply, Error = wa
         .and_then(eth_key_gen_service)
 }
 
-pub async fn list_bls_keys_service() -> Result<impl warp::Reply, warp::Rejection> {
-    match list_bls_keys() {
+pub async fn list_imported_bls_keys_service() -> Result<impl warp::Reply, warp::Rejection> {
+    match list_imported_bls_keys() {
         Ok(pks) => {
             let resp = ListKeysResponse::new(pks);
             Ok(reply::with_status(reply::json(&resp), warp::http::StatusCode::OK))
@@ -160,14 +160,64 @@ pub async fn list_bls_keys_service() -> Result<impl warp::Reply, warp::Rejection
 }
 
 /// Returns the hex-encoded BLS public keys that have their corresponding secret keys safeguarded in Enclave memory. 
-pub fn list_bls_keys_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+pub fn list_imported_bls_keys_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::get()
         .and(warp::path("portal"))
         .and(warp::path("v1"))
         .and(warp::path("keystores"))
-        .and_then(list_bls_keys_service)
+        .and(warp::path("imported"))
+        .and(warp::path("bls"))
+        .and_then(list_imported_bls_keys_service)
 }
 
+pub async fn list_generated_bls_keys_service() -> Result<impl warp::Reply, warp::Rejection> {
+    match list_generated_bls_keys() {
+        Ok(pks) => {
+            let resp = ListKeysResponse::new(pks);
+            Ok(reply::with_status(reply::json(&resp), warp::http::StatusCode::OK))
+        }
+        Err(e) => {
+            let mut resp = HashMap::new();
+            resp.insert("error", e.to_string());
+            Ok(reply::with_status(reply::json(&resp), warp::http::StatusCode::INTERNAL_SERVER_ERROR))
+        }
+    }
+}
+
+/// Returns the hex-encoded BLS public keys that have their corresponding secret keys safeguarded in Enclave memory. 
+pub fn list_generated_bls_keys_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    warp::get()
+        .and(warp::path("portal"))
+        .and(warp::path("v1"))
+        .and(warp::path("keystores"))
+        .and(warp::path("generated"))
+        .and(warp::path("bls"))
+        .and_then(list_generated_bls_keys_service)
+}
+
+pub async fn list_eth_keys_service() -> Result<impl warp::Reply, warp::Rejection> {
+    match list_eth_keys() {
+        Ok(pks) => {
+            let resp = ListKeysResponse::new(pks);
+            Ok(reply::with_status(reply::json(&resp), warp::http::StatusCode::OK))
+        }
+        Err(e) => {
+            let mut resp = HashMap::new();
+            resp.insert("error", e.to_string());
+            Ok(reply::with_status(reply::json(&resp), warp::http::StatusCode::INTERNAL_SERVER_ERROR))
+        }
+    }
+}
+
+/// Returns the hex-encoded BLS public keys that have their corresponding secret keys safeguarded in Enclave memory. 
+pub fn list_eth_keys_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    warp::get()
+        .and(warp::path("portal"))
+        .and(warp::path("v1"))
+        .and(warp::path("keystores"))
+        .and(warp::path("eth"))
+        .and_then(list_eth_keys_service)
+}
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct KeyImportRequest {
@@ -203,7 +253,7 @@ pub fn decrypt_and_save_imported_bls_key(req: &KeyImportRequest) -> Result<()> {
     if hex::encode(bls_sk.sk_to_pk().serialize()) != req.bls_pk_hex {
         bail!("The imported bls sk doesn't match the expected bls pk")
     }
-    let fname = format!("bls_keys/imports/{}", req.bls_pk_hex);
+    let fname = format!("bls_keys/imported/{}", req.bls_pk_hex);
     let bls_sk_hex = hex::encode(bls_sk.serialize());
     // save the bls key  
     write_key(&fname, &bls_sk_hex)

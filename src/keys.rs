@@ -248,7 +248,7 @@ pub fn write_key(fname: &String, sk_hex: &String) -> Result<()> {
 
 /// Reads hex-encoded secret key from a file named from `pk_hex` and converts it to a BLS SecretKey
 pub fn read_bls_key(pk_hex: &String) -> Result<SecretKey> {
-    let file_path: PathBuf = ["./etc/keys/", pk_hex.as_str()].iter().collect();
+    let file_path: PathBuf = ["./etc/keys/bls_keys/", pk_hex.as_str()].iter().collect();
     let sk_rec_bytes = fs::read(&file_path).with_context(|| format!("Unable to read bls sk from pk_hex {}", pk_hex))?;
     let sk_rec_dec = hex::decode(sk_rec_bytes).with_context(|| "Unable to decode sk hex")?;
     let sk_res = SecretKey::from_bytes(&sk_rec_dec);
@@ -269,10 +269,8 @@ pub fn read_eth_key(fname: &String) -> Result<EthSecretKey> {
     EthSecretKey::parse_slice(&sk_rec_dec).with_context(|| "couldn't parse sk bytes to eth sk type")
 }
 
-/// Returns the file names of each of the saved secret keys, where each fname
-/// is assumed to be the compressed public key in hex without the `0x` prefix.
-pub fn list_bls_keys() -> Result<Vec<String>> {
-    let paths = fs::read_dir("./etc/keys/").with_context(|| "No keys saved in dir")?;
+pub fn list_keys(path: &str) -> Result<Vec<String>> {
+    let paths = fs::read_dir(path).with_context(|| "No keys saved in dir")?;
 
     let mut keys: Vec<String> = Vec::new();
     for path in paths {
@@ -291,6 +289,24 @@ pub fn list_bls_keys() -> Result<Vec<String>> {
         }
     }
     Ok(keys)
+}
+
+/// Returns the file names of each of the saved bls secret keys, where each fname
+/// is assumed to be the compressed public key in hex without the `0x` prefix.
+pub fn list_imported_bls_keys() -> Result<Vec<String>> {
+    list_keys("./etc/keys/bls_keys/imported")
+}
+
+/// Returns the file names of each of the saved bls secret keys, where each fname
+/// is assumed to be the compressed public key in hex without the `0x` prefix.
+pub fn list_generated_bls_keys() -> Result<Vec<String>> {
+    list_keys("./etc/keys/bls_keys/generated")
+}
+
+/// Returns the file names of each of the saved eth secret keys, where each fname
+/// is assumed to be the eth wallet address derived from the eth public key in hex without the `0x` prefix.
+pub fn list_eth_keys() -> Result<Vec<String>> {
+    list_keys("./etc/keys/eth_keys")
 }
 
 pub fn aggregate_uniform_bls_sigs(agg_pk: AggregatePublicKey, sigs: Vec<&Signature>, 

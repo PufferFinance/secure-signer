@@ -264,7 +264,7 @@ mod tests {
 
         let req = KeyImportRequest {
             ct_bls_sk_hex,
-            bls_pk_hex,
+            bls_pk_hex: bls_pk_hex.clone(),
             encrypting_pk_hex
         };
         println!("making bls key import req: {:?}", req);
@@ -279,6 +279,11 @@ mod tests {
 
         println!{"{:?}", res.body()};
         assert_eq!(res.status(), 200);
+
+        let resp: KeyImportResponse = serde_json::from_slice(&res.body()).unwrap();
+
+        assert_eq!(resp.data[0].status, "imported".to_string());
+        assert_eq!(resp.data[0].message, bls_pk_hex);
 
     }
 }

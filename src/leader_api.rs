@@ -1,4 +1,4 @@
-use crate::keys::{bls_key_gen, list_bls_keys, bls_key_provision};
+use crate::keys::{bls_key_gen, bls_key_provision};
 use crate::attest::{epid_remote_attestation, AttestationEvidence};
 use crate::common_api::{KeyProvisionRequest, KeyProvisionResponse, ListKeysResponse, KeyGenResponse, KeyGenResponseInner, ListKeysResponseInner};
 
