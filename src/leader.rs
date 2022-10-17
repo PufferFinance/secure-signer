@@ -34,7 +34,7 @@ async fn main() {
         .or(routes::list_imported_bls_keys_route())
 
         // Request to list pks of saved bls keys 
-        .or(routes::list_eth_keys_route())
+        .or(routes::list_generated_eth_keys_route())
 
         .or(routes::bls_key_import_route())
         .or(routes::bls_key_provision_route())

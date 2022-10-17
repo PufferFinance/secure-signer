@@ -11,5 +11,53 @@
 >- Each `W[i]` can compute then save `BLS_SK[i]` by first deriving `K[i]` via ECDH from their saved `SK[i]`, then decrypting `CT_BLS_SK[i]` with it.
 >- At this point, the `Leader` has saved an aggregate BLS public key `AGG_PK` and the enclave code ensures that it has forgotten each `BLS_SK[i]`. Each `Worker` has saved a BLS secret key `BLS_SK[i]` in their enclave memory which can only be used during the oracle service. In order to generate a valid aggregeate signature, all `n` `Workers` must sign off on the message.
 
-> ## Leader
-> ## Worker
+# APIs
+> ### /portal/v1/keygen/eth
+>> `POST`: Generates an ETH SECP256K1 secret key in the enclave. 
+>>> Request body: None
+
+>>> Response body: 
+>>> ```
+>>> {TODO}
+>>> ```
+
+>> `GET`: Lists the public keys of each ETH SECP256K1 secret key safeguarded in the enclave.
+>>> Response body: 
+>>> ```
+>>> {TODO}
+>>> ```
+
+> ### /portal/v1/keygen/bls
+>> `POST`: Generates a BLS12-381 secret key in the enclave. 
+>>> Request body: None
+
+>>> Response body: 
+>>> ```
+>>> {TODO}
+>>> ```
+
+>> `GET`: Lists the public keys of each of the *generated* BLS12-381 secret keys safeguarded in the enclave.
+>>> Response body: 
+>>> ```
+>>> {TODO}
+>>> ```
+
+
+> ### /portal/v1/keystores/bls
+>> `POST`: Imports a BLS12-381 secret key to the enclave. 
+>>> Request body:
+>>> ```
+>>> {TODO}
+>>> ```
+
+>>> Response body: 
+>>> ```
+>>> {TODO}
+>>> ```
+
+>> `GET`: Lists the public keys of each of the *imported* BLS12-381 secret keys safeguarded in the enclave.
+>>> Response body: 
+>>> ```
+>>> {TODO}
+>>> ```
+

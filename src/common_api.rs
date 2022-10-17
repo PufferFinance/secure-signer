@@ -56,8 +56,13 @@ pub struct ListKeysResponse {
 impl ListKeysResponse {
     pub fn new(keys: Vec<String>) -> ListKeysResponse {
         let inners = keys.iter().map(|pk| {
+            // Strip leading 0x if included
+            let pubkey = match pk[0..2].into() {
+                "0x" => pk[2..].to_string(),
+                _ => pk.to_string(),
+            };
             ListKeysResponseInner {
-                pubkey: format!("0x{}", pk),
+                pubkey: pubkey.into()
             }
         }).collect();
 

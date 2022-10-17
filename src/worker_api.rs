@@ -10,9 +10,9 @@ use crate::keys::{eth_key_gen, pk_to_eth_addr, read_eth_key, new_eth_key, write_
 use std::collections::HashMap;
 
 
-/// Makes a Reqwest GET request to the API endpoint to get a ListKeysResponse
-pub async fn list_bls_keys_get_request() -> Result<ListKeysResponse> {
-    let url = format!("http://localhost:3030/portal/v1/keystores");
+/// Makes a Reqwest GET request to the Leader's `list_generated_bls_keys_route` route to get a ListKeysResponse.
+pub async fn list_generated_bls_keys_get_request() -> Result<ListKeysResponse> {
+    let url = format!("http://localhost:3030/portal/v1/keygen/bls");
     let resp = get_request(&url)
         .await
         .with_context(|| format!("failed GET request to URL: {}", url))?
@@ -23,9 +23,9 @@ pub async fn list_bls_keys_get_request() -> Result<ListKeysResponse> {
     Ok(resp)
 }
 
-/// Handles errors and prepares an http response for running `list_bls_keys_get_request`
-pub async fn list_bls_keys_request() -> Result<impl warp::Reply, warp::Rejection> {
-    match list_bls_keys_get_request().await {
+/// Handles errors and prepares an http response for running `list_generated_bls_keys_get_request`
+pub async fn list_generated_bls_keys_request() -> Result<impl warp::Reply, warp::Rejection> {
+    match list_generated_bls_keys_get_request().await {
         Ok(resp) => {
             Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
         }
@@ -38,8 +38,9 @@ pub async fn list_bls_keys_request() -> Result<impl warp::Reply, warp::Rejection
 }
 
 
+/// Makes a Reqwest GET request to the Leader's `bls_key_gen_route` route to get a KeyGenResponse.
 pub async fn bls_key_gen_get_request() -> Result<KeyGenResponse> {
-    let url = format!("http://localhost:3030/portal/v1/keystores");
+    let url = format!("http://localhost:3030/portal/v1/keygen/bls");
     let resp = post_request_no_body(&url)
         .await
         .with_context(|| format!("failed GET request to URL: {}", url))?
@@ -50,6 +51,7 @@ pub async fn bls_key_gen_get_request() -> Result<KeyGenResponse> {
     Ok(resp)
 }
 
+/// Handles errors and prepares an http response for running `bls_key_gen_get_request`
 pub async fn bls_key_gen_request() -> Result<impl warp::Reply, warp::Rejection> {
     match bls_key_gen_get_request().await {
         Ok(resp) => {
@@ -62,7 +64,6 @@ pub async fn bls_key_gen_request() -> Result<impl warp::Reply, warp::Rejection> 
         }
     }
 }
-
 
 pub async fn bls_key_gen_provision_post_request(body: KeyProvisionRequest) -> Result<KeyProvisionResponse> {
     let url = format!("http://localhost:3030/portal/v1/provision");

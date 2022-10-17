@@ -26,6 +26,14 @@ pub fn new_eth_key() -> Result<(EthSecretKey, EthPublicKey)> {
     Ok(generate_keypair())
 }
 
+pub fn eth_sk_to_hex(sk: &EthSecretKey) -> String {
+    hex::encode(sk.serialize())
+}
+
+pub fn eth_pk_to_hex(pk: &EthPublicKey) -> String {
+    hex::encode(pk.serialize())
+}
+
 /// keccak hash function to hash arbitrary bytes to 32 bytes 
 pub fn keccak(bytes: &[u8]) -> Result<[u8; 32]> {
     // create a Keccak256 object
@@ -92,17 +100,16 @@ pub fn checksum(address: &str) -> Result<String> {
         }))
 }
 
-/// write the Eth SECP256K1 secret key to a secure file using the derived 
-/// Eth wallet address as the file name
+/// write the Eth SECP256K1 secret key to a secure file using the hex encoded pk as filename 
 fn save_eth_key(sk: EthSecretKey, pk: EthPublicKey) -> Result<EthPublicKey> {
-    // convert the pk to an eth address
-    let addr = pk_to_eth_addr(&pk).with_context(|| "couldnt convert pk to eth addr to use as file name")?;
-    println!("new enclave address: {}", addr);
+    // let pk_hex = hex::encode(pk.serialize());
+    let pk_hex = eth_pk_to_hex(&pk);
+    println!("new enclave pk: {}", pk_hex);
 
-    let sk_hex = hex::encode(sk.serialize());
+    let sk_hex = eth_sk_to_hex(&sk);
     println!("debug sk_hex: {:?}", sk_hex);
 
-    write_key(&format!("eth_keys/{}", addr), &sk_hex).with_context(|| "eth sk failed to save")?;
+    write_key(&format!("eth_keys/{}", pk_hex), &sk_hex).with_context(|| "eth sk failed to save")?;
 
     Ok(pk)
 }
@@ -436,9 +443,9 @@ mod tests {
         // gen key and save it to file
         let pk = eth_key_gen()?;
         // rederive eth wallet address filename
-        let addr = pk_to_eth_addr(&pk)?;
+        let fname = eth_pk_to_hex(&pk);
         // read sk from file
-        let sk = read_eth_key(&addr)?;
+        let sk = read_eth_key(&fname)?;
 
         let msg = b"yadayada";
 
@@ -644,16 +651,16 @@ mod tests {
         // number of nodes
         const n: usize = 10;
 
-        // generate n eth keys
+        // generate n eth keys (saving them to fs)
         let eth_pks: Vec<EthPublicKey> = (0..n).into_iter()
             .map(|_| eth_key_gen().unwrap()).collect();
 
-        // derive n eth wallet addresses
-        let eth_addrs: Vec<String> = eth_pks.iter()
-            .map(|pk| pk_to_eth_addr(pk).unwrap()).collect();
+        // hex encode pks
+        let pk_hexs: Vec<String> = eth_pks.iter()
+            .map(|pk| eth_pk_to_hex(pk)).collect();
 
         // lookup n eth secret keys
-        let eth_sks: Vec<EthSecretKey> = eth_addrs.iter()
+        let eth_sks: Vec<EthSecretKey> = pk_hexs.iter()
             .map(|addr| read_eth_key(addr).unwrap()).collect();
 
         // generate n BLS keys
