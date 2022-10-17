@@ -24,6 +24,7 @@ async fn main() {
         // .or(common_api::bls_key_gen_route())
         .or(common_api::eth_key_gen_route())
         .or(common_api::list_bls_keys_route())
+        .or(common_api::bls_key_import_route())
         .or(leader_api::bls_key_provision_route());
 
     warp::serve(routes).run(([127, 0, 0, 1], LEADER_PORT)).await

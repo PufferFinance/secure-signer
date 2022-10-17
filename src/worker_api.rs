@@ -4,7 +4,7 @@ use ecies::decrypt;
 use warp::{reply, Filter, http::Response, http::StatusCode};
 use crate::attest::fetch_dummy_evidence;
 use crate::datafeed::{get_btc_price_feed, get_request, post_request, post_request_no_body};
-use crate::common_api::{KeyProvisionRequest, KeyProvisionResponse, ListKeysResponse, KeyGenResponse};
+use crate::common_api::{KeyProvisionRequest, KeyProvisionResponse, ListKeysResponse, KeyGenResponse, KeyImportRequest, KeyImportResponse};
 use crate::keys::{eth_key_gen, pk_to_eth_addr, read_eth_key, new_eth_key, write_key};
 
 use std::collections::HashMap;
@@ -166,8 +166,48 @@ pub fn request_bls_key_provision_route() -> impl Filter<Extract = impl warp::Rep
         .and_then(bls_key_gen_provision_request)
 }
 
+/// Makes a Reqwest POST request to the API endpoint to get a KeyImportResponse
+pub async fn bls_key_import_post_request(req: KeyImportRequest) -> Result<KeyImportResponse> {
+    let url = format!("http://localhost:3030/portal/v1/keystores/import");
+    let resp = post_request(&url, req)
+        .await
+        .with_context(|| format!("failed POST request to URL: {}", url))?
+        .json::<KeyImportResponse>()
+        .await
+        .with_context(|| format!("could not parse json response from  URL: {}", url))?;
+    println!("{:#?}", resp);
+    Ok(resp)
+}
+
+/// Handles errors and prepares an http response for running `bls_key_import_post_request`
+pub async fn bls_key_import_request(req: KeyImportRequest) -> Result<impl warp::Reply, warp::Rejection> {
+    match bls_key_import_post_request(req).await {
+        Ok(resp) => {
+            Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
+        }
+        Err(e) => {
+            let mut resp = HashMap::new();
+            resp.insert("error", e.to_string());
+            Ok(reply::with_status(reply::json(&resp), StatusCode::INTERNAL_SERVER_ERROR))
+        }
+    }
+}
+
+/// Asks the server Sample client route for getting a specific datafeed
+pub fn request_bls_key_import_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    warp::post()
+        .and(warp::path("portal"))
+        .and(warp::path("v1"))
+        .and(warp::path("keystores"))
+        .and(warp::path("import"))
+        .and(warp::body::json())
+        .and_then(bls_key_import_request)
+}
+
 #[cfg(test)]
 mod tests {
+    use ecies::encrypt;
+    use crate::keys::new_bls_key;
     use super::*;
 
     #[tokio::test]
@@ -206,5 +246,39 @@ mod tests {
             .await;
         assert_eq!(res.status(), 200);
         println!{"{:?}", res.body()};
+    }
+
+    #[tokio::test]
+    async fn test_request_bls_key_import_route() {
+        let filter = request_bls_key_import_route();
+
+        // generate ETH sk (abuse that we are working in a shared fs and this key will be saved in leader's fs)
+        let leader_eth_pk = eth_key_gen().unwrap();
+        let encrypting_pk_hex = hex::encode(leader_eth_pk.serialize());
+
+        // generate a new BLS sk to import
+        let bls_sk = new_bls_key().unwrap();
+        let ct_bls_sk = encrypt(&leader_eth_pk.serialize(), &bls_sk.serialize()).unwrap();
+        let ct_bls_sk_hex = hex::encode(ct_bls_sk);
+        let bls_pk_hex = hex::encode(bls_sk.sk_to_pk().serialize());
+
+        let req = KeyImportRequest {
+            ct_bls_sk_hex,
+            bls_pk_hex,
+            encrypting_pk_hex
+        };
+        println!("making bls key import req: {:?}", req);
+
+        let res = warp::test::request()
+            .method("POST")
+            .header("accept", "application/json")
+            .path("/portal/v1/keystores/import")
+            .json(&req)
+            .reply(&filter)
+            .await;
+
+        println!{"{:?}", res.body()};
+        assert_eq!(res.status(), 200);
+
     }
 }

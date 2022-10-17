@@ -263,7 +263,7 @@ pub fn read_bls_key(pk_hex: &String) -> Result<SecretKey> {
 
 /// Reads hex-encoded secret key from a file named from `pk_hex` and converts it to an Eth SecretKey
 pub fn read_eth_key(fname: &String) -> Result<EthSecretKey> {
-    let file_path: PathBuf = ["./etc/keys/", fname.as_str()].iter().collect();
+    let file_path: PathBuf = ["./etc/keys/eth_keys", fname.as_str()].iter().collect();
     let sk_rec_bytes = fs::read(&file_path).with_context(|| "Unable to read eth secret key")?;
     let sk_rec_dec = hex::decode(sk_rec_bytes).with_context(|| "Unable to decode sk hex")?;
     EthSecretKey::parse_slice(&sk_rec_dec).with_context(|| "couldn't parse sk bytes to eth sk type")

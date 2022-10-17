@@ -1,10 +1,13 @@
-use crate::keys::{bls_key_gen, list_bls_keys, eth_key_gen};
+use crate::keys::{bls_key_gen, list_bls_keys, eth_key_gen, read_eth_key, pk_to_eth_addr, write_key};
 use crate::attest::{epid_remote_attestation, AttestationEvidence};
 
 use anyhow::{Result, Context, bail};
+use blst::min_pk::SecretKey;
 use serde_derive::{Deserialize, Serialize};
 use warp::{reply, Filter, http::Response, http::StatusCode};
 use std::collections::HashMap;
+use ecies::PublicKey as EthPublicKey;
+use ecies::decrypt;
 
 /// Runs all the logic to generate and save a new BLS key. Returns a `KeyGenResponse` on success.
 pub async fn epid_remote_attestation_service(req: AttestationRequest) -> Result<impl warp::Reply, warp::Rejection> {
@@ -163,4 +166,73 @@ pub fn list_bls_keys_route() -> impl Filter<Extract = impl warp::Reply, Error = 
         .and(warp::path("v1"))
         .and(warp::path("keystores"))
         .and_then(list_bls_keys_service)
+}
+
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct KeyImportRequest {
+    pub ct_bls_sk_hex: String,
+    pub bls_pk_hex: String,
+    pub encrypting_pk_hex: String,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct KeyImportResponseInner {
+    pub status: String,
+    pub message: String,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct KeyImportResponse {
+    pub data: [KeyImportResponseInner; 1],
+}
+
+pub fn decrypt_and_save_imported_bls_key(req: &KeyImportRequest) -> Result<()> {
+    println!("Leader servicing req: {:?}", req);
+    let pk_bytes = hex::decode(&req.encrypting_pk_hex)?;
+    let pk = EthPublicKey::parse_slice(&pk_bytes, None)?;
+    let addr = pk_to_eth_addr(&pk)?;
+    println!("reading eth key with addr: {}", addr);
+    let sk = read_eth_key(&addr)?;
+    let ct_bls_sk_bytes = hex::decode(&req.ct_bls_sk_hex)?;
+    let bls_sk_bytes = decrypt(&sk.serialize(), &ct_bls_sk_bytes)?;
+    let bls_sk = match SecretKey::from_bytes(&bls_sk_bytes) {
+        Ok(sk) => sk,
+        Err(e) => bail!("couldn't recover bls sk from import request: {:?}", e),
+    };
+    if hex::encode(bls_sk.sk_to_pk().serialize()) != req.bls_pk_hex {
+        bail!("The imported bls sk doesn't match the expected bls pk")
+    }
+    let fname = format!("bls_keys/imports/{}", req.bls_pk_hex);
+    let bls_sk_hex = hex::encode(bls_sk.serialize());
+    // save the bls key  
+    write_key(&fname, &bls_sk_hex)
+}
+
+/// Decrypts and saves an incoming encrypted BLS key. Returns a `KeyImportResponse` on success.
+pub async fn bls_key_import_service(req: KeyImportRequest) -> Result<impl warp::Reply, warp::Rejection> {
+    match decrypt_and_save_imported_bls_key(&req) {
+        Ok(()) => {
+            // The key has successfully been saved, formulate http response
+            let data = KeyImportResponseInner { status: "imported".to_string(), message: req.bls_pk_hex};
+            let resp = KeyImportResponse { data: [data] };
+            Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
+        }
+        Err(e) => {
+            let mut resp = HashMap::new();
+            resp.insert("error", e.to_string());
+            Ok(reply::with_status(reply::json(&resp), StatusCode::INTERNAL_SERVER_ERROR))
+        }
+    }
+}
+
+/// Imports a BLS private key to the Enclave. 
+pub fn bls_key_import_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    warp::post()
+        .and(warp::path("portal"))
+        .and(warp::path("v1"))
+        .and(warp::path("keystores"))
+        .and(warp::path("import"))
+        .and(warp::body::json())
+        .and_then(bls_key_import_service)
 }
