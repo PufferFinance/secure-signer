@@ -118,7 +118,7 @@ pub fn decrypt_and_save_bls_key(resp: &KeyProvisionResponse, eth_sk_bytes: &[u8]
     let bls_sk_hex = hex::encode(bls_sk.to_bytes());
 
     // save the secret key
-    write_key(&resp.bls_pk_hex, &bls_sk_hex)?;
+    write_key(&format!("bls_keys/generated/{}", resp.bls_pk_hex), &bls_sk_hex)?;
     println!("got bls_sk: {:?}", bls_sk);
     Ok(())
 }

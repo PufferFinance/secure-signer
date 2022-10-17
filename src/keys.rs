@@ -141,11 +141,27 @@ pub fn bls_key_gen(save_key: bool) -> Result<PublicKey> {
     Ok(pk)
 }
 
+pub fn bls_pk_from_hex(pk_hex: String) -> Result<PublicKey> {
+    let pk_bytes = hex::decode(&pk_hex)?;
+    match PublicKey::from_bytes(&pk_bytes) {
+        Ok(pk) => Ok(pk),
+        Err(e) => bail!("failed to recover BLS pk from pk_hex: {}, error: {:?}", pk_hex, e)
+    }
+}
+
+pub fn bls_sk_from_hex(sk_hex: String) -> Result<SecretKey> {
+    let sk_bytes = hex::decode(sk_hex)?;
+    match SecretKey::from_bytes(&sk_bytes) {
+        Ok(sk) => Ok(sk),
+        Err(e) => bail!("failed to recover BLS sk from sk_hex, error: {:?}", e)
+    }
+}
+
 /// Generates a BLS secret key then encrypts via ECDH using pk_hex
-// pub fn bls_key_provision(eth_pk_hex: &String) -> Result<(Vec<u8>, PublicKey)> {
-pub fn bls_key_provision(eth_pk_hex: &String) -> Result<(String, PublicKey)> {
+pub fn bls_key_provision(eth_pk_hex: &String) -> Result<(String, String)> {
     let sk = new_bls_key()?;
     let pk = sk.sk_to_pk();
+    let bls_pk_hex = hex::encode(pk.compress());
     let receiver_pub = hex::decode(eth_pk_hex)
         .with_context(|| format!("couldnt decode eth_pk_hex in bls_key_provision: {}", eth_pk_hex))?;
 
@@ -154,7 +170,10 @@ pub fn bls_key_provision(eth_pk_hex: &String) -> Result<(String, PublicKey)> {
 
     let ct_sk_hex = hex::encode(ct_sk_bytes);
 
-    Ok((ct_sk_hex, pk))
+    // Save the public bls key (NOT the sk)
+    write_key(&format!("provisioned/{}", bls_pk_hex), &bls_pk_hex)?;
+
+    Ok((ct_sk_hex, bls_pk_hex))
 }
 
 /// Generates `n` BLS secret keys and derives one `n/n` aggregate public key from it
@@ -460,7 +479,7 @@ mod tests {
         let bls_sk = SecretKey::from_bytes(&bls_sk_bytes).unwrap();
 
         // assert this recovered bls sk derives the expected bls pk
-        assert_eq!(bls_sk.sk_to_pk(), bls_pk);
+        assert_eq!(hex::encode(bls_sk.sk_to_pk().compress()), bls_pk);
         
         Ok(())
     }

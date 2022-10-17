@@ -1,8 +1,10 @@
-use crate::keys::{bls_key_gen, bls_key_provision};
+use crate::keys::{bls_key_gen, bls_key_provision, write_key, list_keys, bls_pk_from_hex};
 use crate::attest::{epid_remote_attestation, AttestationEvidence};
 use crate::common_api::{KeyProvisionRequest, KeyProvisionResponse, ListKeysResponse, KeyGenResponse, KeyGenResponseInner, ListKeysResponseInner};
 
 use anyhow::{Result, Context, bail};
+use blst::BLST_ERROR;
+use blst::min_pk::{PublicKey, AggregatePublicKey};
 use serde_derive::{Deserialize, Serialize};
 use warp::{reply, Filter, http::Response, http::StatusCode};
 use std::collections::HashMap;
@@ -26,7 +28,7 @@ pub async fn bls_key_provision_service(req: KeyProvisionRequest) -> Result<impl 
         }
     }
     
-    // TODO verify the req.bls_pk is the same committed in the attestation evidence
+    // Extract bls pk from attestation evidence
     let exp_pk = match req.evidence.get_eth_pk() {
         Ok(pk) => pk,
         Err(e) => {
@@ -37,6 +39,7 @@ pub async fn bls_key_provision_service(req: KeyProvisionRequest) -> Result<impl 
     };
 
     // TODO uncomment this when sending real attestation reports
+    // TODO verify the pk is the same committed in the attestation evidence
     if req.eth_pk_hex != hex::encode(exp_pk.serialize()) {
     //     let mut resp = HashMap::new();
     //     resp.insert("error", "eth_pk_hex does not match pk embedded in attestation evidence");
@@ -45,10 +48,7 @@ pub async fn bls_key_provision_service(req: KeyProvisionRequest) -> Result<impl 
 
     // generate bls sk, encrypt it, respond
     match bls_key_provision(&req.eth_pk_hex) {
-        Ok((ct_bls_sk_hex, bls_pk)) => {
-            // TODO the leader should save this bls_pk
-
-            let bls_pk_hex = hex::encode(bls_pk.compress());
+        Ok((ct_bls_sk_hex, bls_pk_hex)) => {
             let resp = KeyProvisionResponse {
                 ct_bls_sk_hex: ct_bls_sk_hex,
                 bls_pk_hex: bls_pk_hex,
@@ -71,6 +71,67 @@ pub fn bls_key_provision_route() -> impl Filter<Extract = impl warp::Reply, Erro
         .and(warp::path("provision"))
         .and(warp::body::json())
         .and_then(bls_key_provision_service)
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct BLSKeyAggregatorResponse {
+    pub bls_agg_key_hex: String,
+}
+
+pub fn bls_key_aggregator() -> Result<AggregatePublicKey> {
+    // Read the public keys of each member as hex strings
+    let pk_hexs = list_keys("./etc/keys/provisioned")?;
+
+    // convert the hex pks to pks
+    let mut pks: Vec<PublicKey> = Vec::new();
+    for pk_hex in pk_hexs {
+        match bls_pk_from_hex(pk_hex.clone()) {
+            Ok(pk) => pks.push(pk),
+            Err(e) => bail!("bls_key_aggregator() could not convert pk_hex: {} to bls pk, e: {:?}", pk_hex, e),
+        }
+    }
+
+    let pks_refs: Vec<&PublicKey> = pks.iter().map(|pk| pk).collect();
+
+    let agg_pk_res = AggregatePublicKey::aggregate(&pks_refs, true);
+    match agg_pk_res.err() {
+        Some(BLST_ERROR::BLST_SUCCESS) | None => {
+            let agg_pk = agg_pk_res.unwrap();
+            println!("agg_pk: {:?}", hex::encode(agg_pk.to_public_key().to_bytes()));
+            Ok(agg_pk)
+        },
+        _ => bail!("Failed to aggregate BLS pub keys"),
+    }
+
+}
+
+
+// get aggregate pk
+pub async fn bls_key_aggregator_service() -> Result<impl warp::Reply, warp::Rejection> {
+    match bls_key_aggregator() {
+        Ok(agg_pk) => {
+
+            let bls_agg_key_hex = hex::encode(agg_pk.to_public_key().compress());
+            let resp = BLSKeyAggregatorResponse {
+                bls_agg_key_hex
+            };
+            Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
+        }
+        Err(e) => {
+            let mut resp = HashMap::new();
+            resp.insert("error", e.to_string());
+            Ok(reply::with_status(reply::json(&resp), StatusCode::INTERNAL_SERVER_ERROR))
+        }
+    }
+}
+
+/// the route to call `bls_key_aggregator_service`
+pub fn bls_key_aggregator_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    warp::get()
+        .and(warp::path("portal"))
+        .and(warp::path("v1"))
+        .and(warp::path("aggregate"))
+        .and_then(bls_key_aggregator_service)
 }
 
 #[cfg(test)]
