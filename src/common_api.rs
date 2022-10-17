@@ -1,9 +1,10 @@
-use crate::keys::{bls_key_gen, eth_key_gen, read_eth_key, pk_to_eth_addr, write_key, list_eth_keys, list_imported_bls_keys, list_generated_bls_keys};
+use crate::keys::{bls_key_gen, eth_key_gen, read_eth_key, pk_to_eth_addr, write_key, list_eth_keys, list_imported_bls_keys, list_generated_bls_keys, read_bls_key, bls_sign};
 use crate::attest::{epid_remote_attestation, AttestationEvidence};
 
 use anyhow::{Result, Context, bail};
 use blst::min_pk::SecretKey;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
+// use serde_derive::{Deserialize, Serialize};
 use warp::{reply, Filter, http::Response, http::StatusCode};
 use std::collections::HashMap;
 use ecies::PublicKey as EthPublicKey;
@@ -89,7 +90,7 @@ pub async fn bls_key_gen_service() -> Result<impl warp::Reply, warp::Rejection> 
     match bls_key_gen(save_key) {
         Ok(pk) => {
             let pk_hex = hex::encode(pk.compress());
-            let data = KeyGenResponseInner { status: "imported".to_string(), message: pk_hex};
+            let data = KeyGenResponseInner { status: "generated".to_string(), message: pk_hex};
             let resp = KeyGenResponse { data: [data] };
             Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
         }
@@ -160,6 +161,47 @@ pub async fn list_eth_keys_service() -> Result<impl warp::Reply, warp::Rejection
             let mut resp = HashMap::new();
             resp.insert("error", e.to_string());
             Ok(reply::with_status(reply::json(&resp), warp::http::StatusCode::INTERNAL_SERVER_ERROR))
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct BlsSignRequest {
+    pub msg_hex: String,
+    pub bls_pk_hex: String,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct BlsSignResponse {
+    pub msg_hex: String,
+    pub bls_sig_hex: String,
+}
+
+pub async fn bls_sign_data(req: BlsSignRequest) -> Result<impl warp::Reply, warp::Rejection> {
+    let msg = match hex::decode(&req.msg_hex) {
+        Ok(msg) => msg,
+        Err(e) => {
+            let mut resp = HashMap::new();
+            resp.insert("error", e.to_string());
+            return Ok(reply::with_status(reply::json(&resp), warp::http::StatusCode::INTERNAL_SERVER_ERROR))
+        }
+    };
+
+    // Possible verify something about the msg first
+    // ...
+
+    match bls_sign(&req.bls_pk_hex, &msg) {
+        Ok(sig) => {
+            let resp = BlsSignResponse {
+                msg_hex: req.msg_hex,
+                bls_sig_hex: hex::encode(sig.serialize())
+            };
+            Ok(reply::with_status(reply::json(&resp), warp::http::StatusCode::OK))
+        },
+        Err(e) => {
+            let mut resp = HashMap::new();
+            resp.insert("error", e.to_string());
+            return Ok(reply::with_status(reply::json(&resp), warp::http::StatusCode::INTERNAL_SERVER_ERROR))
         }
     }
 }

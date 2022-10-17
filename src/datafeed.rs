@@ -65,7 +65,7 @@ pub async fn coindesk_usd_feed(url: String) -> Result<f64> {
 pub async fn get_btc_price_feed() -> Result<impl warp::Reply, warp::Rejection> {
     let url = format!("https://api.coindesk.com/v1/bpi/currentprice.json");
     match coindesk_usd_feed(url.clone()).await {
-        Ok((price)) => {
+        Ok(price) => {
             let mut resp = HashMap::new();
             resp.insert("price", price);
             Ok(warp::reply::with_status(warp::reply::json(&resp), warp::http::StatusCode::OK))

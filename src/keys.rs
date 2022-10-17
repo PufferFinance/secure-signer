@@ -142,7 +142,7 @@ pub fn bls_key_gen(save_key: bool) -> Result<PublicKey> {
 
     // save secret key using pk_hex as file identifier (omitting '0x' prefix)
     if save_key {
-        write_key(&format!("bls_keys/{}", pk_hex), &sk_hex).with_context(|| "failed to save bls key")?;
+        write_key(&format!("bls_keys/generated/{}", pk_hex), &sk_hex).with_context(|| "failed to save bls key")?;
     }
 
     Ok(pk)
@@ -230,25 +230,20 @@ pub fn verify_bls_sig(sig: Signature, pk: PublicKey, msg: &[u8]) -> Result<()> {
 
 /// Performs BLS signnature on `msg` using the BLS secret key looked up from memory
 /// with pk_hex as the file identifier. 
-fn bls_sign(pk_hex: &String, msg: &[u8]) -> Result<Signature> {
-    // read pk
-    let pk_bytes = hex::decode(pk_hex)?;
-    let pk_res = PublicKey::from_bytes(&pk_bytes);
-
-    let pk = match pk_res.as_ref().err() {
-        Some(BLST_ERROR::BLST_SUCCESS) | None => {
-            let pk = pk_res.unwrap();
-            println!("pk: {:?}", hex::encode(pk.to_bytes()));
-            pk
-        },
-        _ => bail!("Could not recover pk from pk_hex"),
+pub fn bls_sign(pk_hex: &String, msg: &[u8]) -> Result<Signature> {
+    // the sk is either imported or generated or does not exist:
+    let sk = match read_bls_key(&format!("imported/{}", pk_hex)) {
+        Ok(sk) => sk,
+        Err(_) => match read_bls_key(&format!("generated/{}", pk_hex)) {
+            Ok(sk) => sk,
+            Err(e) => bail!("Secret key for pk: {} not found", pk_hex)
+        }
     };
 
-    // read sk
-    let sk = read_bls_key(&pk_hex)?;
+    let exp_pk = bls_pk_from_hex(pk_hex.to_owned()).with_context(|| format!("failed to read pk: {} in bls_sign()", pk_hex))?;
 
     // valid keypair
-    if sk.sk_to_pk() != pk {
+    if sk.sk_to_pk() != exp_pk {
         bail!("Mismatch with input and derived pk");
     }
     println!("DEBUG: sk recovered {:?}", sk);
@@ -257,7 +252,7 @@ fn bls_sign(pk_hex: &String, msg: &[u8]) -> Result<Signature> {
     let sig = sk.sign(msg, CIPHER_SUITE, &[]);
 
     // verify the signatures correctness
-    verify_bls_sig(sig, pk, msg)?;
+    verify_bls_sig(sig, exp_pk, msg)?;
 
     // Return the BLS signature
     Ok(sig)

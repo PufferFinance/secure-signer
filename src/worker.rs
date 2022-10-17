@@ -41,10 +41,14 @@ async fn main() {
         // curl -X GET localhost:3031/portal/v1/keystores
         .or(routes::list_imported_bls_keys_route())
 
-        // Endpoint to list pks of saved bls keys 
+        // Endpoint to request a signature using BLS sk 
+        // curl -X POST localhost:3031/portal/v1/sign/bls -H "Content-Type: application/json"  -d '{"msg_hex": "0xdeadbeef", "bls_pk_hex": "0x123"}'  
+        .or(routes::bls_sign_route())
+
+        // Endpoint to make a pricefeed request
+        .or(routes::btc_pricefeed_route());
         // .or(routes::request_bls_key_import_route())
-        // .or(routes::btc_pricefeed_route())
-        .or(routes::request_bls_key_provision_route());
+        // .or(routes::request_bls_key_provision_route());
 
     warp::serve(routes).run(([127, 0, 0, 1], WORKER_PORT)).await;
 }
