@@ -37,16 +37,7 @@ pub async fn list_bls_keys_request() -> Result<impl warp::Reply, warp::Rejection
     }
 }
 
-/// Asks the server Sample client route for getting a specific datafeed
-pub fn request_list_bls_keys_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    warp::get()
-        .and(warp::path("portal"))
-        .and(warp::path("v1"))
-        .and(warp::path("keystores"))
-        .and_then(list_bls_keys_request)
-}
 
-/// 
 pub async fn bls_key_gen_get_request() -> Result<KeyGenResponse> {
     let url = format!("http://localhost:3030/portal/v1/keystores");
     let resp = post_request_no_body(&url)
@@ -72,23 +63,6 @@ pub async fn bls_key_gen_request() -> Result<impl warp::Reply, warp::Rejection> 
     }
 }
 
-/// Asks the server Sample client route for getting a specific datafeed
-pub fn request_bls_key_gen_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    warp::post()
-        .and(warp::path("portal"))
-        .and(warp::path("v1"))
-        .and(warp::path("keystores"))
-        .and_then(bls_key_gen_request)
-}
-
-/// Sample client route for getting a specific datafeed
-pub fn btc_pricefeed_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    warp::get()
-        .and(warp::path("portal"))
-        .and(warp::path("v1"))
-        .and(warp::path("datafeed"))
-        .and_then(get_btc_price_feed)
-}
 
 pub async fn bls_key_gen_provision_post_request(body: KeyProvisionRequest) -> Result<KeyProvisionResponse> {
     let url = format!("http://localhost:3030/portal/v1/provision");
@@ -158,13 +132,6 @@ pub async fn bls_key_gen_provision_request() -> Result<impl warp::Reply, warp::R
     }
 }
 
-pub fn request_bls_key_provision_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    warp::post()
-        .and(warp::path("portal"))
-        .and(warp::path("v1"))
-        .and(warp::path("provision"))
-        .and_then(bls_key_gen_provision_request)
-}
 
 /// Makes a Reqwest POST request to the API endpoint to get a KeyImportResponse
 pub async fn bls_key_import_post_request(req: KeyImportRequest) -> Result<KeyImportResponse> {
@@ -193,21 +160,12 @@ pub async fn bls_key_import_request(req: KeyImportRequest) -> Result<impl warp::
     }
 }
 
-/// Asks the server Sample client route for getting a specific datafeed
-pub fn request_bls_key_import_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    warp::post()
-        .and(warp::path("portal"))
-        .and(warp::path("v1"))
-        .and(warp::path("keystores"))
-        .and(warp::path("import"))
-        .and(warp::body::json())
-        .and_then(bls_key_import_request)
-}
 
 #[cfg(test)]
 mod tests {
     use ecies::encrypt;
     use crate::keys::new_bls_key;
+    use crate::routes::*;
     use super::*;
 
     #[tokio::test]

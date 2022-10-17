@@ -1,12 +1,11 @@
-use crate::keys::{bls_key_gen, bls_key_provision, write_key, list_keys, bls_pk_from_hex};
-use crate::attest::{epid_remote_attestation, AttestationEvidence};
-use crate::common_api::{KeyProvisionRequest, KeyProvisionResponse, ListKeysResponse, KeyGenResponse, KeyGenResponseInner, ListKeysResponseInner};
+use crate::keys::{bls_key_provision, list_keys, bls_pk_from_hex};
+use crate::common_api::{KeyProvisionRequest, KeyProvisionResponse};
 
 use anyhow::{Result, Context, bail};
 use blst::BLST_ERROR;
 use blst::min_pk::{PublicKey, AggregatePublicKey};
 use serde_derive::{Deserialize, Serialize};
-use warp::{reply, Filter, http::Response, http::StatusCode};
+use warp::{reply, http::StatusCode};
 use std::collections::HashMap;
 
 
@@ -63,15 +62,6 @@ pub async fn bls_key_provision_service(req: KeyProvisionRequest) -> Result<impl 
     }
 }
 
-/// the route to call `bls_key_provision_service`
-pub fn bls_key_provision_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    warp::post()
-        .and(warp::path("portal"))
-        .and(warp::path("v1"))
-        .and(warp::path("provision"))
-        .and(warp::body::json())
-        .and_then(bls_key_provision_service)
-}
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct BLSKeyAggregatorResponse {
@@ -125,20 +115,13 @@ pub async fn bls_key_aggregator_service() -> Result<impl warp::Reply, warp::Reje
     }
 }
 
-/// the route to call `bls_key_aggregator_service`
-pub fn bls_key_aggregator_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    warp::get()
-        .and(warp::path("portal"))
-        .and(warp::path("v1"))
-        .and(warp::path("aggregate"))
-        .and_then(bls_key_aggregator_service)
-}
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::keys::{new_bls_key, new_eth_key, CIPHER_SUITE};
     use crate::attest::{AttestationEvidence};
+    use crate::routes::*;
     use ecies::{decrypt};
     use blst::min_pk::{SecretKey, PublicKey, Signature};
     use std::fs;
