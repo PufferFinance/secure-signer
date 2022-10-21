@@ -1,13 +1,11 @@
-use crate::keys::{bls_key_gen, eth_key_gen, read_eth_key, pk_to_eth_addr, write_key, list_eth_keys, list_imported_bls_keys, list_generated_bls_keys, read_bls_key, bls_sign};
+use crate::keys::{bls_key_gen, eth_key_gen, read_eth_key, write_key, list_eth_keys, list_imported_bls_keys, list_generated_bls_keys, bls_sign};
 use crate::attest::{epid_remote_attestation, AttestationEvidence};
 
-use anyhow::{Result, Context, bail};
+use anyhow::{Result, bail};
 use blst::min_pk::SecretKey;
 use serde::{Deserialize, Serialize};
-// use serde_derive::{Deserialize, Serialize};
-use warp::{reply, Filter, http::Response, http::StatusCode};
+use warp::{reply, http::StatusCode};
 use std::collections::HashMap;
-use ecies::PublicKey as EthPublicKey;
 use ecies::decrypt;
 
 /// Runs all the logic to generate and save a new BLS key. Returns a `KeyGenResponse` on success.

@@ -1,9 +1,9 @@
 use anyhow::{Result, Context, bail};
 use blst::min_pk::SecretKey;
 use ecies::decrypt;
-use warp::{reply, Filter, http::Response, http::StatusCode};
+use warp::{reply, http::StatusCode};
 use crate::attest::{fetch_dummy_evidence, epid_remote_attestation};
-use crate::datafeed::{get_btc_price_feed, get_request, post_request, post_request_no_body};
+use crate::datafeed::{get_request, post_request, post_request_no_body};
 use crate::common_api::{KeyProvisionRequest, KeyProvisionResponse, ListKeysResponse, KeyGenResponse, KeyImportRequest, KeyImportResponse};
 use crate::keys::{eth_key_gen, pk_to_eth_addr, read_eth_key, new_eth_key, write_key};
 

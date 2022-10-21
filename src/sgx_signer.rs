@@ -174,6 +174,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_list_imported_bls_keys_route() {
+        // clear any existing local keys
         fs::remove_dir_all("./etc");
         let key_gen_resp = mock_request_bls_key_import_route().await;
         let bls_pk_hex = key_gen_resp.data[0].message.clone();
@@ -183,5 +184,50 @@ mod tests {
         assert_eq!(list_keys_resp.data.len(), 1);
         assert_eq!(list_keys_resp.data[0].pubkey, bls_pk_hex);
     }
+
+
+    async fn mock_request_bls_key_gen_route() -> KeyGenResponse {
+        let filter = bls_key_gen_route();
+        let res = warp::test::request()
+            .method("POST")
+            .path("/eth/v1/keygen/bls")
+            .reply(&filter)
+            .await;
+
+        println!{"{:?}", res.body()};
+        assert_eq!(res.status(), 200);
+
+        let resp: KeyGenResponse = serde_json::from_slice(&res.body()).unwrap();
+
+        assert_eq!(resp.data[0].status, "generated".to_string());
+        resp
+    }
+
+    async fn mock_request_generated_bls_key_list_route() -> ListKeysResponse {
+        let filter = list_generated_bls_keys_route();
+        let res = warp::test::request()
+            .method("GET")
+            .path("/eth/v1/keygen/bls")
+            .reply(&filter)
+            .await;
+
+        assert_eq!(res.status(), 200);
+        let resp: ListKeysResponse = serde_json::from_slice(&res.body()).unwrap();
+        resp
+    }
+
+    #[tokio::test]
+    async fn test_bls_key_gen_route() {
+        // clear any existing local keys
+        fs::remove_dir_all("./etc");
+        let key_gen_resp = mock_request_bls_key_gen_route().await;
+        let bls_pk_hex = key_gen_resp.data[0].message.clone();
+        assert_eq!(key_gen_resp.data.len(), 1);
+
+        let list_keys_resp = mock_request_generated_bls_key_list_route().await;
+        assert_eq!(list_keys_resp.data.len(), 1);
+        assert_eq!(list_keys_resp.data[0].pubkey, bls_pk_hex);
+    }
+
 }
 
