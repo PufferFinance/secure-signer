@@ -37,8 +37,16 @@ async fn main() {
         .or(routes::list_generated_eth_keys_route())
 
         .or(routes::bls_key_import_route())
+
+        // Endpoint to provision a new bls key
+        // curl -X POST localhost:3030/portal/v1/provision -H "Content-Type: application/json"  -d '{"eth_pk_hex": "deadbeef", "evidence": "{}"}' 
         .or(routes::bls_key_provision_route())
         .or(routes::bls_key_aggregator_route());
 
     warp::serve(routes).run(([127, 0, 0, 1], LEADER_PORT)).await
+
+
+    // let url = "https://api.coindesk.com/v1/bpi/currentprice.json";
+    // let res = datafeed::coindesk_usd_feed(url.into()).await;
+    // println!("got res: {:?}", res);
 }

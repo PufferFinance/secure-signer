@@ -177,6 +177,7 @@ pub fn bls_key_provision(eth_pk_hex: &String) -> Result<(String, String)> {
 
     let ct_sk_hex = hex::encode(ct_sk_bytes);
 
+    println!("provisioned bls key: {}", bls_pk_hex);
     // Save the public bls key (NOT the sk)
     write_key(&format!("provisioned/{}", bls_pk_hex), &bls_pk_hex)?;
 

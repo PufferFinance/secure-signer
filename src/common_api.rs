@@ -12,7 +12,8 @@ use ecies::decrypt;
 
 /// Runs all the logic to generate and save a new BLS key. Returns a `KeyGenResponse` on success.
 pub async fn epid_remote_attestation_service(req: AttestationRequest) -> Result<impl warp::Reply, warp::Rejection> {
-    match epid_remote_attestation(&req.wallet_address) {
+    let from_file = true;
+    match epid_remote_attestation(&req.pub_key, from_file) {
         Ok(evidence) => {
             // TODO can embed AttestationEvidence into parent data structure
             Ok(reply::with_status(reply::json(&evidence), StatusCode::OK))
@@ -27,7 +28,7 @@ pub async fn epid_remote_attestation_service(req: AttestationRequest) -> Result<
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct AttestationRequest {
-    pub wallet_address: String,
+    pub pub_key: String,
 }
 
 #[derive(Deserialize, Serialize, Debug)]

@@ -1,0 +1,53 @@
+CMAKE_MINIMUM_REQUIRED(VERSION 3.5)
+
+MESSAGE(STATUS "Build Mode: ${BUILD_MODE}")
+ADD_COMPILE_OPTIONS(-std=c++11)
+if(BUILD_MODE STREQUAL "Debug")
+  ADD_COMPILE_OPTIONS(-O0 -g2 -DDEBUG -UNDEBUG -UEDEBUG)
+endif()
+
+PROJECT(REMOTE_ATTESTATION LANGUAGES CXX VERSION 0.1.0)
+MESSAGE(STATUS "BINARY dir " ${CMAKE_CURRENT_BINARY_DIR})
+MESSAGE(STATUS "SOURCE dir " ${CMAKE_CURRENT_SOURCE_DIR})
+
+SET(SGXSDK_INSTALL_DIR /opt/intel/sgxsdk)
+SET(OCCLUM_INSTALL_DIR /usr/local/occlum/x86_64-linux-musl)
+
+# Gather all epid RA c++ src files to LIB_SRCS
+FILE(GLOB LIB_SRCS ${CMAKE_CURRENT_SOURCE_DIR}/lib/src/*.cpp)
+
+SET(RALIB occlumra)
+# create static libocclumara.a
+ADD_LIBRARY(${RALIB} ${LIB_SRCS})
+# include the necessary deps to perform epid RA
+TARGET_INCLUDE_DIRECTORIES(
+  ${RALIB} PUBLIC
+  ${CMAKE_CURRENT_SOURCE_DIR}/lib/include
+  ${SGXSDK_INSTALL_DIR}/include
+  ${OCCLUM_INSTALL_DIR}/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/deps/cppcodec
+  ${CMAKE_CURRENT_SOURCE_DIR}/deps/rapidjson/include  # for parsing ra_config.json
+)
+# link curl lib for making the RA requests
+TARGET_LINK_LIBRARIES(${RALIB}
+  -L${OCCLUM_INSTALL_DIR}/lib -lcurl
+)
+
+SET(CUSTOM_LIB epid_ra)
+FILE(GLOB APP_SRCS ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
+# create static libepid_ra.a
+ADD_LIBRARY(${CUSTOM_LIB} ${APP_SRCS})
+TARGET_INCLUDE_DIRECTORIES(
+  ${CUSTOM_LIB} PUBLIC
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CMAKE_CURRENT_SOURCE_DIR}/lib/include
+  ${SGXSDK_INSTALL_DIR}/include
+  ${OCCLUM_INSTALL_DIR}/include
+)
+# link this to libocclumra.a
+TARGET_LINK_LIBRARIES(${CUSTOM_LIB}
+  -L${CMAKE_CURRENT_BINARY_DIR} -l${RALIB}
+  -L${OCCLUM_INSTALL_DIR}/lib -lcurl -lcrypto
+  -Wl,-rpath=${CMAKE_CURRENT_BINARY_DIR}:${OCCLUM_INSTALL_DIR}/lib
+)
+ADD_DEPENDENCIES(${CUSTOM_LIB} ${RALIB})

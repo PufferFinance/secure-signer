@@ -54,7 +54,7 @@ pub struct PriceInfo {
 pub async fn coindesk_usd_feed(url: String) -> Result<f64> {
     let resp = get_request(&url)
         .await
-        .with_context(|| format!("failed GET request to URL: {}", url))?
+        .with_context(|| format!("failed POST request to URL: {}", url))?
         .json::<CoinDeskResp>()
         .await
         .with_context(|| format!("could not parse json response from  URL: {}", url))?;

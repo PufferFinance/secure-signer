@@ -16,7 +16,12 @@ const WORKER_PORT: u16 = 3031;
 #[tokio::main]
 async fn main() {
     println!("Starting worker enclave HTTP server on port {}", WORKER_PORT);
-    let routes = routes::epid_remote_attestation_route()
+    let routes = 
+
+        // Endpoint to perform remote attestation with intel using a supplied PK
+        // curl -X POST localhost:3031/portal/v1/remote-attestation H "Content-Type: application/json"  -d '{"pub_key": "123123"}'
+        routes::epid_remote_attestation_route()
+
         // Endpoint to securely generate and save an ETH sk 
         // curl -X POST localhost:3031/portal/v1/keygen/eth
         .or(routes::eth_key_gen_route())
@@ -47,8 +52,15 @@ async fn main() {
 
         // Endpoint to make a pricefeed request
         // curl -X POST localhost:3031/portal/v1/datafeed -H "Content-Type: application/json"  -d '{"url": "https://api.coindesk.com/v1/bpi/currentprice.json", "bls_pk_hex": "..."}'  
-        .or(routes::btc_pricefeed_route());
+        .or(routes::btc_pricefeed_route())
 
+        // Endpoint to request a BLS sk from the leader
+        // curl -X POST localhost:3031/portal/v1/leader/provision
+        .or(routes::request_bls_key_provision_route());
+
+        // .or(routes::request_bls_key_gen_route())
+        // .or(routes::request_list_bls_keys_route());
+        // .or(routes::bls_key_provision_route())
         // .or(routes::request_bls_key_import_route())
         // .or(routes::request_bls_key_provision_route());
 

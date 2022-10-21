@@ -21,7 +21,7 @@ pub fn bls_key_provision_verifier(req: KeyProvisionRequest) -> Result<KeyProvisi
     // TODO uncomment this when sending real attestation reports
     // TODO verify the pk is the same committed in the attestation evidence
     if req.eth_pk_hex != hex::encode(exp_pk.serialize()) {
-        // bail!("Error, supplied pk {} does not match pk in attestation evidence")
+        bail!("Error, supplied pk {} does not match pk in attestation evidence", req.eth_pk_hex)
     }
 
     // generate bls sk, encrypt it, respond
@@ -254,7 +254,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_bls_key_aggregator_route() {
-        fs::remove_dir_all("./etc/keys/provisioned").unwrap();
+        fs::remove_dir_all("./etc/keys/provisioned");
         let n = 5;
         let mut sks = Vec::new();
         let mut resps = Vec::new();
@@ -292,7 +292,7 @@ mod tests {
 
  #[tokio::test]
     async fn test_bls_key_batch_provisioner_route() {
-        fs::remove_dir_all("./etc/keys/provisioned").unwrap();
+        fs::remove_dir_all("./etc/keys/provisioned");
         let n = 5;
         let mut sks = Vec::new();
         let mut reqs = Vec::new();

@@ -92,25 +92,6 @@ pub fn bls_sign_route() -> impl Filter<Extract = impl warp::Reply, Error = warp:
 }
 
 /// @WORKER ROUTE
-pub fn request_list_bls_keys_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    warp::get()
-        .and(warp::path("portal"))
-        .and(warp::path("v1"))
-        .and(warp::path("keystores"))
-        .and_then(list_generated_bls_keys_request)
-}
-
-
-/// @WORKER ROUTE
-pub fn request_bls_key_gen_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    warp::post()
-        .and(warp::path("portal"))
-        .and(warp::path("v1"))
-        .and(warp::path("keystores"))
-        .and_then(bls_key_gen_request)
-}
-
-/// @WORKER ROUTE
 /// Sample worker route for getting a specific datafeed
 pub fn btc_pricefeed_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::post()
@@ -122,6 +103,27 @@ pub fn btc_pricefeed_route() -> impl Filter<Extract = impl warp::Reply, Error = 
 }
 
 /// @WORKER ROUTE
+pub fn request_list_bls_keys_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    warp::get()
+        .and(warp::path("portal"))
+        .and(warp::path("v1"))
+        .and(warp::path("leader"))
+        .and(warp::path("keystores"))
+        .and_then(list_generated_bls_keys_request)
+}
+
+
+/// @WORKER ROUTE
+pub fn request_bls_key_gen_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    warp::post()
+        .and(warp::path("portal"))
+        .and(warp::path("v1"))
+        .and(warp::path("leader"))
+        .and(warp::path("keystores"))
+        .and_then(bls_key_gen_request)
+}
+
+/// @WORKER ROUTE
 /// Worker generates ephemeral ETH key for envelope encryption, commits it to quote, 
 /// performs remote attestation, then requests the Leader to provision a new BLS key. The 
 /// Leader will only provision if RA evidence is valid, then will encrypt the BLS SK using
@@ -130,6 +132,7 @@ pub fn request_bls_key_provision_route() -> impl Filter<Extract = impl warp::Rep
     warp::post()
         .and(warp::path("portal"))
         .and(warp::path("v1"))
+        .and(warp::path("leader"))
         .and(warp::path("provision"))
         .and_then(bls_key_gen_provision_request)
 }
@@ -140,13 +143,14 @@ pub fn request_bls_key_import_route() -> impl Filter<Extract = impl warp::Reply,
     warp::post()
         .and(warp::path("portal"))
         .and(warp::path("v1"))
+        .and(warp::path("leader"))
         .and(warp::path("keystores"))
         .and(warp::path("import"))
         .and(warp::body::json())
         .and_then(bls_key_import_request)
 }
 
-/// @WORKER ROUTE
+/// @LEADER ROUTE
 /// the route to call `bls_key_provision_service`
 pub fn bls_key_provision_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::post()
@@ -180,3 +184,11 @@ pub fn bls_key_batch_provisioner_route() -> impl Filter<Extract = impl warp::Rep
         .and(warp::body::json())
         .and_then(batch_provision_service)
 }
+
+// pub fn test_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+//     let url = "https://api.coindesk.com/v1/bpi/currentprice.json";
+//     warp::post()
+//         .and(warp::path("test"))
+//         .and(warp::body::json())
+//         .and_then(get_btc_price_feed(req))
+// }

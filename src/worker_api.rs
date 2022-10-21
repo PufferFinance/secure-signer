@@ -2,7 +2,7 @@ use anyhow::{Result, Context, bail};
 use blst::min_pk::SecretKey;
 use ecies::decrypt;
 use warp::{reply, Filter, http::Response, http::StatusCode};
-use crate::attest::fetch_dummy_evidence;
+use crate::attest::{fetch_dummy_evidence, epid_remote_attestation};
 use crate::datafeed::{get_btc_price_feed, get_request, post_request, post_request_no_body};
 use crate::common_api::{KeyProvisionRequest, KeyProvisionResponse, ListKeysResponse, KeyGenResponse, KeyImportRequest, KeyImportResponse};
 use crate::keys::{eth_key_gen, pk_to_eth_addr, read_eth_key, new_eth_key, write_key};
@@ -110,7 +110,17 @@ pub async fn bls_key_gen_provision_request() -> Result<impl warp::Reply, warp::R
     };
 
     // TODO perform real remote attestation
-    let evidence = fetch_dummy_evidence();
+    // let evidence = fetch_dummy_evidence();
+    let from_file = false;
+    let evidence = match epid_remote_attestation(&eth_pk_hex, from_file) {
+        Ok(evidence) => evidence,
+        Err(e) =>  {
+            let mut resp = HashMap::new();
+            resp.insert("error", e.to_string());
+            return Ok(warp::reply::with_status(warp::reply::json(&resp), warp::http::StatusCode::INTERNAL_SERVER_ERROR))
+        }
+    };
+    println!("DEBUG: Did remote attestation! eth_pk_hex: {:?}", eth_pk_hex);
     let req_body = KeyProvisionRequest { eth_pk_hex, evidence };
 
     // decrypt the returned BLS secret key and save it
@@ -132,7 +142,6 @@ pub async fn bls_key_gen_provision_request() -> Result<impl warp::Reply, warp::R
         }
     }
 }
-
 
 /// Makes a Reqwest POST request to the API endpoint to get a KeyImportResponse
 pub async fn bls_key_import_post_request(req: KeyImportRequest) -> Result<KeyImportResponse> {

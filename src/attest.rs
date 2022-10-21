@@ -4,19 +4,26 @@ use openssl::stack::{Stack, StackRef};
 use openssl::x509::{X509, X509StoreContext};
 use openssl::x509::store::X509StoreBuilder;
 use rand::AsByteSliceMut;
-use serde_derive::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde_derive::{Serialize};
 use ecies::PublicKey as EthPublicKey;
 
 use std::ffi::CString;
 use std::{fmt, fs};
+use std::os::raw::c_char;
 
 
 use crate::keys;
 // use super::do_epid_ra;
 
+#[link(name = "epid")]
+extern "C" {
+   /// The cpp function for epid remote attestation with IAS defined in src/ra_wrapper.cpp
+   fn do_epid_ra(data: *const u8, report: *mut c_char, signature: *mut c_char, signing_cert: *mut c_char);
+}
+
 // Use this func sig for local development
-use std::os::raw::c_char;
-pub fn do_epid_ra(data: *const u8, report: *mut c_char, signature: *mut c_char, signing_cert: *mut c_char) {}
+// pub fn do_epid_ra(data: *const u8, report: *mut c_char, signature: *mut c_char, signing_cert: *mut c_char) {}
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct AttestationEvidence {
@@ -28,15 +35,22 @@ pub struct AttestationEvidence {
 impl AttestationEvidence {
     /// TODO clean up expects with anyhow crate
     /// currently accepts a compressed pk (33B) as the data to commit to the report
-    pub fn new(data: [u8; 33]) -> Result<Self> {
+    // pub fn new(data: [u8; 33]) -> Result<Self> {
+    pub fn new(data: &[u8]) -> Result<Self> {
+        if data.len() > 64 {
+            bail!("remote attestation report data exceed 64B limit!")
+        }
+
+        let mut report_data = [0_u8; 64];
+        report_data.clone_from_slice(&data[..data.len()]);
 
         // sufficient sized buffers
         let a = [1_u8; 5000].to_vec();
         let b = [1_u8; 1000].to_vec();
         let c = [1_u8; 10000].to_vec();
-        let report = CString::new(a).expect("CString::new failed");
-        let signature = CString::new(b).expect("CString::new failed");
-        let signing_cert = CString::new(c).expect("CString::new failed");
+        let report = CString::new(a).with_context(|| "CString::new failed")?;
+        let signature = CString::new(b).with_context(|| "CString::new failed")?;
+        let signing_cert = CString::new(c).with_context(|| "CString::new failed")?;
 
         // conv to pointer to pass into FFI
         let raw_rpt = report.into_raw();
@@ -44,13 +58,14 @@ impl AttestationEvidence {
         let raw_cert = signing_cert.into_raw();
 
         // for scoping
-        let mut rpt = CString::new("").expect("CString::new failed");
-        let mut sig = CString::new("").expect("CString::new failed");
-        let mut cert = CString::new("").expect("CString::new failed");
+        let mut rpt = CString::new("").with_context(|| "CString::new failed")?;
+        let mut sig = CString::new("").with_context(|| "CString::new failed")?;
+        let mut cert = CString::new("").with_context(|| "CString::new failed")?;
 
         unsafe {
             // call cpp EPID remote attestation lib
-            do_epid_ra(&data as *const u8, raw_rpt, raw_sig, raw_cert);
+            // do_epid_ra(&data as *const u8, raw_rpt, raw_sig, raw_cert);
+            do_epid_ra(&report_data as *const u8, raw_rpt, raw_sig, raw_cert);
             rpt = CString::from_raw(raw_rpt);
             sig = CString::from_raw(raw_sig);
             cert = CString::from_raw(raw_cert);
@@ -151,11 +166,19 @@ impl AttestationEvidence {
 
 }
 
-pub fn epid_remote_attestation(pk_hex: &String) -> Result<AttestationEvidence> {
-    let sk = keys::read_eth_key(pk_hex)?;
-    let proof = AttestationEvidence::new(
-        EthPublicKey::from_secret_key(&sk).serialize_compressed()
-    )?;
+pub fn epid_remote_attestation(pk_hex: &String, from_file: bool) -> Result<AttestationEvidence> {
+    let pk_bytes = match from_file {
+        true => {
+            let pk_bytes = hex::decode(pk_hex)?;
+            pk_bytes
+            // EthPublicKey::parse_slice(k_bytes, None)?
+        },
+        false => {
+            let sk = keys::read_eth_key(pk_hex)?;
+            EthPublicKey::from_secret_key(&sk).serialize_compressed().to_vec()
+        }
+    };
+    let proof = AttestationEvidence::new(&pk_bytes)?;
     // println!("{:?}", proof.signed_report);
     Ok(proof)
 }
