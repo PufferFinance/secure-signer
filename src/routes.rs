@@ -13,7 +13,7 @@ use crate::worker_api::{list_generated_bls_keys_request, bls_key_gen_request, bl
 /// TODO
 pub fn epid_remote_attestation_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::post()
-        .and(warp::path("portal"))
+        .and(warp::path("eth"))
         .and(warp::path("v1"))
         .and(warp::path("remote-attestation"))
         .and(warp::body::json::<AttestationRequest>())
@@ -23,27 +23,27 @@ pub fn epid_remote_attestation_route() -> impl Filter<Extract = impl warp::Reply
 /// Generates a new ETH (SECP256K1) private key in Enclave. The ETH public key is returned 
 pub fn eth_key_gen_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::post()
-        .and(warp::path("portal"))
+        .and(warp::path("eth"))
         .and(warp::path("v1"))
         .and(warp::path("keygen"))
-        .and(warp::path("eth"))
+        .and(warp::path("secp256k1"))
         .and_then(eth_key_gen_service)
 }
 
 /// Returns the hex-encoded BLS public keys that have their corresponding secret keys safeguarded in Enclave memory. 
 pub fn list_generated_eth_keys_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::get()
-        .and(warp::path("portal"))
+        .and(warp::path("eth"))
         .and(warp::path("v1"))
         .and(warp::path("keygen"))
-        .and(warp::path("eth"))
+        .and(warp::path("secp256k1"))
         .and_then(list_eth_keys_service)
 }
 
 /// Generates a new BLS private key in Enclave. To remain compatible with web3signer POST /eth/v1/keystores, the JSON body is not parsed. The BLS public key is returned 
 pub fn bls_key_gen_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::post()
-        .and(warp::path("portal"))
+        .and(warp::path("eth"))
         .and(warp::path("v1"))
         .and(warp::path("keygen"))
         .and(warp::path("bls"))
@@ -53,7 +53,7 @@ pub fn bls_key_gen_route() -> impl Filter<Extract = impl warp::Reply, Error = wa
 /// Returns the hex-encoded BLS public keys that have their corresponding secret keys safeguarded in Enclave memory. 
 pub fn list_generated_bls_keys_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::get()
-        .and(warp::path("portal"))
+        .and(warp::path("eth"))
         .and(warp::path("v1"))
         .and(warp::path("keygen"))
         .and(warp::path("bls"))
@@ -63,7 +63,7 @@ pub fn list_generated_bls_keys_route() -> impl Filter<Extract = impl warp::Reply
 /// Imports a BLS private key to the Enclave. 
 pub fn bls_key_import_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::post()
-        .and(warp::path("portal"))
+        .and(warp::path("eth"))
         .and(warp::path("v1"))
         .and(warp::path("keystores"))
         .and(warp::body::json())
@@ -73,7 +73,7 @@ pub fn bls_key_import_route() -> impl Filter<Extract = impl warp::Reply, Error =
 /// Returns the hex-encoded BLS public keys that have their corresponding secret keys safeguarded in Enclave memory. 
 pub fn list_imported_bls_keys_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::get()
-        .and(warp::path("portal"))
+        .and(warp::path("eth"))
         .and(warp::path("v1"))
         .and(warp::path("keystores"))
         .and_then(list_imported_bls_keys_service)
@@ -83,7 +83,7 @@ pub fn list_imported_bls_keys_route() -> impl Filter<Extract = impl warp::Reply,
 pub fn bls_sign_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone
 {
     warp::post()
-        .and(warp::path("portal"))
+        .and(warp::path("eth"))
         .and(warp::path("v1"))
         .and(warp::path("sign"))
         .and(warp::path("bls"))
@@ -95,7 +95,7 @@ pub fn bls_sign_route() -> impl Filter<Extract = impl warp::Reply, Error = warp:
 /// Sample worker route for getting a specific datafeed
 pub fn btc_pricefeed_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::post()
-        .and(warp::path("portal"))
+        .and(warp::path("eth"))
         .and(warp::path("v1"))
         .and(warp::path("datafeed"))
         .and(warp::body::json())
@@ -105,7 +105,7 @@ pub fn btc_pricefeed_route() -> impl Filter<Extract = impl warp::Reply, Error = 
 /// @WORKER ROUTE
 pub fn request_list_bls_keys_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::get()
-        .and(warp::path("portal"))
+        .and(warp::path("eth"))
         .and(warp::path("v1"))
         .and(warp::path("leader"))
         .and(warp::path("keystores"))
@@ -116,7 +116,7 @@ pub fn request_list_bls_keys_route() -> impl Filter<Extract = impl warp::Reply, 
 /// @WORKER ROUTE
 pub fn request_bls_key_gen_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::post()
-        .and(warp::path("portal"))
+        .and(warp::path("eth"))
         .and(warp::path("v1"))
         .and(warp::path("leader"))
         .and(warp::path("keystores"))
@@ -130,7 +130,7 @@ pub fn request_bls_key_gen_route() -> impl Filter<Extract = impl warp::Reply, Er
 /// ephemeral ETH key and respond to the Worker.
 pub fn request_bls_key_provision_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::post()
-        .and(warp::path("portal"))
+        .and(warp::path("eth"))
         .and(warp::path("v1"))
         .and(warp::path("leader"))
         .and(warp::path("provision"))
@@ -141,7 +141,7 @@ pub fn request_bls_key_provision_route() -> impl Filter<Extract = impl warp::Rep
 /// Asks the server Sample client route for getting a specific datafeed
 pub fn request_bls_key_import_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::post()
-        .and(warp::path("portal"))
+        .and(warp::path("eth"))
         .and(warp::path("v1"))
         .and(warp::path("leader"))
         .and(warp::path("keystores"))
@@ -154,7 +154,7 @@ pub fn request_bls_key_import_route() -> impl Filter<Extract = impl warp::Reply,
 /// the route to call `bls_key_provision_service`
 pub fn bls_key_provision_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::post()
-        .and(warp::path("portal"))
+        .and(warp::path("eth"))
         .and(warp::path("v1"))
         .and(warp::path("provision"))
         .and(warp::body::json())
@@ -166,7 +166,7 @@ pub fn bls_key_provision_route() -> impl Filter<Extract = impl warp::Reply, Erro
 /// the route to call `bls_key_aggregator_service`
 pub fn bls_key_aggregator_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::get()
-        .and(warp::path("portal"))
+        .and(warp::path("eth"))
         .and(warp::path("v1"))
         .and(warp::path("aggregate"))
         .and_then(bls_key_aggregator_service)
@@ -177,7 +177,7 @@ pub fn bls_key_aggregator_route() -> impl Filter<Extract = impl warp::Reply, Err
 /// the route to call `batch_provision_service`
 pub fn bls_key_batch_provisioner_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::post()
-        .and(warp::path("portal"))
+        .and(warp::path("eth"))
         .and(warp::path("v1"))
         .and(warp::path("provision"))
         .and(warp::path("batch"))

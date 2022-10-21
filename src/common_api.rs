@@ -212,6 +212,7 @@ pub async fn bls_sign_data(req: BlsSignRequest) -> Result<impl warp::Reply, warp
 pub struct KeyImportRequest {
     pub ct_bls_sk_hex: String,
     pub bls_pk_hex: String,
+    /// The SECP256K1 public key (hex) safeguarded in TEE
     pub encrypting_pk_hex: String,
 }
 
@@ -227,17 +228,14 @@ pub struct KeyImportResponse {
 }
 
 pub fn decrypt_and_save_imported_bls_key(req: &KeyImportRequest) -> Result<()> {
-    println!("Leader servicing req: {:?}", req);
-    let pk_bytes = hex::decode(&req.encrypting_pk_hex)?;
-    let pk = EthPublicKey::parse_slice(&pk_bytes, None)?;
-    let addr = pk_to_eth_addr(&pk)?;
-    println!("reading eth key with addr: {}", addr);
-    let sk = read_eth_key(&addr)?;
+    println!("DEBUG: servicing req: {:?}", req);
+    println!("reading eth key with pk: {}", req.encrypting_pk_hex);
+    let sk = read_eth_key(&req.encrypting_pk_hex)?;
     let ct_bls_sk_bytes = hex::decode(&req.ct_bls_sk_hex)?;
     let bls_sk_bytes = decrypt(&sk.serialize(), &ct_bls_sk_bytes)?;
     let bls_sk = match SecretKey::from_bytes(&bls_sk_bytes) {
         Ok(sk) => sk,
-        Err(e) => bail!("couldn't recover bls sk from import request: {:?}", e),
+        Err(e) => bail!("decrypt_and_save_imported_bls_key() couldn't recover bls sk from import request: {:?}", e),
     };
     if hex::encode(bls_sk.sk_to_pk().serialize()) != req.bls_pk_hex {
         bail!("The imported bls sk doesn't match the expected bls pk")

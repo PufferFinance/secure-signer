@@ -49,3 +49,7 @@ path = "src/worker.rs"
 [[bin]] # Bin to run the leader node
 name = "leader"
 path = "src/leader.rs"
+
+[[bin]] # Bin to run the sgx-signer rpc
+name = "sgx-signer"
+path = "src/sgx_signer.rs"
