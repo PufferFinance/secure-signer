@@ -80,13 +80,13 @@ pub fn list_imported_bls_keys_route() -> impl Filter<Extract = impl warp::Reply,
 }
 
 /// Returns signed 
-pub fn bls_sign_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone
-{
+pub fn bls_sign_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::post()
-        .and(warp::path("eth"))
+        .and(warp::path("api"))
         .and(warp::path("v1"))
+        .and(warp::path("eth2"))
         .and(warp::path("sign"))
-        .and(warp::path("bls"))
+        .and(warp::path::param())
         .and(warp::body::json())
         .and_then(bls_sign_data)
 }

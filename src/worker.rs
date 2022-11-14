@@ -8,6 +8,7 @@ mod routes;
 mod worker_api;
 mod common_api;
 mod leader_api;
+mod beacon;
 
 use warp::Filter;
 

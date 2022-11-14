@@ -1,5 +1,6 @@
 use crate::keys::{bls_key_gen, eth_key_gen, read_eth_key, write_key, list_eth_keys, list_imported_bls_keys, list_generated_bls_keys, bls_sign};
 use crate::attest::{epid_remote_attestation, AttestationEvidence};
+use crate::beacon::*;
 
 use anyhow::{Result, bail};
 use blst::min_pk::SecretKey;
@@ -164,10 +165,29 @@ pub async fn list_eth_keys_service() -> Result<impl warp::Reply, warp::Rejection
     }
 }
 
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct ForkInfo {
+    pub fork: Fork,
+    pub genesis_validators_root: Root,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct BlsProposeBlockRequest {
+    #[serde(rename = "type")]
+    pub type_: String,
+    pub fork_info: ForkInfo,
+    pub signing_root: Root,
+    pub block: BeaconBlock,
+}
+
 #[derive(Deserialize, Serialize, Debug)]
 pub struct BlsSignRequest {
+    #[serde(rename = "type")]
+    pub type_: String,
+    pub fork_info: ForkInfo,
+    pub signing_root: String,
     pub msg_hex: String,
-    pub bls_pk_hex: String,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -176,20 +196,25 @@ pub struct BlsSignResponse {
     pub bls_sig_hex: String,
 }
 
-pub async fn bls_sign_data(req: BlsSignRequest) -> Result<impl warp::Reply, warp::Rejection> {
-    let msg = match hex::decode(&req.msg_hex) {
-        Ok(msg) => msg,
-        Err(e) => {
-            let mut resp = HashMap::new();
-            resp.insert("error", e.to_string());
-            return Ok(reply::with_status(reply::json(&resp), warp::http::StatusCode::INTERNAL_SERVER_ERROR))
-        }
-    };
+pub async fn bls_sign_data<T: Serialize>(identifier: String, req: T) -> Result<impl warp::Reply, warp::Rejection> {
+    match serde_json::from_slice::<BlsProposeBlockRequest>(req) {
+        Ok(req) => {},
+        Err(e) => {}
+    }
+
+    // let msg = match hex::decode(&req.msg_hex) {
+    //     Ok(msg) => msg,
+    //     Err(e) => {
+    //         let mut resp = HashMap::new();
+    //         resp.insert("error", e.to_string());
+    //         return Ok(reply::with_status(reply::json(&resp), warp::http::StatusCode::INTERNAL_SERVER_ERROR))
+    //     }
+    // };
 
     // Possible verify something about the msg first
     // ...
 
-    match bls_sign(&req.bls_pk_hex, &msg) {
+    match bls_sign(&identifier, &msg) {
         Ok(sig) => {
             let resp = BlsSignResponse {
                 msg_hex: req.msg_hex,

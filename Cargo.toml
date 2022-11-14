@@ -23,12 +23,13 @@ rand_chacha = "0.2"
 hex = "0.4.3"
 ecies = {version = "0.2.2", default-features = false, features = ["pure"]}
 sha3 = "0.10.1"
-# base64 = "0.13.0"
 openssl = "0.10.42"
 
 # web3 deps
-ethabi = { version = "17.1.0", default-features = false }
-ethereum-tx-sign = "4.0.0"
+eth2_ssz = "0.4.0"
+eth2_ssz_derive = "0.3.0"
+eth2_ssz_types = "0.2.1"
+tree_hash = "0.4.0"
 
 # server deps
 tokio = { version = "1", features = ["full"] }
@@ -36,7 +37,6 @@ warp = "0.3"
 
 # client deps
 reqwest = { version = "0.11", features = ["json"] }
-
 
 # misc
 anyhow = "1.0.65"

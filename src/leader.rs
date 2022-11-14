@@ -5,6 +5,7 @@ mod leader_api;
 mod worker_api;
 mod common_api;
 mod datafeed;
+mod beacon;
 
 // deps
 use std::os::raw::c_char;
