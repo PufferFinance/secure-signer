@@ -1,6 +1,8 @@
 use crate::keys;
 
 use serde::{Deserialize, Serialize};
+use anyhow::{Result, Context, bail};
+
 use ssz::{Decode, Encode};
 use ssz_derive::{Decode, Encode};
 use ssz_types::{FixedVector, typenum, BitList, Bitfield};
@@ -21,6 +23,7 @@ pub type BLSSignature = Bytes96;
 pub type BLSPubkey = Bytes48;
 pub type Version = Bytes4;
 pub type Gwei = u64;
+pub type DomainType = Bytes4;
 
 // typenums for specifying the length of FixedVector
 type MAX_VALIDATORS_PER_COMMITTEE = typenum::U2048;
@@ -31,6 +34,17 @@ type MAX_ATTESTATIONS = typenum::U128;
 type MAX_DEPOSITS = typenum::U16;
 type MAX_VOLUNTARY_EXITS = typenum::U16;
 
+pub const DOMAIN_BEACON_PROPOSER:     DomainType = [0_u8, 0_u8, 0_u8, 0_u8]; // '0x00000000'
+pub const DOMAIN_BEACON_ATTESTER:     DomainType = [1_u8, 0_u8, 0_u8, 0_u8]; // '0x01000000'
+pub const DOMAIN_RANDAO:              DomainType = [2_u8, 0_u8, 0_u8, 0_u8]; // '0x02000000'
+pub const DOMAIN_DEPOSIT:             DomainType = [3_u8, 0_u8, 0_u8, 0_u8]; // '0x03000000'
+pub const DOMAIN_VOLUNTARY_EXIT:      DomainType = [4_u8, 0_u8, 0_u8, 0_u8]; // '0x04000000'
+pub const DOMAIN_SELECTION_PROOF:     DomainType = [5_u8, 0_u8, 0_u8, 0_u8]; // '0x05000000'
+pub const DOMAIN_AGGREGATE_AND_PROOF: DomainType = [6_u8, 0_u8, 0_u8, 0_u8]; // '0x06000000'
+pub const DOMAIN_APPLICATION_MASK:    DomainType = [0_u8, 0_u8, 0_u8, 1_u8]; // '0x00000001'
+
+pub const GENESIS_FORK_VERSION: Version = [0_u8, 0_u8, 0_u8, 0_u8]; // '0x00000000'
+
 
 #[derive(Debug)]
 #[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
@@ -40,9 +54,15 @@ pub struct Fork {
     pub epoch: Epoch,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
 pub struct ForkData {
     pub current_version: Version,
+    pub genesis_validators_root: Root,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct ForkInfo {
+    pub fork: Fork,
     pub genesis_validators_root: Root,
 }
 
@@ -52,6 +72,13 @@ pub struct Checkpoint {
     pub epoch: Epoch,
     pub root: Root,
 }
+
+#[derive(Debug)]
+#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+pub struct RandaoReveal {
+    pub epoch: Epoch
+}
+
 
 #[derive(Debug)]
 #[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
@@ -249,7 +276,78 @@ fn read_attestation_data() -> AttestationData {
     unimplemented!()
 }
 
-fn secure_sign_block(pk_hex: String, block: BeaconBlock, domain: Domain) -> BLSSignature {
+#[derive(Deserialize, Serialize, Debug)]
+pub struct ProposeBlockRequest {
+    #[serde(rename = "type")]
+    pub type_: String,
+    pub fork_info: ForkInfo,
+    pub signingRoot: Root,
+    pub block: BeaconBlock,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct ProposeBlockResponse {
+    pub signature: BLSSignature,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct AttestBlockRequest {
+    #[serde(rename = "type")]
+    pub type_: String,
+    pub fork_info: ForkInfo,
+    pub signingRoot: Root,
+    pub attestation: AttestationData,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct AttestBlockResponse {
+    pub signature: BLSSignature,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct RandaoRevealRequest {
+    #[serde(rename = "type")]
+    pub type_: String,
+    pub fork_info: ForkInfo,
+    pub signingRoot: Root,
+    pub randao_reveal: Epoch,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct RandaoRevealResponse {
+    pub signature: BLSSignature,
+}
+
+/// Return the 32-byte fork data root for the ``current_version`` and ``genesis_validators_root``.
+/// This is used primarily in signature domains to avoid collisions across forks/chains.
+pub fn compute_fork_data_root(current_version: Version, genesis_validators_root: Root) -> Root {
+    let f = ForkData {
+        current_version,
+        genesis_validators_root,
+    };
+    hash_tree_root(f)
+}
+
+/// Return the domain for the ``domain_type`` and ``fork_version``.
+pub fn compute_domain(domain_type: DomainType, fork_version: Option<Version>, genesis_validators_root: Option<Root>) -> Domain {
+    let fv = match fork_version {
+        Some(fv) => fv, 
+        None => GENESIS_FORK_VERSION
+    };
+
+    let gvr = match genesis_validators_root {
+        Some(gvr) => gvr, 
+        None => [0_u8; 32] // all bytes zero by default
+    };
+    let fork_data_root = compute_fork_data_root(fv, gvr);
+    let mut d: Vec<u8> = Vec::new(); // domain_type + fork_data_root[:28]
+    d.extend(domain_type.as_slice().to_vec());
+    d.extend(fork_data_root[..28].to_vec());
+    d;
+    unimplemented!()
+}
+
+pub fn secure_sign_block(pk_hex: String, block: BeaconBlock, domain: Domain) -> Result<BLSSignature> {
 	// let previous_block = read_block();
 	// // The block slot number must be strictly increasing to prevent slashing
 	// assert!(block.slot > previous_block.slot);
@@ -262,10 +360,10 @@ fn secure_sign_block(pk_hex: String, block: BeaconBlock, domain: Domain) -> BLSS
     // let sig = sk.sign(&root, keys::CIPHER_SUITE, &[]);
 
     // <_>::from(sig.to_bytes().to_vec())
-    unimplemented!()
+    bail!("unimplemented")
 }
 
-fn secure_sign_attestation(pk_hex: String, attestation_data: AttestationData, domain: Domain) -> BLSSignature {
+pub fn secure_sign_attestation(pk_hex: String, attestation_data: AttestationData, domain: Domain) -> Result<BLSSignature> {
 	// let previous_attestation_data = read_attestation_data();
 
 	// // The attestation source epoch must be non-decreasing to prevent slashing
@@ -283,10 +381,10 @@ fn secure_sign_attestation(pk_hex: String, attestation_data: AttestationData, do
     // let sig = sk.sign(&root, keys::CIPHER_SUITE, &[]);
 
     // <_>::from(sig.to_bytes().to_vec())
-    unimplemented!()
+    bail!("unimplemented")
 }
 
-fn secure_sign_randao(pk_hex: String, epoch: Epoch, domain: Domain) -> BLSSignature {
+pub fn secure_sign_randao(pk_hex: String, epoch: Epoch, domain: Domain) -> Result<BLSSignature> {
     // let sk = keys::read_key(&pk_hex).expect("Couldn't fetch pk");
 
     // let root: Root = compute_signing_root(epoch, domain);
@@ -294,7 +392,7 @@ fn secure_sign_randao(pk_hex: String, epoch: Epoch, domain: Domain) -> BLSSignat
     // let sig = sk.sign(&root, keys::CIPHER_SUITE, &[]);
 
     // <_>::from(sig.to_bytes().to_vec())
-    unimplemented!()
+    bail!("unimplemented")
 }
 
 #[cfg(test)]

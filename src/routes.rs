@@ -4,7 +4,7 @@ use ecies::decrypt;
 use warp::{reply, Filter, http::Response, http::StatusCode};
 use crate::attest::fetch_dummy_evidence;
 use crate::datafeed::{get_btc_price_feed, get_request, post_request, post_request_no_body};
-use crate::common_api::{KeyProvisionRequest, KeyProvisionResponse, ListKeysResponse, KeyGenResponse, KeyImportRequest, KeyImportResponse, epid_remote_attestation_service, AttestationRequest, eth_key_gen_service, list_eth_keys_service, bls_key_gen_service, list_generated_bls_keys_service, bls_key_import_service, list_imported_bls_keys_service, bls_sign_data};
+use crate::common_api::{KeyProvisionRequest, KeyProvisionResponse, ListKeysResponse, KeyGenResponse, KeyImportRequest, KeyImportResponse, epid_remote_attestation_service, AttestationRequest, eth_key_gen_service, list_eth_keys_service, bls_key_gen_service, list_generated_bls_keys_service, bls_key_import_service, list_imported_bls_keys_service, secure_sign_bls};
 use crate::keys::{eth_key_gen, pk_to_eth_addr, read_eth_key, new_eth_key, write_key};
 use crate::leader_api::{bls_key_provision_service, bls_key_aggregator_service, batch_provision_service};
 use crate::worker_api::{list_generated_bls_keys_request, bls_key_gen_request, bls_key_gen_provision_request, bls_key_import_request};
@@ -87,8 +87,8 @@ pub fn bls_sign_route() -> impl Filter<Extract = impl warp::Reply, Error = warp:
         .and(warp::path("eth2"))
         .and(warp::path("sign"))
         .and(warp::path::param())
-        .and(warp::body::json())
-        .and_then(bls_sign_data)
+        .and(warp::body::bytes())
+        .and_then(secure_sign_bls)
 }
 
 /// @WORKER ROUTE

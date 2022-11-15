@@ -1,5 +1,5 @@
 [package]
-name = "portaldatafeeds"
+name = "puffersecuresigner"
 version = "1.0.0"
 authors = ["Jason Vranek <jason@portalcompute.com>"]
 build = "build.rs"
@@ -24,6 +24,7 @@ hex = "0.4.3"
 ecies = {version = "0.2.2", default-features = false, features = ["pure"]}
 sha3 = "0.10.1"
 openssl = "0.10.42"
+bytes = "1"
 
 # web3 deps
 eth2_ssz = "0.4.0"
@@ -51,5 +52,5 @@ name = "leader"
 path = "src/leader.rs"
 
 [[bin]] # Bin to run the sgx-signer rpc
-name = "sgx-signer"
-path = "src/sgx_signer.rs"
+name = "secure-signer"
+path = "src/secure_signer.rs"
