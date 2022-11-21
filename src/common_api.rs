@@ -182,103 +182,8 @@ pub struct BlsSignResponse {
 }
 
 /// Handler for secure_sign_block()
-// pub async fn handle_block_type(req: ProposeBlockRequest, bls_pk_hex: String) -> Result<impl warp::Reply, warp::Rejection> {
-//     if req.type_ != "BLOCK" {
-//         let mut resp = HashMap::new();
-//         resp.insert("error", "Bad request format");
-//         return Ok(reply::with_status(reply::json(&resp), StatusCode::BAD_REQUEST));
-//     }
-
-//     let domain = compute_domain(
-//         DOMAIN_BEACON_PROPOSER, 
-//         Some(req.fork_info.fork.current_version),
-//         Some(req.fork_info.genesis_validators_root)
-//     );
-
-//     match secure_sign_block(bls_pk_hex, req.block, domain) {
-//         Ok(sig) => {
-//             // TODOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
-//             let mut resp = HashMap::new();
-//             resp.insert("error, no ", "UNIMPLEMENTED");
-//             Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
-//         },
-//         // return 412 error
-//         Err(e) => {
-//             let mut resp = HashMap::new();
-//             resp.insert("error", "Signing operation failed due to slashing protection rules");
-//             Ok(reply::with_status(reply::json(&resp), StatusCode::PRECONDITION_FAILED))
-//         }
-//     }
-// }
-
-// /// Handler for secure_sign_attestation()
-// pub async fn handle_attestation_type(req: AttestBlockRequest, bls_pk_hex: String) -> Result<impl warp::Reply, warp::Rejection> {
-//     if req.type_ != "ATTESTATION" {
-//         let mut resp = HashMap::new();
-//         resp.insert("error", "Bad request format");
-//         return Ok(reply::with_status(reply::json(&resp), StatusCode::BAD_REQUEST));
-//     }
-
-//     let mut resp = HashMap::new();
-//     resp.insert("error, no ", "asdfasf");
-//     Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
-
-//     // match secure_sign_block() {
-
-//     // }
-// }
-
-// /// Handler for secure_sign_randao()
-// pub async fn handle_randao_reveal_type(req: RandaoRevealRequest, bls_pk_hex: String) -> Result<impl warp::Reply, warp::Rejection> {
-//     if req.type_ != "RANDAO_REVEAL" {
-//         let mut resp = HashMap::new();
-//         resp.insert("error", "Bad request format");
-//         return Ok(reply::with_status(reply::json(&resp), StatusCode::BAD_REQUEST));
-//     }
-
-//     let mut resp = HashMap::new();
-//     resp.insert("error, no ", "asdfasf");
-//     Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
-
-//     // match secure_sign_block() {
-
-//     // }
-// }
-
-/// maintain compatibility with https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing 
-// pub async fn secure_sign_bls(identifier: String, req: bytes::Bytes) -> Result<impl warp::Reply, warp::Rejection> {
-//     match serde_json::from_slice::<ProposeBlockRequest>(&req) {
-//         Ok(req) => {
-//             // handle "BLOCK" type request
-//             handle_block_type(req, identifier)
-//         },
-//         Err(e) => {
-//             match serde_json::from_slice::<AttestBlockRequest>(&req) {
-//                 Ok(req) => {
-//                     // handle "ATTESTATION" type request
-//                     handle_attestation_type(req, identifier)
-//                 },
-//                 Err(e) => {
-//                     match serde_json::from_slice::<RandaoRevealRequest>(&req) {
-//                         Ok(req) => {
-//                             // handle "RANDAO_REVEAL" type request
-//                             handle_randao_reveal_type(req, identifier)
-//                         },
-//                         Err(e) => {
-//                             let mut resp = HashMap::new();
-//                             resp.insert("error", "Type not in ['BLOCK', 'ATTESTATION', RANDAO_REVEAL']");
-//                             Ok(reply::with_status(reply::json(&resp), StatusCode::BAD_REQUEST))
-//                         }
-//                     }
-//                 }
-//             }
-//         }
-//     }
-// }
-
-/// Handler for secure_sign_block()
 pub fn handle_block_type(req: ProposeBlockRequest, bls_pk_hex: String) -> Result<BLSSignature> {
-    if req.type_ != "BLOCK" {
+    if req.type_.to_lowercase() != "block" {
         bail!("Bad request format");
     }
 
@@ -293,7 +198,7 @@ pub fn handle_block_type(req: ProposeBlockRequest, bls_pk_hex: String) -> Result
 
 /// Handler for secure_sign_attestation()
 pub fn handle_attestation_type(req: AttestBlockRequest, bls_pk_hex: String) -> Result<BLSSignature> {
-    if req.type_ != "ATTESTATION" {
+    if req.type_.to_lowercase() != "attestation" {
         bail!("Bad request format");
     }
 
@@ -308,7 +213,7 @@ pub fn handle_attestation_type(req: AttestBlockRequest, bls_pk_hex: String) -> R
 
 /// Handler for secure_sign_randao()
 pub fn handle_randao_reveal_type(req: RandaoRevealRequest, bls_pk_hex: String) -> Result<BLSSignature> {
-    if req.type_ != "RANDAO_REVEAL" {
+    if req.type_.to_lowercase() != "randao_reveal" {
         bail!("Bad request format");
     }
 
@@ -321,6 +226,7 @@ pub fn handle_randao_reveal_type(req: RandaoRevealRequest, bls_pk_hex: String) -
     secure_sign_randao(bls_pk_hex, req.randao_reveal, domain)
 }
 
+/// maintain compatibility with https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing 
 pub async fn secure_sign_bls(identifier: String, req: bytes::Bytes) -> Result<impl warp::Reply, warp::Rejection> {
     match serde_json::from_slice::<ProposeBlockRequest>(&req) {
         Ok(req) => {

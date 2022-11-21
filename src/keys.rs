@@ -12,7 +12,8 @@ use sha3::{Digest, Keccak256};
 use std::path::PathBuf;
 use std::fs;
 
-pub const CIPHER_SUITE: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_";
+/// https://github.com/ethereum/consensus-specs/blob/master/specs/phase0/beacon-chain.md#bls-signatures
+pub const CIPHER_SUITE: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_";
 
 /// Generates Eth secret and public key, then saves the key using the
 /// ETH address derived from the public key as the filename.
@@ -164,6 +165,14 @@ pub fn bls_sk_from_hex(sk_hex: String) -> Result<SecretKey> {
     }
 }
 
+pub fn bls_sig_from_hex(sig_hex: String) -> Result<Signature> {
+    let sig_bytes = hex::decode(sig_hex)?;
+    match Signature::from_bytes(&sig_bytes) {
+        Ok(sig) => Ok(sig),
+        Err(e) => bail!("failed to recover BLS sig from sig_hex, error: {:?}", e)
+    }
+}
+
 /// Generates a BLS secret key then encrypts via ECDH using pk_hex
 pub fn bls_key_provision(eth_pk_hex: &String) -> Result<(String, String)> {
     let sk = new_bls_key()?;
@@ -229,7 +238,7 @@ pub fn verify_bls_sig(sig: Signature, pk: PublicKey, msg: &[u8]) -> Result<()> {
         }
 }
 
-/// Performs BLS signnature on `msg` using the BLS secret key looked up from memory
+/// Performs BLS signature on `msg` using the BLS secret key looked up from memory
 /// with pk_hex as the file identifier. 
 pub fn bls_sign(pk_hex: &String, msg: &[u8]) -> Result<Signature> {
     // the sk is either imported or generated or does not exist:
