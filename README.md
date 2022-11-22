@@ -1,20 +1,52 @@
-# datafeeds
-> An oracle service for providing data feeds on-chain.
+# Secure-Signer
+> Secure-Signer is a validator client written in Rust that runs on Intel SGX, and leverages the [Occlum LibOS](https://github.com/occlum/occlum) to prevent [slashable offenses](https://github.com/ethereum/consensus-specs/blob/master/specs/phase0/validator.md#how-to-avoid-slashing) for Ethereum validators. We aim to remain compatible with [Web3Signer](https://consensys.github.io/web3signer/web3signer-eth2.html) where possible to remain interoperable with existing consensus clients like [Teku](https://docs.teku.consensys.net/en/latest/HowTo/Builder-Network/).
 
-# Key Distribution Protocol
-> - A group of `n` `Workers` and one `Leader` form a `PON` (Portal Oracle Network).
-> - Each `Worker` `W[i]` generates an ephemeral SECP256K1 secret key `SK[i]`, then commits to the corresponding public key `PK[i]` by including it as report data during remote attestation with Intel. The remote attestation procedure yields attestation evidence `AV[i]`. Each `W[i]` will save `SK[i]` in the their enclave's memory until it is refreshed after a timeout (e.g., daily).
-> - Each `Worker` broadcasts `AV[i]` to the `Leader`.
-> - Upon receiving and verifying all `n` attestation evidence `AV[i]`, the `Leader` securely generates `n` BLS secret keys `BLS_SK[i]` in their enclave.
-> - The `Leader` produces `CT_BLS_SK[i]` by encrypting `BLS_SK[i]` with a symmetric key `K[i]`, where `K[i]` is derived via ECDH from the `PK[i]` embedded in `AV[i]`.  
-> - The `Leader` derives and saves the aggregate BLS public key `AGG_PK`, then distributes `CT_BLS_SK[i]` to each `Worker`.
->- Each `W[i]` can compute then save `BLS_SK[i]` by first deriving `K[i]` via ECDH from their saved `SK[i]`, then decrypting `CT_BLS_SK[i]` with it.
->- At this point, the `Leader` has saved an aggregate BLS public key `AGG_PK` and the enclave code ensures that it has forgotten each `BLS_SK[i]`. Each `Worker` has saved a BLS secret key `BLS_SK[i]` in their enclave memory which can only be used during the oracle service. In order to generate a valid aggregeate signature, all `n` `Workers` must sign off on the message.
+# Dev Usage:
+## Installing Rust
+> Running the [Warp HTTP server](https://github.com/seanmonstar/warp) requires rust 1.64, to update your rust toolchain run:
+- `rustup update stable`  
+- `rustup default stable`
 
-# APIs
-> ### /portal/v1/keygen/eth
->> `POST`: Generates an ETH SECP256K1 secret key in the enclave. 
+## Docker
+> TODO
+
+## Running the server
+> In one terminal, connect to the Docker container:
+- `TODO`
+> Start the Secure-Signer RPC server on port 3031:
+- `cargo run --bin secure-signer 3031`
+
+# Making requests
+> In another terminal, make HTTP requests via curl:
+
+## Compatible with Web3Signer
+
+### POST /eth/v1/keystores
+> Overloads [Web3Signer's API endpoint](https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Keymanager/operation/KEYMANAGER_IMPORT) to securely import the BLS12-381 secret key to the enclave which may reside on an untrusted and remote server.
+ 
+> ```
+> curl -X POST localhost:3031/eth/v1/keystores -H "Content-Type: application/json"  -d '{"ct_bls_sk_hex": "0x123...", "bls_pk_hex": "0x123...", "encrypting_pk_hex": "0x123..."}'  
+> ```
+
+### GET /eth/v1/keystores
+Overloads [Web3Signer's API endpoint](https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Keymanager/operation/KEYMANAGER_LIST) to request the enclave list the public key of each *imported* BLS12-381 private key it is safeguarding.
+> ```curl -X GET localhost:3031/eth/v1/keystores```
+
+
+### POST /api/v1/eth2/sign
+Compatible with [Web3Signer's API endpoint](https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing/operation/ETH2_SIGN) to request the Secure-Signer to use its BLS12-381 secret key for signing.
+> ```curl -X GET localhost:3031/ap1/v1/eth2/sign -H "Content-Type: application/json"  -d '{"msg_hex": "0xdeadbeef", "bls_pk_hex": "0x123"}'```
+
+> Currently accepts "BLOCK", "ATTESTATION", and "RANDAO_REVEAL" as the type. 
+
+> TODO: implement code for types ["AGGREGATION_SLOT", "AGGREGATE_AND_PROOF", "DEPOSIT","VOLUNTARY_EXIT", "SYNC_COMMITEE_MESSAGE", "SYNC_COMMITEE_SELECTION_PROOF", "SYNC_COMMITEE_CONTRIBUTION_AND_PROOF" "VALIDATOR_REGISTRATION"]
+
+## Additions to Web3Signer
+> ### /eth/v1/keygen/eth
+>> `POST`: Generates and safeguards an ETH SECP256K1 secret key in the enclave. This key can be used to facilitate the secure transfering of a BLS secret key into the enclave via [ECDH](https://en.wikipedia.org/wiki/Elliptic-curve_Diffie%E2%80%93Hellman) using [ECIES lib](https://github.com/ecies/rs).
 >>> Request body: None
+
+>>> Example Request: `curl -X POST localhost:3031/eth/v1/keygen/eth`
 
 >>> Response body: 
 >>> ```
@@ -22,14 +54,19 @@
 >>> ```
 
 >> `GET`: Lists the public keys of each ETH SECP256K1 secret key safeguarded in the enclave.
+
+>>> Example Request: `curl -X GET localhost:3031/eth/v1/keygen/eth`
+
 >>> Response body: 
 >>> ```
 >>> {TODO}
 >>> ```
 
-> ### /portal/v1/keygen/bls
->> `POST`: Generates a BLS12-381 secret key in the enclave. 
+> ### /eth/v1/keygen/bls
+>> `POST`: Generates and safeguards a BLS12-381 secret key in the enclave. 
 >>> Request body: None
+
+>>> Example Request: `curl -X POST localhost:3031/eth/v1/keygen/bls`
 
 >>> Response body: 
 >>> ```
@@ -37,27 +74,36 @@
 >>> ```
 
 >> `GET`: Lists the public keys of each of the *generated* BLS12-381 secret keys safeguarded in the enclave.
+
+>>> Example Request: `curl -X GET localhost:3031/eth/v1/keygen/bls`
+
 >>> Response body: 
 >>> ```
 >>> {TODO}
 >>> ```
 
 
-> ### /portal/v1/keystores/bls
->> `POST`: Imports a BLS12-381 secret key to the enclave. 
+> ### /eth/v1/remote-attestation
+>> `POST`: Performs remote attestation with Intel Attestation Service, committing to the supplied public key (either SECP256K1 or BLS12-381). 
 >>> Request body:
 >>> ```
->>> {TODO}
+>>> {
+>>>     "pub_key": "0x123..."
+>>> }
 >>> ```
+>>> Example Request: `curl -X POST localhost:3031/eth/v1/remote-attestation -H "Content-Type: application/json"  -d '{"pub_key": "0x123..."}'`
 
 >>> Response body: 
 >>> ```
 >>> {TODO}
 >>> ```
 
->> `GET`: Lists the public keys of each of the *imported* BLS12-381 secret keys safeguarded in the enclave.
->>> Response body: 
->>> ```
->>> {TODO}
->>> ```
 
+# TODOs
+- [ ] run extensive [SSZ testing](https://github.com/ethereum/consensus-specs/blob/master/tests/formats/ssz_static/core.md) to ensure Secure-Signer correctly implemented ETH2 specs
+- [ ] run extensive testing to ensure slash-resistance working locally
+- [ ] implement remaining API endpoints
+- [ ] connect to Teku
+- [ ] run on Goerli and Shandong
+- [ ] run above but in enclave environment
+- [ ] dockerization / documentation
