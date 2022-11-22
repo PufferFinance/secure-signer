@@ -12,6 +12,9 @@ use ssz_derive::{Decode, Encode};
 use ssz_types::{FixedVector, typenum, BitList, Bitfield};
 use tree_hash::merkle_root;
 
+use std::path::PathBuf;
+use std::fs;
+
 /// Types
 pub type Bytes4  = [u8; 4];
 pub type Bytes32 = [u8; 32];
@@ -28,6 +31,7 @@ pub type BLSPubkey = Bytes48;
 pub type Version = Bytes4;
 pub type Gwei = u64;
 pub type DomainType = Bytes4;
+pub type Domain = Bytes32;
 
 // typenums for specifying the length of FixedVector
 type MAX_VALIDATORS_PER_COMMITTEE = typenum::U2048;
@@ -56,13 +60,12 @@ where
     println!("in from_bls_pk_hex");
     let hex_str: &str = Deserialize::deserialize(deserializer)?;
     println!("hex_str: {:?}", hex_str);
-    let bytes = hex::decode(hex_str).expect("failed to deserialize");
+    // let bytes = hex::decode(hex_str).expect("failed to deserialize");
+    let bytes = match &hex_str[0..2] { 
+        "0x" => hex::decode(&hex_str[2..]).expect("failed to deserialize"),
+        _ => hex::decode(hex_str).expect("failed to deserialize")
+    };
     println!("bytes: {:?}", bytes);
-    // let bytes = hex::decode(hex_str).map_err(D::Error::custom);
-    // let bytes = match hex::decode(hex_str) {
-    //     Ok(bs) => bs,
-    //     Err(e) => return Err()
-    // };
     let pk: BLSPubkey = FixedVector::from(bytes);
     Ok(pk)
 }
@@ -72,7 +75,10 @@ where
 {
     println!("in from_bls_sig_hex");
     let hex_str: &str = Deserialize::deserialize(deserializer)?;
-    let bytes = hex::decode(hex_str).expect("failed to deserialize");
+    let bytes = match &hex_str[0..2] { 
+        "0x" => hex::decode(&hex_str[2..]).expect("failed to deserialize"),
+        _ => hex::decode(hex_str).expect("failed to deserialize")
+    };
     let pk: BLSSignature = FixedVector::from(bytes);
     Ok(pk)
 }
@@ -297,13 +303,8 @@ pub struct BeaconBlock {
 pub struct SigningData {
     #[serde(with = "SerHex::<StrictPfx>")]
     object_root: Root,
+    #[serde(with = "SerHex::<StrictPfx>")]
     domain: Domain,
-}
-
-#[derive(Debug)]
-#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
-pub struct Domain {
-    // TODO
 }
 
 fn hash_tree_root<T: Encode>(ssz_object: T) -> Root {
@@ -311,8 +312,8 @@ fn hash_tree_root<T: Encode>(ssz_object: T) -> Root {
     let minimum_leaf_count:usize = 0;
     // `minimum_leaf_count` will only be used if it is greater than or equal to the minimum number of leaves that can be created from `bytes`.
     let root = merkle_root(&bytes, minimum_leaf_count);
-    println!("Got root {:?}", root);
-    println!("Got root {:?}", root.as_fixed_bytes());
+    println!("Got hash_tree_root {:?}", root);
+    // println!("Got root {:?}", root.as_fixed_bytes());
     *root.as_fixed_bytes()
 }
 
@@ -327,19 +328,33 @@ fn compute_signing_root<T: Encode>(ssz_object: T, domain: Domain) -> Root {
     hash_tree_root(sign_data)
 }
 
-fn write_block(b: BeaconBlock) {
+fn write_block_slot(pk_hex: &String, slot: Slot) -> Result<()> {
+    let file_path: PathBuf = ["./etc/slashing/", pk_hex.as_str()].iter().collect();
+    if let Some(p) = file_path.parent() { 
+        fs::create_dir_all(p).with_context(|| "Failed to create slashing dir")?
+    }; 
+    fs::write(&file_path, slot.to_le_bytes()).with_context(|| "failed to write slot") 
+}
+
+/// If there is no block saved with fname `pk_hex` then return the default slot of 0 
+fn read_block_slot(pk_hex: &String) -> Result<Slot> {
+    match fs::read(&format!("./etc/slashing/{}", pk_hex)) {
+        Ok(slot) => {
+            // Convert slot form little endian bytes
+            let mut s: [u8; 8] = [0_u8; 8];
+            s.iter_mut().zip(slot[0..8].iter()).for_each(|(s, v)| *s = *v);
+            Ok(u64::from_le_bytes(s))
+        },
+        // No existing slot. return default 0
+        Err(e) => Ok(0)
+    }
+}
+
+fn write_attestation_data(pk_hex: &String, d: AttestationData) {
     unimplemented!()
 }
 
-fn read_block() -> BeaconBlock {
-    unimplemented!()
-}
-
-fn write_attestation_data(d: AttestationData) {
-    unimplemented!()
-}
-
-fn read_attestation_data() -> AttestationData {
+fn read_attestation_data(pk_hex: &String) -> AttestationData {
     unimplemented!()
 }
 
@@ -348,6 +363,7 @@ pub struct ProposeBlockRequest {
     #[serde(rename = "type")]
     pub type_: String,
     pub fork_info: ForkInfo,
+    #[serde(with = "SerHex::<StrictPfx>")]
     pub signingRoot: Root,
     pub block: BeaconBlock,
 }
@@ -357,6 +373,7 @@ pub struct AttestBlockRequest {
     #[serde(rename = "type")]
     pub type_: String,
     pub fork_info: ForkInfo,
+    #[serde(with = "SerHex::<StrictPfx>")]
     pub signingRoot: Root,
     pub attestation: AttestationData,
 }
@@ -366,7 +383,9 @@ pub struct RandaoRevealRequest {
     #[serde(rename = "type")]
     pub type_: String,
     pub fork_info: ForkInfo,
+    #[serde(with = "SerHex::<StrictPfx>")]
     pub signingRoot: Root,
+    #[serde(with = "SerHex::<CompactPfx>")]
     pub randao_reveal: Epoch,
 }
 
@@ -392,32 +411,30 @@ pub fn compute_domain(domain_type: DomainType, fork_version: Option<Version>, ge
         None => [0_u8; 32] // all bytes zero by default
     };
     let fork_data_root = compute_fork_data_root(fv, gvr);
-    let mut d: Vec<u8> = Vec::new(); // domain_type + fork_data_root[:28]
-    d.extend(domain_type.as_slice().to_vec());
-    d.extend(fork_data_root[..28].to_vec());
-    d;
-    unimplemented!()
+    let mut d = [0_u8; 32]; // domain_type + fork_data_root[:28]
+    domain_type.iter().enumerate().for_each(|(i, v)| d[i] = *v);
+    d[4..32].iter_mut().zip(fork_data_root[0..28].iter()).for_each(|(src, dest)| *src = *dest);
+    d
 }
 
 pub fn secure_sign_block(pk_hex: String, block: BeaconBlock, domain: Domain) -> Result<BLSSignature> {
     println!("pk_hex: {:?}, block: {:?}, domain: {:?}", pk_hex, block, domain);
-	// let previous_block = read_block();
-	// // The block slot number must be strictly increasing to prevent slashing
-	// assert!(block.slot > previous_block.slot);
-	// write_block(block.clone());
+    // read previous slot from mem
+	let previous_slot = read_block_slot(&pk_hex)?;   
 
-    // let sk = keys::read_key(&pk_hex).expect("Couldn't fetch pk");
+	// The block slot number must be strictly increasing to prevent slashing
+	assert!(block.slot > previous_slot);
+ 
+    // write current slot to mem
+	write_block_slot(&pk_hex, block.slot)?;
 
-    // let root: Root = compute_signing_root(block, domain);
-
-    // let sig = sk.sign(&root, keys::CIPHER_SUITE, &[]);
-
-    // <_>::from(sig.to_bytes().to_vec())
-    bail!("unimplemented")
+    let root: Root = compute_signing_root(block, domain);
+    let sig = keys::bls_sign(&pk_hex, &root)?;
+    Ok(<_>::from(sig.to_bytes().to_vec()))
 }
 
 pub fn secure_sign_attestation(pk_hex: String, attestation_data: AttestationData, domain: Domain) -> Result<BLSSignature> {
-    println!("pk_hex: {:?}, attesetation_data: {:?}, domain: {:?}", pk_hex, attestation_data, domain);
+    println!("pk_hex: {:?}, attestation_data: {:?}, domain: {:?}", pk_hex, attestation_data, domain);
 	// let previous_attestation_data = read_attestation_data();
 
 	// // The attestation source epoch must be non-decreasing to prevent slashing
@@ -498,16 +515,16 @@ mod spec_tests {
                     "current_version":"0x00000001",
                     "epoch":"0xff"
                 },
-                "genesis_validators_root": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69"
+                "genesis_validators_root": "0x04700007fabc8282644aed6d1c7c9e21d38a03a0c4ba193f3afe428824b3a673"
             }"#;
 
         let v: ForkInfo = serde_json::from_str(req)?;
         assert_eq!(v.fork.previous_version, [0, 0, 0, 1]);
         assert_eq!(v.fork.current_version, [0, 0, 0, 1]);
         assert_eq!(v.fork.epoch, 255); 
-        // python: list(bytes.fromhex('270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69'))
-        assert_eq!(v.genesis_validators_root, [39, 13, 67, 231, 76, 227, 64, 222, 75, 202, 43, 25, 54, 190, 202, 15, 79, 84, 8, 217, 231, 138, 236, 72, 80, 146, 11, 175, 101, 157, 91, 105]);
-        assert_eq!(hex::encode(v.genesis_validators_root), "270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69");
+        // python: list(bytes.fromhex('04700007fabc8282644aed6d1c7c9e21d38a03a0c4ba193f3afe428824b3a673'))
+        assert_eq!(v.genesis_validators_root, [4, 112, 0, 7, 250, 188, 130, 130, 100, 74, 237, 109, 28, 124, 158, 33, 211, 138, 3, 160, 196, 186, 25, 63, 58, 254, 66, 136, 36, 179, 166, 115]);
+        assert_eq!(hex::encode(v.genesis_validators_root), "04700007fabc8282644aed6d1c7c9e21d38a03a0c4ba193f3afe428824b3a673");
         Ok(())
     }
     
@@ -551,59 +568,121 @@ mod spec_tests {
 #[cfg(test)]
 mod secure_signer_tests {
     use super::*;
+    use std::fs;
 
+    /// hardcoded bls sk
+    fn setup_keypair() -> String {
+        let sk_hex: String = "3ee2224386c82ffea477e2adf28a2929f5c349165a4196158c7f3a2ecca40f35".into();
+        let sk = keys::bls_sk_from_hex(sk_hex.clone()).unwrap();
+        let pk = sk.sk_to_pk();
+        let pk_hex = hex::encode(pk.compress());
+        assert_eq!(pk_hex, "989d34725a2bfc3f15105f3f5fc8741f436c25ee1ee4f948e425d6bcb8c56bce6e06c269635b7e985a7ffa639e2409bf");
+        keys::write_key(&format!("bls_keys/generated/{}", pk_hex), &sk_hex).with_context(|| "failed to save bls key").unwrap();
+        pk_hex
+    }
 
-    fn mock_propose_block_request() {
+    fn mock_propose_block_request(slot: &str) -> String {
         let type_: String = "BlOcK".into(); // mixed case
 
-
-        // let fork = Fork {
-        //     previous_version: "0x00000001",
-        //     current_version: "0x00000001",
-        //     epoch: 
-        // }
-        // let fork_info = ForkInfo { fork: (), genesis_validators_root: () };
-        // let signingRoot: Root =  [0_u8; 32];
-
-        // let req = r#"
-        //        "type":"block",
-        //        "fork_info":{
-        //           "fork":{
-        //              "previous_version":"0x00000001",
-        //              "current_version":"0x00000001",
-        //              "epoch":"0"
-        //           },
-        //           "genesis_validators_root":"0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69"
-        //        },
-        //        "block":{
-        //           "slot":"${slot}",
-        //           "proposer_index":"5",
-        //           "parent_root":"0xb2eedb01adbd02c828d5eec09b4c70cbba12ffffba525ebf48aca33028e8ad89",
-        //           "state_root":"0x2b530d6262576277f1cc0dbe341fd919f9f8c5c92fc9140dff6db4ef34edea0d",
-        //           "body":{
-        //              "randao_reveal":"0xa686652aed2617da83adebb8a0eceea24bb0d2ccec9cd691a902087f90db16aa5c7b03172a35e874e07e3b60c5b2435c0586b72b08dfe5aee0ed6e5a2922b956aa88ad0235b36dfaa4d2255dfeb7bed60578d982061a72c7549becab19b3c12f",
-        //              "eth1_data":{
-        //                 "deposit_root":"0x6a0f9d6cb0868daa22c365563bb113b05f7568ef9ee65fdfeb49a319eaf708cf",
-        //                 "deposit_count":"8",
-        //                 "block_hash":"0x4242424242424242424242424242424242424242424242424242424242424242"
-        //              },
-        //              "graffiti":"0x74656b752f76302e31322e31302d6465762d6338316361363235000000000000",
-        //              "proposer_slashings":[],
-        //              "attester_slashings":[],
-        //              "attestations":[],
-        //              "deposits":[],
-        //              "voluntary_exits":[]
-        //           }
-        //        }
-        //     }
-        //     "
-
-        // let req = ProposeBlockRequest {
-        //     type_,
-        //     fork_info,
-        //     signingRoot,
-        //     block
-        // }
-
+        let req = format!(r#"
+            {{
+               "type":"{type_}",
+               "fork_info":{{
+                  "fork":{{
+                     "previous_version":"0x00000001",
+                     "current_version":"0x00000001",
+                     "epoch":"0"
+                  }},
+                  "genesis_validators_root":"0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69"
+               }},
+               "block":{{
+                  "slot":"{slot}",
+                  "proposer_index":"5",
+                  "parent_root":"0xb2eedb01adbd02c828d5eec09b4c70cbba12ffffba525ebf48aca33028e8ad89",
+                  "state_root":"0x2b530d6262576277f1cc0dbe341fd919f9f8c5c92fc9140dff6db4ef34edea0d",
+                  "body":{{
+                     "randao_reveal":"0xa686652aed2617da83adebb8a0eceea24bb0d2ccec9cd691a902087f90db16aa5c7b03172a35e874e07e3b60c5b2435c0586b72b08dfe5aee0ed6e5a2922b956aa88ad0235b36dfaa4d2255dfeb7bed60578d982061a72c7549becab19b3c12f",
+                     "eth1_data":{{
+                        "deposit_root":"0x6a0f9d6cb0868daa22c365563bb113b05f7568ef9ee65fdfeb49a319eaf708cf",
+                        "deposit_count":"8",
+                        "block_hash":"0x4242424242424242424242424242424242424242424242424242424242424242"
+                     }},
+                     "graffiti":"0x74656b752f76302e31322e31302d6465762d6338316361363235000000000000",
+                     "proposer_slashings":[],
+                     "attester_slashings":[],
+                     "attestations":[],
+                     "deposits":[],
+                     "voluntary_exits":[]
+                  }}
+               }},
+               "signingRoot": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69"
+            }}"#);
+        // println!("{req}");
+        req
     }
+
+    #[test]
+    fn test_propose_block_request() -> Result<()>{
+        // clear state
+        fs::remove_dir_all("./etc")?;
+
+        // new key
+        let bls_pk_hex = setup_keypair();
+
+        let n = 10;
+        for s in 1..n {
+            let slot = format!("{s:x}");
+            let req = mock_propose_block_request(&slot);
+            let pbr: ProposeBlockRequest = serde_json::from_str(&req)?;
+            assert_eq!(pbr.block.slot, s);
+
+            let domain = compute_domain(
+                DOMAIN_BEACON_PROPOSER, 
+                Some(pbr.fork_info.fork.current_version),
+                Some(pbr.fork_info.genesis_validators_root)
+            );
+            let sig : BLSSignature = secure_sign_block(bls_pk_hex.clone(), pbr.block, domain)?;
+            println!("sig: {}", hex::encode(sig.to_vec()));
+        }
+        Ok(())
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_propose_block_prevents_slash() {
+        // clear state
+        fs::remove_dir_all("./etc").unwrap();
+
+        // new key
+        let bls_pk_hex = setup_keypair();
+
+        let s = 100;
+        let slot = format!("{s:x}");
+        let req = mock_propose_block_request(&slot);
+        let pbr: ProposeBlockRequest = serde_json::from_str(&req).unwrap();
+        assert_eq!(pbr.block.slot, s);
+
+        let domain = compute_domain(
+            DOMAIN_BEACON_PROPOSER, 
+            Some(pbr.fork_info.fork.current_version),
+            Some(pbr.fork_info.genesis_validators_root)
+        );
+        let sig : BLSSignature = secure_sign_block(bls_pk_hex.clone(), pbr.block, domain).unwrap();
+        println!("sig: {}", hex::encode(sig.to_vec()));
+
+        // make one more request using an old slot and expect panic
+        let s = 50;
+        let slot = format!("{s:x}");
+        let req = mock_propose_block_request(&slot);
+        let pbr: ProposeBlockRequest = serde_json::from_str(&req).unwrap();
+        assert_eq!(pbr.block.slot, s);
+
+        let domain = compute_domain(
+            DOMAIN_BEACON_PROPOSER, 
+            Some(pbr.fork_info.fork.current_version),
+            Some(pbr.fork_info.genesis_validators_root)
+        );
+        let sig : BLSSignature = secure_sign_block(bls_pk_hex.clone(), pbr.block, domain).unwrap();
+    }
+
 }
