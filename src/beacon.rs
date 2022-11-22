@@ -329,7 +329,7 @@ fn compute_signing_root<T: Encode>(ssz_object: T, domain: Domain) -> Root {
 }
 
 fn write_block_slot(pk_hex: &String, slot: Slot) -> Result<()> {
-    let file_path: PathBuf = ["./etc/slashing/", pk_hex.as_str()].iter().collect();
+    let file_path: PathBuf = ["./etc/slashing/blocks/", pk_hex.as_str()].iter().collect();
     if let Some(p) = file_path.parent() { 
         fs::create_dir_all(p).with_context(|| "Failed to create slashing dir")?
     }; 
@@ -338,11 +338,11 @@ fn write_block_slot(pk_hex: &String, slot: Slot) -> Result<()> {
 
 /// If there is no block saved with fname `pk_hex` then return the default slot of 0 
 fn read_block_slot(pk_hex: &String) -> Result<Slot> {
-    match fs::read(&format!("./etc/slashing/{}", pk_hex)) {
+    match fs::read(&format!("./etc/slashing/blocks/{}", pk_hex)) {
         Ok(slot) => {
             // Convert slot form little endian bytes
             let mut s: [u8; 8] = [0_u8; 8];
-            s.iter_mut().zip(slot[0..8].iter()).for_each(|(s, v)| *s = *v);
+            s.iter_mut().zip(slot[0..8].iter()).for_each(|(to, from)| *to = *from);
             Ok(u64::from_le_bytes(s))
         },
         // No existing slot. return default 0
@@ -350,12 +350,56 @@ fn read_block_slot(pk_hex: &String) -> Result<Slot> {
     }
 }
 
-fn write_attestation_data(pk_hex: &String, d: AttestationData) {
-    unimplemented!()
+// fn write_block(pk_hex: &String, b: &BeaconBlock) -> Result<()> {
+//     let file_path: PathBuf = ["./etc/slashing/blocks/", pk_hex.as_str()].iter().collect();
+//     if let Some(p) = file_path.parent() { 
+//         fs::create_dir_all(p).with_context(|| "Failed to create slashing/blocks dir")?
+//     }; 
+//     let bs = b.as_ssz_bytes();
+//     println!("bs: {:?}", bs);
+//     fs::write(&file_path, bs).with_context(|| "failed to write block") 
+// }
+
+// note currently this is not decoding correctly
+// /// If there is no block saved with fname `pk_hex` then return the default slot of 0 
+// fn read_block(pk_hex: &String) -> Result<BeaconBlock> {
+//     match fs::read(&format!("./etc/slashing/blocks/{}", pk_hex)) {
+//         Ok(b) => {
+//             println!("b: {:?}", b);
+//             match BeaconBlock::from_ssz_bytes(&b) {
+//                 Ok(bb) => Ok(bb),
+//                 Err(e) => bail!("Error, could not ssz decode previous block {:?}", e)
+//             }
+//         },
+//         // No existing slot. return default 0
+//         Err(e) => Ok(BeaconBlock::default())
+//     }
+// }
+
+fn write_attestation_data(pk_hex: &String, d: &AttestationData) -> Result<()>{
+    let file_path: PathBuf = ["./etc/slashing/attestations/", pk_hex.as_str()].iter().collect();
+    if let Some(p) = file_path.parent() { 
+        fs::create_dir_all(p).with_context(|| "Failed to create attestations dir")?
+    }; 
+    let s = d.source.epoch.to_le_bytes();
+    let t = d.target.epoch.to_le_bytes();
+    let data = [&s[..], &t[..]].concat();
+    fs::write(&file_path, data).with_context(|| "failed to write attestation epochs") 
 }
 
-fn read_attestation_data(pk_hex: &String) -> AttestationData {
-    unimplemented!()
+fn read_attestation_data(pk_hex: &String) -> Result<(Epoch, Epoch)> {
+    match fs::read(&format!("./etc/slashing/blocks/{}", pk_hex)) {
+        Ok(data) => {
+            // Convert slot form little endian bytes
+            let mut source: [u8; 8] = [0_u8; 8];
+            let mut target: [u8; 8] = [0_u8; 8];
+            source.iter_mut().zip(data[0..8].iter()).for_each(|(to, from)| *to = *from);
+            target.iter_mut().zip(data[8..16].iter()).for_each(|(to, from)| *to = *from);
+            Ok((u64::from_le_bytes(source), u64::from_le_bytes(target)))
+        },
+        // No existing attsetation data. return default (0,0)
+        Err(e) => Ok((0, 0))
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -420,10 +464,10 @@ pub fn compute_domain(domain_type: DomainType, fork_version: Option<Version>, ge
 pub fn secure_sign_block(pk_hex: String, block: BeaconBlock, domain: Domain) -> Result<BLSSignature> {
     println!("pk_hex: {:?}, block: {:?}, domain: {:?}", pk_hex, block, domain);
     // read previous slot from mem
-	let previous_slot = read_block_slot(&pk_hex)?;   
+	let previous_block_slot = read_block_slot(&pk_hex)?;   
 
 	// The block slot number must be strictly increasing to prevent slashing
-	assert!(block.slot > previous_slot);
+	assert!(block.slot > previous_block_slot);
  
     // write current slot to mem
 	write_block_slot(&pk_hex, block.slot)?;
@@ -435,36 +479,26 @@ pub fn secure_sign_block(pk_hex: String, block: BeaconBlock, domain: Domain) -> 
 
 pub fn secure_sign_attestation(pk_hex: String, attestation_data: AttestationData, domain: Domain) -> Result<BLSSignature> {
     println!("pk_hex: {:?}, attestation_data: {:?}, domain: {:?}", pk_hex, attestation_data, domain);
-	// let previous_attestation_data = read_attestation_data();
+	let (prev_src_epoch, prev_tgt_epoch) = read_attestation_data(&pk_hex)?;
 
-	// // The attestation source epoch must be non-decreasing to prevent slashing
-	// assert!(attestation_data.source.epoch >= previous_attestation_data.source.epoch);
+	// The attestation source epoch must be non-decreasing to prevent slashing
+	assert!(attestation_data.source.epoch >= prev_src_epoch);
 
-	// // The attestation target epoch must be strictly increasing to prevent slashing
-	// assert!(attestation_data.target.epoch > previous_attestation_data.target.epoch);
+	// The attestation target epoch must be strictly increasing to prevent slashing
+	assert!(attestation_data.target.epoch > prev_tgt_epoch);
 
-    // write_attestation_data(attestation_data.clone());
+    write_attestation_data(&pk_hex, &attestation_data)?;
 
-    // let sk = keys::read_key(&pk_hex).expect("Couldn't fetch pk");
-
-    // let root: Root = compute_signing_root(attestation_data, domain);
-
-    // let sig = sk.sign(&root, keys::CIPHER_SUITE, &[]);
-
-    // <_>::from(sig.to_bytes().to_vec())
-    bail!("unimplemented")
+    let root: Root = compute_signing_root(attestation_data, domain);
+    let sig = keys::bls_sign(&pk_hex, &root)?;
+    Ok(<_>::from(sig.to_bytes().to_vec()))
 }
 
 pub fn secure_sign_randao(pk_hex: String, epoch: Epoch, domain: Domain) -> Result<BLSSignature> {
     println!("pk_hex: {:?}, epoch: {:?}, domain: {:?}", pk_hex, epoch, domain);
-    // let sk = keys::read_key(&pk_hex).expect("Couldn't fetch pk");
-
-    // let root: Root = compute_signing_root(epoch, domain);
-
-    // let sig = sk.sign(&root, keys::CIPHER_SUITE, &[]);
-
-    // <_>::from(sig.to_bytes().to_vec())
-    bail!("unimplemented")
+    let root: Root = compute_signing_root(epoch, domain);
+    let sig = keys::bls_sign(&pk_hex, &root)?;
+    Ok(<_>::from(sig.to_bytes().to_vec()))
 }
 
 #[cfg(test)]
