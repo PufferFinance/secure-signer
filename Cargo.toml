@@ -43,6 +43,10 @@ reqwest = { version = "0.11", features = ["json"] }
 # misc
 anyhow = "1.0.65"
 
+#[dev-dependencies]
+#serde_yaml = "0.9"
+#snap = "1"
+
 
 [[bin]] # Bin to run the worker node
 name = "worker"

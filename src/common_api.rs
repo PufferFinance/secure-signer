@@ -1,6 +1,7 @@
 use crate::keys::{bls_key_gen, eth_key_gen, read_eth_key, write_key, list_eth_keys, list_imported_bls_keys, list_generated_bls_keys, bls_sign};
 use crate::attest::{epid_remote_attestation, AttestationEvidence};
-use crate::beacon::*;
+use crate::beacon_types::*;
+use crate::beacon_signing::*;
 
 use anyhow::{Result, bail};
 use blst::min_pk::SecretKey;
