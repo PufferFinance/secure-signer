@@ -9,7 +9,7 @@ use anyhow::{Result, Context, bail};
 
 use ssz::{Decode, Encode};
 use ssz_derive::{Decode, Encode};
-use ssz_types::{FixedVector, typenum, BitList, Bitfield};
+use ssz_types::{FixedVector, typenum, BitList, Bitfield, BitVector};
 use tree_hash::merkle_root;
 
 use std::path::PathBuf;
@@ -41,6 +41,10 @@ type MAX_ATTESTER_SLASHINGS = typenum::U2;
 type MAX_ATTESTATIONS = typenum::U128;
 type MAX_DEPOSITS = typenum::U16;
 type MAX_VOLUNTARY_EXITS = typenum::U16;
+
+// type SYNC_COMMITTEE_SUBNET_COUNT = typenum::U4;
+// type TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE = typenum::U16;
+type SYNC_COMMITTEE_SIZE_BY_SYNC_COMMITTEE_SUBNET_COUNT = typenum::U128;  // 512 / 4
 
 pub const DOMAIN_BEACON_PROPOSER:     DomainType = [0_u8, 0_u8, 0_u8, 0_u8]; // '0x00000000'
 pub const DOMAIN_BEACON_ATTESTER:     DomainType = [1_u8, 0_u8, 0_u8, 0_u8]; // '0x01000000'
@@ -120,6 +124,7 @@ pub struct Checkpoint {
 
 #[derive(Debug)]
 #[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+/// used by Web3Signer type = "RANDAO_REVEAL"
 pub struct RandaoReveal {
     #[serde(with = "SerHex::<CompactPfx>")]
     pub epoch: Epoch
@@ -127,6 +132,8 @@ pub struct RandaoReveal {
 
 #[derive(Debug)]
 #[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#attestationdata
+/// used by Web3Signer type = "ATTESTATION"
 pub struct AttestationData {
     #[serde(with = "SerHex::<CompactPfx>")]
     pub slot: Slot,
@@ -199,6 +206,8 @@ pub struct Eth1Data {
 
 #[derive(Debug)]
 #[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#depositdata
+/// used by Web3Signer type = "DEPOSIT"
 pub struct DepositData {
     #[serde(deserialize_with = "from_bls_pk_hex")]
     pub pubkey: BLSPubkey,
@@ -219,6 +228,8 @@ pub struct Deposit {
 
 #[derive(Debug)]
 #[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#voluntaryexit
+/// used by Web3Signer type = "VOLUNTARY_EXIT"
 pub struct VoluntaryExit {
     #[serde(with = "SerHex::<CompactPfx>")]
     pub epoch: Epoch,  // Earliest epoch when voluntary exit can be processed
@@ -232,6 +243,16 @@ pub struct SignedVoluntaryExit {
     pub message: VoluntaryExit,
     #[serde(deserialize_with = "from_bls_sig_hex")]
     pub signature: BLSSignature,
+}
+
+#[derive(Debug)]
+#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+/// used by Web3Signer type = "VALIDATOR_REGISTRATION"
+pub struct ValidatorRegistration { // TODO
+    pub fee_recipient: u64, // TODO type
+    pub gas_limit: u64,  // TODO type
+    pub timestamp: u64, // TODO type
+    pub pubkey: BLSPubkey,
 }
 
 #[derive(Debug)]
@@ -286,6 +307,8 @@ impl Default for BeaconBlockBody {
 
 #[derive(Debug)]
 #[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#beaconblock
+/// used by Web3Signer type = "BLOCK"
 pub struct BeaconBlock {
     #[serde(with = "SerHex::<CompactPfx>")]
     pub slot: Slot,
@@ -305,6 +328,90 @@ pub struct SigningData {
     object_root: Root,
     #[serde(with = "SerHex::<StrictPfx>")]
     domain: Domain,
+}
+
+#[derive(Debug)]
+#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#aggregateandproof
+/// used by Web3Signer type = "AGGREGATE_AND_PROOF"
+pub struct AggregateAndProof {
+    #[serde(with = "SerHex::<CompactPfx>")]
+    pub aggregator_index: ValidatorIndex,
+    pub aggregate: Attestation,
+    #[serde(deserialize_with = "from_bls_sig_hex")]
+    pub signature: BLSSignature,  
+}
+
+#[derive(Debug)]
+#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#synccommitteemessage
+/// used by Web3Signer type = "SYNC_COMMITTEE_MESSAGE"
+pub struct SyncCommitteeMessage {
+    // Slot to which this contribution pertains
+    #[serde(with = "SerHex::<CompactPfx>")]
+    pub slot: Slot,
+    // Block root for this signature
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub beacon_block_root: Root,
+    // Index of the validator that produced this signature
+    #[serde(with = "SerHex::<CompactPfx>")]
+    pub validator_index: ValidatorIndex,
+    // Signature by the validator over the block root of `slot`
+    #[serde(deserialize_with = "from_bls_sig_hex")]
+    pub signature: BLSSignature,
+}
+
+#[derive(Debug)]
+#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#synccommitteecontribution
+pub struct SyncCommitteeContribution {
+    // Slot to which this contribution pertains
+    #[serde(with = "SerHex::<CompactPfx>")]
+    pub slot: Slot,
+    // Block root for this contribution
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub beacon_block_root: Root,
+    // The subcommittee this contribution pertains to out of the broader sync committee
+    #[serde(with = "SerHex::<CompactPfx>")]
+    pub subcommittee_index: ValidatorIndex,
+    // A bit is set if a signature from the validator at the corresponding
+    // index in the subcommittee is present in the aggregate `signature`.
+    // aggregation_bits: Bitvector[SYNC_COMMITTEE_SIZE // SYNC_COMMITTEE_SUBNET_COUNT]
+    pub aggregation_bits: BitVector<SYNC_COMMITTEE_SIZE_BY_SYNC_COMMITTEE_SUBNET_COUNT>,
+    // Signature by the validator(s) over the block root of `slot`
+    #[serde(deserialize_with = "from_bls_sig_hex")]
+    pub signature: BLSSignature,
+}
+
+#[derive(Debug)]
+#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#contributionandproof
+/// used by Web3Signer type = "SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF"
+pub struct ContributionAndProof {
+    #[serde(with = "SerHex::<CompactPfx>")]
+    pub aggregator_index: ValidatorIndex,
+    pub contribution: SyncCommitteeContribution,
+    #[serde(deserialize_with = "from_bls_sig_hex")]
+    pub selection_proof: BLSSignature,
+}
+
+#[derive(Debug)]
+#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#syncaggregatorselectiondata
+/// used by Web3Signer type = "SYNC_COMMITTEE_SELECTION_PROOF"
+pub struct SyncAggregatorSelectionData {
+    #[serde(with = "SerHex::<CompactPfx>")]
+    pub slot: Slot, 
+    #[serde(with = "SerHex::<CompactPfx>")]
+    pub subcommittee_index: ValidatorIndex,
+}
+
+#[derive(Debug)]
+#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+/// used by Web3Signer type = "AGGREGATION_SLOT"
+pub struct AggregationSlot {
+    #[serde(with = "SerHex::<CompactPfx>")]
+    pub slot: Slot, 
 }
 
 fn hash_tree_root<T: Encode>(ssz_object: T) -> Root {
