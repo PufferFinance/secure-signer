@@ -93,12 +93,14 @@ fn write_attestation_data(pk_hex: &String, d: &AttestationData) -> Result<()>{
     let s = d.source.epoch.to_le_bytes();
     let t = d.target.epoch.to_le_bytes();
     let data = [&s[..], &t[..]].concat();
+    // println!("Writing attestation data: {:?}", data);
     fs::write(&file_path, data).with_context(|| "failed to write attestation epochs") 
 }
 
 fn read_attestation_data(pk_hex: &String) -> Result<(Epoch, Epoch)> {
-    match fs::read(&format!("./etc/slashing/blocks/{}", pk_hex)) {
+    match fs::read(&format!("./etc/slashing/attestations/{}", pk_hex)) {
         Ok(data) => {
+            // println!("Reading attestation data: {:?}", data);
             // Convert slot form little endian bytes
             let mut source: [u8; 8] = [0_u8; 8];
             let mut target: [u8; 8] = [0_u8; 8];
@@ -189,6 +191,7 @@ pub fn secure_sign_block(pk_hex: String, block: BeaconBlock, domain: Domain) -> 
 pub fn secure_sign_attestation(pk_hex: String, attestation_data: AttestationData, domain: Domain) -> Result<BLSSignature> {
     println!("pk_hex: {:?}, attestation_data: {:?}, domain: {:?}", pk_hex, attestation_data, domain);
 	let (prev_src_epoch, prev_tgt_epoch) = read_attestation_data(&pk_hex)?;
+    println!("src_epoch: {}, prev: {} ... tgt_epoch: {}, prev: {}", attestation_data.source.epoch, prev_src_epoch, attestation_data.target.epoch, prev_tgt_epoch);
 
 	// The attestation source epoch must be non-decreasing to prevent slashing
 	assert!(attestation_data.source.epoch >= prev_src_epoch);
@@ -209,105 +212,6 @@ pub fn secure_sign_randao(pk_hex: String, epoch: Epoch, domain: Domain) -> Resul
     let sig = keys::bls_sign(&pk_hex, &root)?;
     Ok(<_>::from(sig.to_bytes().to_vec()))
 }
-
-#[cfg(test)]
-mod spec_tests {
-    use super::*;
-    // use crate::beacon_types::*;
-
-    // #[test]
-    // fn test_serialize() {
-    //     let bb = BeaconBlock::default(); 
-
-    //     println!("{:?}", bb);
-    //     let bytes = bb.as_ssz_bytes();
-    //     println!("{:?}", bytes);
-    //     println!("{:?}", BeaconBlock::from_ssz_bytes(&bytes).unwrap());
-    // }
-
-    // #[test]
-    // fn test_secure_sign_randao() -> Result<()> {
-    //     let pk_hex = String::from("8b17b1964fdfa87e8f172b09123f0e12cbc8195ee709bfb16545c7da2d98c9ab628ea74e786be0c08566efd366795a6a");
-    //     let epoch = 123;
-    //     let domain = Domain {  };
-    //     secure_sign_randao(pk_hex, epoch, domain)?;
-    //     Ok(())
-    // }
-
-    #[test]
-    fn test_deserialize_fork() -> Result<()> {
-        let req = r#"
-            {
-                "previous_version":"0x00000001",
-                "current_version":"0x00000001",
-                "epoch":"10"
-            }"#;
-
-        let v: Fork = serde_json::from_str(req)?;
-        assert_eq!(v.previous_version, [0, 0, 0, 1]);
-        assert_eq!(v.current_version, [0, 0, 0, 1]);
-        assert_eq!(v.epoch, 16); // 10 == 0x10 == 16
-        Ok(())
-    }
-
-    #[test]
-    fn test_deserialize_fork_info() -> Result<()> {
-        let req = r#"
-            {
-                "fork":{
-                    "previous_version":"0x00000001",
-                    "current_version":"0x00000001",
-                    "epoch":"0xff"
-                },
-                "genesis_validators_root": "0x04700007fabc8282644aed6d1c7c9e21d38a03a0c4ba193f3afe428824b3a673"
-            }"#;
-
-        let v: ForkInfo = serde_json::from_str(req)?;
-        assert_eq!(v.fork.previous_version, [0, 0, 0, 1]);
-        assert_eq!(v.fork.current_version, [0, 0, 0, 1]);
-        assert_eq!(v.fork.epoch, 255); 
-        // python: list(bytes.fromhex('04700007fabc8282644aed6d1c7c9e21d38a03a0c4ba193f3afe428824b3a673'))
-        assert_eq!(v.genesis_validators_root, [4, 112, 0, 7, 250, 188, 130, 130, 100, 74, 237, 109, 28, 124, 158, 33, 211, 138, 3, 160, 196, 186, 25, 63, 58, 254, 66, 136, 36, 179, 166, 115]);
-        assert_eq!(hex::encode(v.genesis_validators_root), "04700007fabc8282644aed6d1c7c9e21d38a03a0c4ba193f3afe428824b3a673");
-        Ok(())
-    }
-    
-    #[test]
-    fn test_deserialize_deposit_data() -> Result<()> {
-        let pk = keys::bls_key_gen(true)?;
-        let bls_pk_hex = hex::encode(pk.compress());
-        let sig = keys::bls_sign(&bls_pk_hex, b"hello world")?;
-        keys::verify_bls_sig(sig, pk, b"hello world").unwrap();
-        let hex_sig = hex::encode(sig.compress());
-        println!("pk: {bls_pk_hex}");
-        println!("sig: {hex_sig}");
-        let withdrawal = "0x0000000000000000000000000000000000000000000000000000000000000001";
-        // test deserialize bls pk and bls sig
-        let req = format!(r#"
-            {{
-                "pubkey": "{bls_pk_hex}",
-                "withdrawal_credentials":"{withdrawal}",
-                "amount":"0xdeadbeef",
-                "signature": "{hex_sig}"
-            }}"#);
-
-        let dd: DepositData = serde_json::from_str(&req)?;
-        let mut exp_w = [0_u8; 32];
-        exp_w[31] = 1;
-        assert_eq!(dd.withdrawal_credentials, exp_w);
-        assert_eq!(dd.amount, 3735928559);
-
-        let got_pk = dd.pubkey;
-        let got_pk_hex = hex::encode(&got_pk[..]);
-        let got_pk = keys::bls_pk_from_hex(got_pk_hex)?;
-        
-        let got_sig = dd.signature;
-        let got_sig_hex = hex::encode(&got_sig[..]);
-        let got_sig = keys::bls_sig_from_hex(got_sig_hex)?;
-        keys::verify_bls_sig(got_sig, got_pk, b"hello world")
-    }
-}
-
 
 #[cfg(test)]
 mod secure_signer_tests {
@@ -365,19 +269,18 @@ mod secure_signer_tests {
         req
     }
 
-    #[test]
-    fn test_propose_block_request() -> Result<()>{
+    fn send_n_proposals(n: u64) -> (String, Vec<BLSSignature>) {
         // clear state
-        fs::remove_dir_all("./etc")?;
+        fs::remove_dir_all("./etc");
 
-        // new key
+        // new keypair
         let bls_pk_hex = setup_keypair();
 
-        let n = 10;
-        for s in 1..n {
+        // make n requests
+        let sigs = (1..n+1).map(|s| {
             let slot = format!("{s:x}");
             let req = mock_propose_block_request(&slot);
-            let pbr: ProposeBlockRequest = serde_json::from_str(&req)?;
+            let pbr: ProposeBlockRequest = serde_json::from_str(&req).unwrap();
             assert_eq!(pbr.block.slot, s);
 
             let domain = compute_domain(
@@ -385,37 +288,28 @@ mod secure_signer_tests {
                 Some(pbr.fork_info.fork.current_version),
                 Some(pbr.fork_info.genesis_validators_root)
             );
-            let sig : BLSSignature = secure_sign_block(bls_pk_hex.clone(), pbr.block, domain)?;
+            let sig : BLSSignature = secure_sign_block(bls_pk_hex.clone(), pbr.block, domain).unwrap();
             println!("sig: {}", hex::encode(sig.to_vec()));
-        }
+            sig
+        }).collect();
+        (bls_pk_hex, sigs)
+    }
+
+    #[test]
+    fn test_propose_block_request() -> Result<()>{
+        let n = 50;
+        let (bls_pk_hex, sigs) = send_n_proposals(n);
         Ok(())
     }
 
     #[test]
     #[should_panic]
-    fn test_propose_block_prevents_slash() {
-        // clear state
-        fs::remove_dir_all("./etc").unwrap();
+    fn test_propose_block_prevents_slash_when_decreasing_slot() {
+        let n = 50;
+        let (bls_pk_hex, sigs) = send_n_proposals(n);
 
-        // new key
-        let bls_pk_hex = setup_keypair();
-
-        let s = 100;
-        let slot = format!("{s:x}");
-        let req = mock_propose_block_request(&slot);
-        let pbr: ProposeBlockRequest = serde_json::from_str(&req).unwrap();
-        assert_eq!(pbr.block.slot, s);
-
-        let domain = compute_domain(
-            DOMAIN_BEACON_PROPOSER, 
-            Some(pbr.fork_info.fork.current_version),
-            Some(pbr.fork_info.genesis_validators_root)
-        );
-        let sig : BLSSignature = secure_sign_block(bls_pk_hex.clone(), pbr.block, domain).unwrap();
-        println!("sig: {}", hex::encode(sig.to_vec()));
-
-        // make one more request using an old slot and expect panic
-        let s = 50;
+        // make a request with slot < n and expect panic
+        let s = n - 1;
         let slot = format!("{s:x}");
         let req = mock_propose_block_request(&slot);
         let pbr: ProposeBlockRequest = serde_json::from_str(&req).unwrap();
@@ -429,4 +323,171 @@ mod secure_signer_tests {
         let sig : BLSSignature = secure_sign_block(bls_pk_hex.clone(), pbr.block, domain).unwrap();
     }
 
+    #[test]
+    #[should_panic]
+    fn test_propose_block_prevents_slash_when_non_increasing_slot() {
+        let n = 50;
+        let (bls_pk_hex, sigs) = send_n_proposals(n);
+
+        // make a request with slot = n and expect panic
+        let s = n;
+        let slot = format!("{s:x}");
+        let req = mock_propose_block_request(&slot);
+        let pbr: ProposeBlockRequest = serde_json::from_str(&req).unwrap();
+        assert_eq!(pbr.block.slot, s);
+
+        let domain = compute_domain(
+            DOMAIN_BEACON_PROPOSER, 
+            Some(pbr.fork_info.fork.current_version),
+            Some(pbr.fork_info.genesis_validators_root)
+        );
+        let sig : BLSSignature = secure_sign_block(bls_pk_hex.clone(), pbr.block, domain).unwrap();
+    }
+
+    fn mock_attestation_request(src_epoch: &str, tgt_epoch: &str) -> String {
+        let type_: String = "aTteStatION".into(); // mixed case
+
+        let req = format!(r#"
+        {{
+            "type": "{type_}",
+            "fork_info":{{
+                "fork":{{
+                   "previous_version":"0x00000001",
+                   "current_version":"0x00000001",
+                   "epoch":"0"
+                }},
+                "genesis_validators_root":"0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69"
+            }},
+            "signingRoot": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69",
+            "attestation": {{
+                "slot": "0xff",
+                "index": "0xffff",
+                "beacon_block_root": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69",
+                "source": {{
+                    "epoch": "{src_epoch}",
+                    "root": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69"
+                }},
+                "target": {{
+                    "epoch": "{tgt_epoch}",
+                    "root": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69"
+                }}
+            }}
+        }}"#);
+        // println!("{req}");
+        req
+    }
+
+    fn send_n_attestations(n: u64) -> (String, Vec<BLSSignature>) {
+        // clear state
+        fs::remove_dir_all("./etc");
+
+        // new keypair
+        let bls_pk_hex = setup_keypair();
+
+        // make n requests
+        let sigs = (1..n+1).map(|s| {
+            // source epoch will be non-decreasing
+            let src_epoch = format!("{s:x}");
+            // target epoch will be strictly increasing
+            let tgt_epoch = format!("{s:x}");
+            let req = mock_attestation_request(&src_epoch, &tgt_epoch);
+            let abr: AttestBlockRequest = serde_json::from_str(&req).unwrap();
+            assert_eq!(abr.attestation.slot, 255);
+            assert_eq!(abr.attestation.index, 65535);
+            assert_eq!(abr.attestation.source.epoch, s);
+            assert_eq!(abr.attestation.target.epoch, s);
+
+            let domain = compute_domain(
+                DOMAIN_BEACON_ATTESTER, 
+                Some(abr.fork_info.fork.current_version),
+                Some(abr.fork_info.genesis_validators_root)
+            );
+            let sig : BLSSignature = secure_sign_attestation(bls_pk_hex.clone(), abr.attestation, domain).unwrap();
+            println!("sig: {}", hex::encode(sig.to_vec()));
+            sig
+        }).collect();
+        (bls_pk_hex, sigs)
+    }
+
+    #[test]
+    fn test_attestation_request() -> Result<()>{
+        let n = 50;
+        let (bls_pk_hex, sigs) = send_n_attestations(n);
+        Ok(())
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_attestation_request_prevents_slash_when_decreasing_src_epoch(){
+        let n = 50;
+        let (bls_pk_hex, sigs) = send_n_attestations(n);
+
+        // prev src epoch should be 50, but send 0
+        let src_epoch = "0x0";
+
+        // target epoch will be strictly increasing
+        let tgt_epoch = format!("{:x}", n + 1);
+
+        let req = mock_attestation_request(&src_epoch, &tgt_epoch);
+        let abr: AttestBlockRequest = serde_json::from_str(&req).unwrap();
+
+        let domain = compute_domain(
+            DOMAIN_BEACON_ATTESTER, 
+            Some(abr.fork_info.fork.current_version),
+            Some(abr.fork_info.genesis_validators_root)
+        );
+        let sig : BLSSignature = secure_sign_attestation(bls_pk_hex.clone(), abr.attestation, domain).unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_attestation_request_prevents_slash_when_non_increasing_tgt_epoch(){
+        let n = 50;
+        let (bls_pk_hex, sigs) = send_n_attestations(n);
+
+        // prev src epoch should be non-decreasing
+        let src_epoch = format!("{:x}", n + 1);
+        // target epoch will be equal (non-increasing)
+        let tgt_epoch = format!("{:x}", n);
+
+        let req = mock_attestation_request(&src_epoch, &tgt_epoch);
+        let abr: AttestBlockRequest = serde_json::from_str(&req).unwrap();
+        assert_eq!(abr.attestation.slot, 255);
+        assert_eq!(abr.attestation.index, 65535);
+        assert_eq!(abr.attestation.source.epoch, n+1);
+        assert_eq!(abr.attestation.target.epoch, n);
+
+        let domain = compute_domain(
+            DOMAIN_BEACON_ATTESTER, 
+            Some(abr.fork_info.fork.current_version),
+            Some(abr.fork_info.genesis_validators_root)
+        );
+        let sig : BLSSignature = secure_sign_attestation(bls_pk_hex.clone(), abr.attestation, domain).unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_attestation_request_prevents_slash_when_decreasing_tgt_epoch(){
+        let n = 50;
+        let (bls_pk_hex, sigs) = send_n_attestations(n);
+
+        // prev src epoch should be non-decreasing
+        let src_epoch = format!("{:x}", n + 1);
+        // target epoch will be decreasing
+        let tgt_epoch = "0x0";
+
+        let req = mock_attestation_request(&src_epoch, &tgt_epoch);
+        let abr: AttestBlockRequest = serde_json::from_str(&req).unwrap();
+        assert_eq!(abr.attestation.slot, 255);
+        assert_eq!(abr.attestation.index, 65535);
+        assert_eq!(abr.attestation.source.epoch, n + 1);
+        assert_eq!(abr.attestation.target.epoch, 0);
+
+        let domain = compute_domain(
+            DOMAIN_BEACON_ATTESTER, 
+            Some(abr.fork_info.fork.current_version),
+            Some(abr.fork_info.genesis_validators_root)
+        );
+        let sig : BLSSignature = secure_sign_attestation(bls_pk_hex.clone(), abr.attestation, domain).unwrap();
+    }
 }

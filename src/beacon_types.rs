@@ -524,7 +524,7 @@ mod spec_tests {
         let mut exp_w = [0_u8; 32];
         exp_w[31] = 1;
         assert_eq!(dd.withdrawal_credentials, exp_w);
-        assert_eq!(dd.amount, 3735928559);
+        assert_eq!(dd.amount, 3735928559); // 0xdeadbeef
 
         let got_pk = dd.pubkey;
         let got_pk_hex = hex::encode(&got_pk[..]);
