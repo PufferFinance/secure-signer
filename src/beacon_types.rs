@@ -12,6 +12,7 @@ use ssz_types::{FixedVector, typenum, BitList, Bitfield, BitVector};
 /// Types
 pub type Bytes4  = [u8; 4];
 pub type Bytes32 = [u8; 32];
+pub type Bytes20 = FixedVector<u8, typenum::U20>;
 pub type Bytes48 = FixedVector<u8, typenum::U48>;
 pub type Bytes96 = FixedVector<u8, typenum::U96>;
 pub type Hash32 = Bytes32;
@@ -26,6 +27,7 @@ pub type Version = Bytes4;
 pub type Gwei = u64;
 pub type DomainType = Bytes4;
 pub type Domain = Bytes32;
+pub type ExecutionAddress = Bytes20;
 
 // typenums for specifying the length of FixedVector
 type MAX_VALIDATORS_PER_COMMITTEE = typenum::U2048;
@@ -67,6 +69,7 @@ where
     let pk: BLSPubkey = FixedVector::from(bytes);
     Ok(pk)
 }
+
 pub fn from_bls_sig_hex<'de, D>(deserializer: D) -> Result<BLSSignature, D::Error>
 where
     D: Deserializer<'de>,
@@ -79,6 +82,20 @@ where
     };
     let pk: BLSSignature = FixedVector::from(bytes);
     Ok(pk)
+}
+
+pub fn from_address_hex<'de, D>(deserializer: D) -> Result<ExecutionAddress, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    println!("in from_address_hex");
+    let hex_str: &str = Deserialize::deserialize(deserializer)?;
+    let bytes = match &hex_str[0..2] { 
+        "0x" => hex::decode(&hex_str[2..]).expect("failed to deserialize"),
+        _ => hex::decode(hex_str).expect("failed to deserialize")
+    };
+    let addr: ExecutionAddress = FixedVector::from(bytes);
+    Ok(addr)
 }
 
 #[derive(Debug)]
@@ -242,10 +259,12 @@ pub struct SignedVoluntaryExit {
 #[derive(Debug)]
 #[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
 /// used by Web3Signer type = "VALIDATOR_REGISTRATION"
-pub struct ValidatorRegistration { // TODO
-    pub fee_recipient: u64, // TODO type
-    pub gas_limit: u64,  // TODO type
-    pub timestamp: u64, // TODO type
+pub struct ValidatorRegistration { 
+    #[serde(deserialize_with = "from_address_hex")]
+    pub fee_recipient: ExecutionAddress, 
+    pub gas_limit: u64,  
+    pub timestamp: u64, 
+    #[serde(deserialize_with = "from_bls_pk_hex")]
     pub pubkey: BLSPubkey,
 }
 
@@ -333,13 +352,14 @@ pub struct AggregateAndProof {
     pub aggregator_index: ValidatorIndex,
     pub aggregate: Attestation,
     #[serde(deserialize_with = "from_bls_sig_hex")]
-    pub signature: BLSSignature,  
+    pub selection_proof: BLSSignature,  
 }
 
 #[derive(Debug)]
 #[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#synccommitteemessage
 /// used by Web3Signer type = "SYNC_COMMITTEE_MESSAGE"
+/// TODO: Eth spec's container differs from W3S API
 pub struct SyncCommitteeMessage {
     // Slot to which this contribution pertains
     #[serde(with = "SerHex::<CompactPfx>")]
@@ -358,6 +378,7 @@ pub struct SyncCommitteeMessage {
 #[derive(Debug)]
 #[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#synccommitteecontribution
+/// used by Web3Signer type = "SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF"
 pub struct SyncCommitteeContribution {
     // Slot to which this contribution pertains
     #[serde(with = "SerHex::<CompactPfx>")]
@@ -367,7 +388,7 @@ pub struct SyncCommitteeContribution {
     pub beacon_block_root: Root,
     // The subcommittee this contribution pertains to out of the broader sync committee
     #[serde(with = "SerHex::<CompactPfx>")]
-    pub subcommittee_index: ValidatorIndex,
+    pub subcommittee_index: u64,
     // A bit is set if a signature from the validator at the corresponding
     // index in the subcommittee is present in the aggregate `signature`.
     // aggregation_bits: Bitvector[SYNC_COMMITTEE_SIZE // SYNC_COMMITTEE_SUBNET_COUNT]
@@ -397,7 +418,7 @@ pub struct SyncAggregatorSelectionData {
     #[serde(with = "SerHex::<CompactPfx>")]
     pub slot: Slot, 
     #[serde(with = "SerHex::<CompactPfx>")]
-    pub subcommittee_index: ValidatorIndex,
+    pub subcommittee_index: u64,
 }
 
 #[derive(Debug)]

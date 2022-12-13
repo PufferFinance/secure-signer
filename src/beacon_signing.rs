@@ -213,8 +213,74 @@ pub fn secure_sign_randao(pk_hex: String, epoch: Epoch, domain: Domain) -> Resul
     Ok(<_>::from(sig.to_bytes().to_vec()))
 }
 
+pub fn secure_sign_aggregate_and_proof(pk_hex: String, aap: AggregateAndProof, domain: Domain) -> Result<BLSSignature> {
+    println!("pk_hex: {:?}, aap: {:?}, domain: {:?}", pk_hex, aap, domain);
+    let root: Root = compute_signing_root(aap, domain);
+    let sig = keys::bls_sign(&pk_hex, &root)?;
+    Ok(<_>::from(sig.to_bytes().to_vec()))
+}
+
+pub fn secure_sign_aggregation_slot(pk_hex: String, ags: AggregationSlot, domain: Domain) -> Result<BLSSignature> {
+    println!("pk_hex: {:?}, ags: {:?}, domain: {:?}", pk_hex, ags, domain);
+    let root: Root = compute_signing_root(ags, domain);
+    let sig = keys::bls_sign(&pk_hex, &root)?;
+    Ok(<_>::from(sig.to_bytes().to_vec()))
+}
+
+pub fn secure_sign_deposit(pk_hex: String, d: DepositData, domain: Domain) -> Result<BLSSignature> {
+    println!("pk_hex: {:?}, d: {:?}, domain: {:?}", pk_hex, d, domain);
+    let root: Root = compute_signing_root(d, domain);
+    let sig = keys::bls_sign(&pk_hex, &root)?;
+    Ok(<_>::from(sig.to_bytes().to_vec()))
+}
+
+pub fn secure_sign_voluntary_exit(pk_hex: String, ve: VoluntaryExit, domain: Domain) -> Result<BLSSignature> {
+    println!("pk_hex: {:?}, ve: {:?}, domain: {:?}", pk_hex, ve, domain);
+    let root: Root = compute_signing_root(ve, domain);
+    let sig = keys::bls_sign(&pk_hex, &root)?;
+    Ok(<_>::from(sig.to_bytes().to_vec()))
+}
+
+pub fn secure_sign_sync_committee_msg(pk_hex: String, scm: SyncCommitteeMessage, domain: Domain) -> Result<BLSSignature> {
+    println!("pk_hex: {:?}, scm: {:?}, domain: {:?}", pk_hex, scm, domain);
+    let root: Root = compute_signing_root(scm, domain);
+    let sig = keys::bls_sign(&pk_hex, &root)?;
+    Ok(<_>::from(sig.to_bytes().to_vec()))
+}
+
+pub fn secure_sign_sync_committee_selection_proof(pk_hex: String, sasd: SyncAggregatorSelectionData, domain: Domain) -> Result<BLSSignature> {
+    println!("pk_hex: {:?}, sasd: {:?}, domain: {:?}", pk_hex, sasd, domain);
+    let root: Root = compute_signing_root(sasd, domain);
+    let sig = keys::bls_sign(&pk_hex, &root)?;
+    Ok(<_>::from(sig.to_bytes().to_vec()))
+}
+
+pub fn secure_sign_sync_committee_contribution_and_proof(pk_hex: String, cap: ContributionAndProof, domain: Domain) -> Result<BLSSignature> {
+    println!("pk_hex: {:?}, cap: {:?}, domain: {:?}", pk_hex, cap, domain);
+    let root: Root = compute_signing_root(cap, domain);
+    let sig = keys::bls_sign(&pk_hex, &root)?;
+    Ok(<_>::from(sig.to_bytes().to_vec()))
+}
+
+pub fn secure_sign_validator_registration(pk_hex: String, vr: ValidatorRegistration, domain: Domain) -> Result<BLSSignature> {
+    println!("pk_hex: {:?}, vr: {:?}, domain: {:?}", pk_hex, vr, domain);
+    let root: Root = compute_signing_root(vr, domain);
+    let sig = keys::bls_sign(&pk_hex, &root)?;
+    Ok(<_>::from(sig.to_bytes().to_vec()))
+}
+
 #[cfg(test)]
-mod secure_signer_tests {
+mod spec_tests {
+
+}
+
+#[cfg(test)]
+mod api_tests {
+
+}
+
+#[cfg(test)]
+mod slash_resistance_tests {
     use super::*;
     use std::fs;
 
