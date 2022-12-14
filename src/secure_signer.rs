@@ -232,22 +232,22 @@ mod tests {
         assert_eq!(list_keys_resp.data[0].pubkey, bls_pk_hex);
     }
 
-    async fn mock_bls_sign_route(bls_pk: &String, req: BlsSignRequest) -> BlsSignResponse {
-        let filter = bls_sign_route();
-        let uri = format!("/api/v1/eth2/sign/{}", bls_pk);
+    // async fn mock_bls_sign_route(bls_pk: &String, req: BlsSignRequest) -> BlsSignResponse {
+    //     let filter = bls_sign_route();
+    //     let uri = format!("/api/v1/eth2/sign/{}", bls_pk);
 
-        let res = warp::test::request()
-            .method("POST")
-            .path(&uri)
-            .json(&req)
-            .reply(&filter)
-            .await;
+    //     let res = warp::test::request()
+    //         .method("POST")
+    //         .path(&uri)
+    //         .json(&req)
+    //         .reply(&filter)
+    //         .await;
 
-        println!("{:?}", res.body());
-        assert_eq!(res.status(), 200);
-        let resp: BlsSignResponse = serde_json::from_slice(&res.body()).unwrap();
-        resp
-    }
+    //     println!("{:?}", res.body());
+    //     assert_eq!(res.status(), 200);
+    //     let resp: BlsSignResponse = serde_json::from_slice(&res.body()).unwrap();
+    //     resp
+    // }
 
     // #[tokio::test]
     // async fn test_bls_sign_route() {
@@ -284,57 +284,57 @@ mod tests {
     // }
 
 
-    async fn mock_secure_sign_randao() -> KeyImportResponse {
-        // 1) generate ETH secret key in enclave
-        let resp = call_eth_key_gen_route().await;
-        let enclave_eth_pk_hex = &resp.data[0].message;
-        let enclave_eth_pk_bytes = hex::decode(&enclave_eth_pk_hex).unwrap();
+    // async fn mock_secure_sign_randao() -> KeyImportResponse {
+    //     // 1) generate ETH secret key in enclave
+    //     let resp = call_eth_key_gen_route().await;
+    //     let enclave_eth_pk_hex = &resp.data[0].message;
+    //     let enclave_eth_pk_bytes = hex::decode(&enclave_eth_pk_hex).unwrap();
 
-        // 2) request enclave to do remote attestation
-        // let resp = enclave_remote_attestation();
+    //     // 2) request enclave to do remote attestation
+    //     // let resp = enclave_remote_attestation();
 
-        // 3) verify evidence
-        // todo
+    //     // 3) verify evidence
+    //     // todo
 
-        // 4) extract ETH pub key
-        // todo
+    //     // 4) extract ETH pub key
+    //     // todo
 
-        // 5) locally generate BLS key to import
-        let bls_sk = new_bls_key().unwrap();
+    //     // 5) locally generate BLS key to import
+    //     let bls_sk = new_bls_key().unwrap();
 
-        // 6) encrypt BLS key with ETH pub key
-        let ct_bls_sk = encrypt(&enclave_eth_pk_bytes, &bls_sk.serialize()).unwrap();
-        let ct_bls_sk_hex = hex::encode(ct_bls_sk);
-        let bls_pk_hex = hex::encode(bls_sk.sk_to_pk().serialize());
+    //     // 6) encrypt BLS key with ETH pub key
+    //     let ct_bls_sk = encrypt(&enclave_eth_pk_bytes, &bls_sk.serialize()).unwrap();
+    //     let ct_bls_sk_hex = hex::encode(ct_bls_sk);
+    //     let bls_pk_hex = hex::encode(bls_sk.sk_to_pk().serialize());
 
-        // 7) make payload to send /eth/v1/keystores POST request
-        let req = KeyImportRequest {
-            ct_bls_sk_hex: ct_bls_sk_hex,
-            bls_pk_hex: bls_pk_hex.clone(),
-            encrypting_pk_hex: enclave_eth_pk_hex.clone(),
-        };
-        println!("making bls key import req: {:?}", req);
+    //     // 7) make payload to send /eth/v1/keystores POST request
+    //     let req = KeyImportRequest {
+    //         ct_bls_sk_hex: ct_bls_sk_hex,
+    //         bls_pk_hex: bls_pk_hex.clone(),
+    //         encrypting_pk_hex: enclave_eth_pk_hex.clone(),
+    //     };
+    //     println!("making bls key import req: {:?}", req);
 
-        // 8) make the actual request
-        let filter = bls_key_import_route();
-        let res = warp::test::request()
-            .method("POST")
-            .header("accept", "application/json")
-            .path("/eth/v1/keystores")
-            .json(&req)
-            .reply(&filter)
-            .await;
+    //     // 8) make the actual request
+    //     let filter = bls_key_import_route();
+    //     let res = warp::test::request()
+    //         .method("POST")
+    //         .header("accept", "application/json")
+    //         .path("/eth/v1/keystores")
+    //         .json(&req)
+    //         .reply(&filter)
+    //         .await;
 
 
-        println!{"{:?}", res.body()};
-        assert_eq!(res.status(), 200);
+    //     println!{"{:?}", res.body()};
+    //     assert_eq!(res.status(), 200);
 
-        let resp: KeyImportResponse = serde_json::from_slice(&res.body()).unwrap();
+    //     let resp: KeyImportResponse = serde_json::from_slice(&res.body()).unwrap();
 
-        assert_eq!(resp.data[0].status, "imported".to_string());
-        assert_eq!(resp.data[0].message, bls_pk_hex);
-        resp
-    }
+    //     assert_eq!(resp.data[0].status, "imported".to_string());
+    //     assert_eq!(resp.data[0].message, bls_pk_hex);
+    //     resp
+    // }
 
 }
 

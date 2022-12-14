@@ -59,32 +59,6 @@ fn read_block_slot(pk_hex: &String) -> Result<Slot> {
     }
 }
 
-// fn write_block(pk_hex: &String, b: &BeaconBlock) -> Result<()> {
-//     let file_path: PathBuf = ["./etc/slashing/blocks/", pk_hex.as_str()].iter().collect();
-//     if let Some(p) = file_path.parent() { 
-//         fs::create_dir_all(p).with_context(|| "Failed to create slashing/blocks dir")?
-//     }; 
-//     let bs = b.as_ssz_bytes();
-//     println!("bs: {:?}", bs);
-//     fs::write(&file_path, bs).with_context(|| "failed to write block") 
-// }
-
-// note currently this is not decoding correctly
-// /// If there is no block saved with fname `pk_hex` then return the default slot of 0 
-// fn read_block(pk_hex: &String) -> Result<BeaconBlock> {
-//     match fs::read(&format!("./etc/slashing/blocks/{}", pk_hex)) {
-//         Ok(b) => {
-//             println!("b: {:?}", b);
-//             match BeaconBlock::from_ssz_bytes(&b) {
-//                 Ok(bb) => Ok(bb),
-//                 Err(e) => bail!("Error, could not ssz decode previous block {:?}", e)
-//             }
-//         },
-//         // No existing slot. return default 0
-//         Err(e) => Ok(BeaconBlock::default())
-//     }
-// }
-
 fn write_attestation_data(pk_hex: &String, d: &AttestationData) -> Result<()>{
     let file_path: PathBuf = ["./etc/slashing/attestations/", pk_hex.as_str()].iter().collect();
     if let Some(p) = file_path.parent() { 
@@ -114,9 +88,7 @@ fn read_attestation_data(pk_hex: &String) -> Result<(Epoch, Epoch)> {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-pub struct ProposeBlockRequest {
-    #[serde(rename = "type")]
-    pub type_: String,
+pub struct BlockRequest {
     pub fork_info: ForkInfo,
     #[serde(with = "SerHex::<StrictPfx>")]
     pub signingRoot: Root,
@@ -124,9 +96,7 @@ pub struct ProposeBlockRequest {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-pub struct AttestBlockRequest {
-    #[serde(rename = "type")]
-    pub type_: String,
+pub struct AttestationRequest {
     pub fork_info: ForkInfo,
     #[serde(with = "SerHex::<StrictPfx>")]
     pub signingRoot: Root,
@@ -135,13 +105,89 @@ pub struct AttestBlockRequest {
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct RandaoRevealRequest {
-    #[serde(rename = "type")]
-    pub type_: String,
     pub fork_info: ForkInfo,
     #[serde(with = "SerHex::<StrictPfx>")]
     pub signingRoot: Root,
     #[serde(with = "SerHex::<CompactPfx>")]
     pub randao_reveal: Epoch,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct AggregateAndProofRequest {
+    pub fork_info: ForkInfo,
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub signingRoot: Root,
+    pub aggregate_and_proof: AggregateAndProof,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct AggregationSlotRequest {
+    pub fork_info: ForkInfo,
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub signingRoot: Root,
+    pub aggregation_slot: AggregationSlot,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct DepositRequest {
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub signingRoot: Root,
+    pub deposit: DepositData,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct VoluntaryExitRequest {
+    pub fork_info: ForkInfo,
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub signingRoot: Root,
+    pub voluntary_exit: VoluntaryExit,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct SyncCommitteeMessageRequest {
+    pub fork_info: ForkInfo,
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub signingRoot: Root,
+    pub sync_committee_message: SyncCommitteeMessage,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct SyncCommitteeSelectionProofRequest {
+    pub fork_info: ForkInfo,
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub signingRoot: Root,
+    pub sync_aggregator_selection_data: SyncAggregatorSelectionData,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct SyncCommitteeContributionAndProofRequest {
+    pub fork_info: ForkInfo,
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub signingRoot: Root,
+    pub contribution_and_proof: ContributionAndProof,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct ValidatorRegistrationRequest {
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub signingRoot: Root,
+    pub validator_registration: ValidatorRegistration,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(tag = "type")]
+pub enum BLSSignMsg {
+    BLOCK (BlockRequest),
+    ATTESTATION (AttestationRequest),
+    RANDAO_REVEAL (RandaoRevealRequest),
+    AGGREGATE_AND_PROOF (AggregateAndProofRequest),
+    AGGREGATION_SLOT (AggregationSlotRequest),
+    DEPOSIT (DepositRequest),
+    VOLUNTARY_EXIT (VoluntaryExitRequest),
+    SYNC_COMMITTEE_MESSAGE (SyncCommitteeMessageRequest),
+    SYNC_COMMITTEE_SELECTION_PROOF (SyncCommitteeSelectionProofRequest),
+    SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF (SyncCommitteeContributionAndProofRequest),
+    // VALIDATOR_REGISTRATION (ValidatorRegistrationRequest), //todo
 }
 
 /// Return the 32-byte fork data root for the ``current_version`` and ``genesis_validators_root``.
@@ -206,7 +252,7 @@ pub fn secure_sign_attestation(pk_hex: String, attestation_data: AttestationData
     Ok(<_>::from(sig.to_bytes().to_vec()))
 }
 
-pub fn secure_sign_randao(pk_hex: String, epoch: Epoch, domain: Domain) -> Result<BLSSignature> {
+pub fn secure_sign_randao_reveal(pk_hex: String, epoch: Epoch, domain: Domain) -> Result<BLSSignature> {
     println!("pk_hex: {:?}, epoch: {:?}, domain: {:?}", pk_hex, epoch, domain);
     let root: Root = compute_signing_root(epoch, domain);
     let sig = keys::bls_sign(&pk_hex, &root)?;
@@ -276,6 +322,8 @@ mod spec_tests {
 
 #[cfg(test)]
 mod api_tests {
+    use super::*;
+
 
 }
 
@@ -295,8 +343,24 @@ mod slash_resistance_tests {
         pk_hex
     }
 
+    #[test]
+    fn test_enum() {
+        let req = mock_propose_block_request("0x5");
+        let x: BLSSignMsg = serde_json::from_str(&req).unwrap();
+        println!("{:?}", x);
+        match x {
+            BLSSignMsg::BLOCK(x) => {
+                println!("{:?}", x.fork_info);
+            },
+            _ => {}
+        }
+        // let y: ProposeBlockRequest = x.try_into().unwrap();
+        // println!("{:?}", y);
+    }
+
     fn mock_propose_block_request(slot: &str) -> String {
-        let type_: String = "BlOcK".into(); // mixed case
+        // let type_: String = "BlOcK".into(); // mixed case
+        let type_: String = "BLOCK".into(); // mixed case
 
         let req = format!(r#"
             {{
@@ -346,7 +410,7 @@ mod slash_resistance_tests {
         let sigs = (1..n+1).map(|s| {
             let slot = format!("{s:x}");
             let req = mock_propose_block_request(&slot);
-            let pbr: ProposeBlockRequest = serde_json::from_str(&req).unwrap();
+            let pbr: BlockRequest = serde_json::from_str(&req).unwrap();
             assert_eq!(pbr.block.slot, s);
 
             let domain = compute_domain(
@@ -378,7 +442,7 @@ mod slash_resistance_tests {
         let s = n - 1;
         let slot = format!("{s:x}");
         let req = mock_propose_block_request(&slot);
-        let pbr: ProposeBlockRequest = serde_json::from_str(&req).unwrap();
+        let pbr: BlockRequest = serde_json::from_str(&req).unwrap();
         assert_eq!(pbr.block.slot, s);
 
         let domain = compute_domain(
@@ -399,7 +463,7 @@ mod slash_resistance_tests {
         let s = n;
         let slot = format!("{s:x}");
         let req = mock_propose_block_request(&slot);
-        let pbr: ProposeBlockRequest = serde_json::from_str(&req).unwrap();
+        let pbr: BlockRequest = serde_json::from_str(&req).unwrap();
         assert_eq!(pbr.block.slot, s);
 
         let domain = compute_domain(
@@ -457,7 +521,7 @@ mod slash_resistance_tests {
             // target epoch will be strictly increasing
             let tgt_epoch = format!("{s:x}");
             let req = mock_attestation_request(&src_epoch, &tgt_epoch);
-            let abr: AttestBlockRequest = serde_json::from_str(&req).unwrap();
+            let abr: AttestationRequest = serde_json::from_str(&req).unwrap();
             assert_eq!(abr.attestation.slot, 255);
             assert_eq!(abr.attestation.index, 65535);
             assert_eq!(abr.attestation.source.epoch, s);
@@ -495,7 +559,7 @@ mod slash_resistance_tests {
         let tgt_epoch = format!("{:x}", n + 1);
 
         let req = mock_attestation_request(&src_epoch, &tgt_epoch);
-        let abr: AttestBlockRequest = serde_json::from_str(&req).unwrap();
+        let abr: AttestationRequest = serde_json::from_str(&req).unwrap();
 
         let domain = compute_domain(
             DOMAIN_BEACON_ATTESTER, 
@@ -517,7 +581,7 @@ mod slash_resistance_tests {
         let tgt_epoch = format!("{:x}", n);
 
         let req = mock_attestation_request(&src_epoch, &tgt_epoch);
-        let abr: AttestBlockRequest = serde_json::from_str(&req).unwrap();
+        let abr: AttestationRequest = serde_json::from_str(&req).unwrap();
         assert_eq!(abr.attestation.slot, 255);
         assert_eq!(abr.attestation.index, 65535);
         assert_eq!(abr.attestation.source.epoch, n+1);
@@ -543,7 +607,7 @@ mod slash_resistance_tests {
         let tgt_epoch = "0x0";
 
         let req = mock_attestation_request(&src_epoch, &tgt_epoch);
-        let abr: AttestBlockRequest = serde_json::from_str(&req).unwrap();
+        let abr: AttestationRequest = serde_json::from_str(&req).unwrap();
         assert_eq!(abr.attestation.slot, 255);
         assert_eq!(abr.attestation.index, 65535);
         assert_eq!(abr.attestation.source.epoch, n + 1);

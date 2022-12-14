@@ -42,14 +42,17 @@ type SYNC_COMMITTEE_SIZE = typenum::U512;
 type SYNC_COMMITTEE_SUBNET_COUNT = typenum::U4;
 type SYNC_COMMITTEE_SIZE_BY_SYNC_COMMITTEE_SUBNET_COUNT = typenum::U128;  // 512 / 4
 
-pub const DOMAIN_BEACON_PROPOSER:     DomainType = [0_u8, 0_u8, 0_u8, 0_u8]; // '0x00000000'
-pub const DOMAIN_BEACON_ATTESTER:     DomainType = [1_u8, 0_u8, 0_u8, 0_u8]; // '0x01000000'
-pub const DOMAIN_RANDAO:              DomainType = [2_u8, 0_u8, 0_u8, 0_u8]; // '0x02000000'
-pub const DOMAIN_DEPOSIT:             DomainType = [3_u8, 0_u8, 0_u8, 0_u8]; // '0x03000000'
-pub const DOMAIN_VOLUNTARY_EXIT:      DomainType = [4_u8, 0_u8, 0_u8, 0_u8]; // '0x04000000'
-pub const DOMAIN_SELECTION_PROOF:     DomainType = [5_u8, 0_u8, 0_u8, 0_u8]; // '0x05000000'
-pub const DOMAIN_AGGREGATE_AND_PROOF: DomainType = [6_u8, 0_u8, 0_u8, 0_u8]; // '0x06000000'
-pub const DOMAIN_APPLICATION_MASK:    DomainType = [0_u8, 0_u8, 0_u8, 1_u8]; // '0x00000001'
+pub const DOMAIN_BEACON_PROPOSER:                DomainType = [0_u8, 0_u8, 0_u8, 0_u8]; // '0x00000000'
+pub const DOMAIN_BEACON_ATTESTER:                DomainType = [1_u8, 0_u8, 0_u8, 0_u8]; // '0x01000000'
+pub const DOMAIN_RANDAO:                         DomainType = [2_u8, 0_u8, 0_u8, 0_u8]; // '0x02000000'
+pub const DOMAIN_DEPOSIT:                        DomainType = [3_u8, 0_u8, 0_u8, 0_u8]; // '0x03000000'
+pub const DOMAIN_VOLUNTARY_EXIT:                 DomainType = [4_u8, 0_u8, 0_u8, 0_u8]; // '0x04000000'
+pub const DOMAIN_SELECTION_PROOF:                DomainType = [5_u8, 0_u8, 0_u8, 0_u8]; // '0x05000000'
+pub const DOMAIN_AGGREGATE_AND_PROOF:            DomainType = [6_u8, 0_u8, 0_u8, 0_u8]; // '0x06000000'
+pub const DOMAIN_SYNC_COMMITTEE:                 DomainType = [7_u8, 0_u8, 0_u8, 0_u8]; // '0x07000000'
+pub const DOMAIN_SYNC_COMMITTEE_SELECTION_PROOF: DomainType = [8_u8, 0_u8, 0_u8, 0_u8]; // '0x08000000'
+pub const DOMAIN_CONTRIBUTION_AND_PROOF:         DomainType = [9_u8, 0_u8, 0_u8, 0_u8]; // '0x09000000'
+pub const DOMAIN_APPLICATION_MASK:               DomainType = [0_u8, 0_u8, 0_u8, 1_u8]; // '0x00000001'
 
 pub const GENESIS_FORK_VERSION: Version = [0_u8, 0_u8, 0_u8, 0_u8]; // '0x00000000'
 
@@ -427,37 +430,6 @@ pub struct SyncAggregatorSelectionData {
 pub struct AggregationSlot {
     #[serde(with = "SerHex::<CompactPfx>")]
     pub slot: Slot, 
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct ProposeBlockRequest {
-    #[serde(rename = "type")]
-    pub type_: String,
-    pub fork_info: ForkInfo,
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub signingRoot: Root,
-    pub block: BeaconBlock,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct AttestBlockRequest {
-    #[serde(rename = "type")]
-    pub type_: String,
-    pub fork_info: ForkInfo,
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub signingRoot: Root,
-    pub attestation: AttestationData,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct RandaoRevealRequest {
-    #[serde(rename = "type")]
-    pub type_: String,
-    pub fork_info: ForkInfo,
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub signingRoot: Root,
-    #[serde(with = "SerHex::<CompactPfx>")]
-    pub randao_reveal: Epoch,
 }
 
 #[cfg(test)]

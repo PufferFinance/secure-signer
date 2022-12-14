@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use bytes::{Buf, Bytes};
 
 /// Runs all the logic to generate and save a new BLS key. Returns a `KeyGenResponse` on success.
-pub async fn epid_remote_attestation_service(req: AttestationRequest) -> Result<impl warp::Reply, warp::Rejection> {
+pub async fn epid_remote_attestation_service(req: RemoteAttestationRequest) -> Result<impl warp::Reply, warp::Rejection> {
     let from_file = true;
     match epid_remote_attestation(&req.pub_key, from_file) {
         Ok(evidence) => {
@@ -28,7 +28,7 @@ pub async fn epid_remote_attestation_service(req: AttestationRequest) -> Result<
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-pub struct AttestationRequest {
+pub struct RemoteAttestationRequest {
     pub pub_key: String,
 }
 
@@ -166,28 +166,8 @@ pub async fn list_eth_keys_service() -> Result<impl warp::Reply, warp::Rejection
     }
 }
 
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct BlsSignRequest {
-    #[serde(rename = "type")]
-    pub type_: String,
-    pub fork_info: ForkInfo,
-    pub signing_root: String,
-    pub msg_hex: String,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct BlsSignResponse {
-    pub msg_hex: String,
-    pub bls_sig_hex: String,
-}
-
 /// Handler for secure_sign_block()
-pub fn handle_block_type(req: ProposeBlockRequest, bls_pk_hex: String) -> Result<BLSSignature> {
-    if req.type_.to_lowercase() != "block" {
-        bail!("Bad request format");
-    }
-
+pub fn handle_block_type(req: BlockRequest, bls_pk_hex: String) -> Result<BLSSignature> {
     let domain = compute_domain(
         DOMAIN_BEACON_PROPOSER, 
         Some(req.fork_info.fork.current_version),
@@ -198,11 +178,7 @@ pub fn handle_block_type(req: ProposeBlockRequest, bls_pk_hex: String) -> Result
 }
 
 /// Handler for secure_sign_attestation()
-pub fn handle_attestation_type(req: AttestBlockRequest, bls_pk_hex: String) -> Result<BLSSignature> {
-    if req.type_.to_lowercase() != "attestation" {
-        bail!("Bad request format");
-    }
-
+pub fn handle_attestation_type(req: AttestationRequest, bls_pk_hex: String) -> Result<BLSSignature> {
     let domain = compute_domain(
         DOMAIN_BEACON_ATTESTER, 
         Some(req.fork_info.fork.current_version),
@@ -212,25 +188,109 @@ pub fn handle_attestation_type(req: AttestBlockRequest, bls_pk_hex: String) -> R
     secure_sign_attestation(bls_pk_hex, req.attestation, domain)
 }
 
-/// Handler for secure_sign_randao()
+/// Handler for secure_sign_randao_reveal()
 pub fn handle_randao_reveal_type(req: RandaoRevealRequest, bls_pk_hex: String) -> Result<BLSSignature> {
-    if req.type_.to_lowercase() != "randao_reveal" {
-        bail!("Bad request format");
-    }
-
     let domain = compute_domain(
         DOMAIN_RANDAO, 
         Some(req.fork_info.fork.current_version),
         Some(req.fork_info.genesis_validators_root)
     );
 
-    secure_sign_randao(bls_pk_hex, req.randao_reveal, domain)
+    secure_sign_randao_reveal(bls_pk_hex, req.randao_reveal, domain)
 }
+
+/// Handler for secure_sign_aggregate_and_proof()
+pub fn handle_aggregate_and_proof_type(req: AggregateAndProofRequest, bls_pk_hex: String) -> Result<BLSSignature> {
+    let domain = compute_domain(
+        DOMAIN_AGGREGATE_AND_PROOF, 
+        Some(req.fork_info.fork.current_version),
+        Some(req.fork_info.genesis_validators_root)
+    );
+
+    secure_sign_aggregate_and_proof(bls_pk_hex, req.aggregate_and_proof, domain)
+}
+
+/// Handler for secure_sign_aggregation_slot()
+pub fn handle_aggregation_slot_type(req: AggregationSlotRequest, bls_pk_hex: String) -> Result<BLSSignature> {
+    let domain = compute_domain(
+        DOMAIN_RANDAO, 
+        Some(req.fork_info.fork.current_version),
+        Some(req.fork_info.genesis_validators_root)
+    );
+
+    secure_sign_aggregation_slot(bls_pk_hex, req.aggregation_slot, domain)
+}
+
+/// Handler for secure_sign_deposit()
+pub fn handle_deposit_type(req: DepositRequest, bls_pk_hex: String) -> Result<BLSSignature> {
+    let domain = compute_domain(
+        DOMAIN_DEPOSIT, 
+        None, // TODO verify this is correct
+        None // TODO verify this is correct
+    );
+
+    secure_sign_deposit(bls_pk_hex, req.deposit, domain)
+}
+
+/// Handler for secure_sign_voluntary_exit()
+pub fn handle_voluntary_exit_type(req: VoluntaryExitRequest, bls_pk_hex: String) -> Result<BLSSignature> {
+    let domain = compute_domain(
+        DOMAIN_VOLUNTARY_EXIT, 
+        Some(req.fork_info.fork.current_version),
+        Some(req.fork_info.genesis_validators_root)
+    );
+
+    secure_sign_voluntary_exit(bls_pk_hex, req.voluntary_exit, domain)
+}
+
+/// Handler for secure_sign_sync_committee_msg()
+pub fn handle_sync_committee_msg_type(req: SyncCommitteeMessageRequest, bls_pk_hex: String) -> Result<BLSSignature> {
+    let domain = compute_domain(
+        DOMAIN_SYNC_COMMITTEE, 
+        Some(req.fork_info.fork.current_version),
+        Some(req.fork_info.genesis_validators_root)
+    );
+
+    secure_sign_sync_committee_msg(bls_pk_hex, req.sync_committee_message, domain)
+}
+
+/// Handler for secure_sign_sync_committee_selection_proof()
+pub fn handle_sync_committee_selection_proof_type(req: SyncCommitteeSelectionProofRequest, bls_pk_hex: String) -> Result<BLSSignature> {
+    let domain = compute_domain(
+        DOMAIN_SYNC_COMMITTEE_SELECTION_PROOF,
+        Some(req.fork_info.fork.current_version),
+        Some(req.fork_info.genesis_validators_root)
+    );
+
+    secure_sign_sync_committee_selection_proof(bls_pk_hex, req.sync_aggregator_selection_data, domain)
+}
+
+/// Handler for secure_sign_sync_committee_contribution_and_proof()
+pub fn handle_sync_committee_contribution_and_proof_type(req: SyncCommitteeContributionAndProofRequest, bls_pk_hex: String) -> Result<BLSSignature> {
+    let domain = compute_domain(
+        DOMAIN_CONTRIBUTION_AND_PROOF,
+        Some(req.fork_info.fork.current_version),
+        Some(req.fork_info.genesis_validators_root)
+    );
+
+    secure_sign_sync_committee_contribution_and_proof(bls_pk_hex, req.contribution_and_proof, domain)
+}
+
+// /// Handler for secure_sign_validator_registration()
+// pub fn handle_validator_registration_type(req: ValidatorRegistrationRequest, bls_pk_hex: String) -> Result<BLSSignature> {
+//     let domain = compute_domain(
+//         DOMAIN_VOLUNTARY_EXIT,  // TODO
+//         None, // TODO verify this is correct
+//         None // TODO verify this is correct
+//     );
+
+//     secure_sign_validator_registration(bls_pk_hex, req.validator_registration, domain)
+// }
 
 /// maintain compatibility with https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing 
 pub async fn secure_sign_bls(identifier: String, req: bytes::Bytes) -> Result<impl warp::Reply, warp::Rejection> {
-    match serde_json::from_slice::<ProposeBlockRequest>(&req) {
-        Ok(req) => {
+    match serde_json::from_slice(&req) {
+        Ok(BLSSignMsg::BLOCK(req)) => {
             // handle "BLOCK" type request
             match handle_block_type(req, identifier) {
                 Ok(sig) => {
@@ -246,54 +306,242 @@ pub async fn secure_sign_bls(identifier: String, req: bytes::Bytes) -> Result<im
                 }
             }
         },
-        Err(e) => {
-            match serde_json::from_slice::<AttestBlockRequest>(&req) {
-                Ok(req) => {
-                    // handle "ATTESTATION" type request
-                    match handle_attestation_type(req, identifier) {
-                        Ok(sig) => {
-                            let mut resp = HashMap::new();
-                            resp.insert("signature", hex::encode(&sig[..]));
-                            Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
-                        },
-                        // return 412 error
-                        Err(e) => {
-                            let mut resp = HashMap::new();
-                            resp.insert("error", format!("{:?}, Signing operation failed due to slashing protection rules", e));
-                            Ok(reply::with_status(reply::json(&resp), StatusCode::PRECONDITION_FAILED))
-                        }
-                    }
+        Ok(BLSSignMsg::ATTESTATION(req)) => {
+            // handle "ATTESTATION" type request
+            match handle_attestation_type(req, identifier) {
+                Ok(sig) => {
+                    let mut resp = HashMap::new();
+                    resp.insert("signature", hex::encode(&sig[..]));
+                    Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
                 },
+                // return 412 error
                 Err(e) => {
-                    match serde_json::from_slice::<RandaoRevealRequest>(&req) {
-                        Ok(req) => {
-                            // handle "RANDAO_REVEAL" type request
-                            match handle_randao_reveal_type(req, identifier) {
-                                Ok(sig) => {
-                                    let mut resp = HashMap::new();
-                                    resp.insert("signature", hex::encode(&sig[..]));
-                                    Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
-                                },
-                                // return 412 error
-                                Err(e) => {
-                                    let mut resp = HashMap::new();
-                                    resp.insert("error", format!("{:?}, Signing operation failed due to slashing protection rules", e));
-                                    Ok(reply::with_status(reply::json(&resp), StatusCode::PRECONDITION_FAILED))
-                                }
-                            }
-                        },
-                        Err(e) => {
-                            // catchall error if signing type not one of ['BLOCK', 'ATTESTATION', RANDAO_REVEAL']
-                            let mut resp = HashMap::new();
-                            resp.insert("error", "Type not in ['BLOCK', 'ATTESTATION', RANDAO_REVEAL']");
-                            Ok(reply::with_status(reply::json(&resp), StatusCode::BAD_REQUEST))
-                        }
-                    }
+                    let mut resp = HashMap::new();
+                    resp.insert("error", format!("{:?}, Signing operation failed due to slashing protection rules", e));
+                    Ok(reply::with_status(reply::json(&resp), StatusCode::PRECONDITION_FAILED))
                 }
             }
-        }
+        },
+        Ok(BLSSignMsg::RANDAO_REVEAL(req)) => {
+            // handle "RANDAO_REVEAL" type request
+            match handle_randao_reveal_type(req, identifier) {
+                Ok(sig) => {
+                    let mut resp = HashMap::new();
+                    resp.insert("signature", hex::encode(&sig[..]));
+                    Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
+                },
+                // return 500 error
+                Err(e) => {
+                    let mut resp = HashMap::new();
+                    resp.insert("error", format!("{:?}", e));
+                    Ok(reply::with_status(reply::json(&resp), StatusCode::INTERNAL_SERVER_ERROR))
+                }
+            }
+        },
+        Ok(BLSSignMsg::AGGREGATE_AND_PROOF(req)) => {
+            // handle "AGGREGATE_AND_PROOF" type request
+            match handle_aggregate_and_proof_type(req, identifier) {
+                Ok(sig) => {
+                    let mut resp = HashMap::new();
+                    resp.insert("signature", hex::encode(&sig[..]));
+                    Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
+                },
+                // return 500 error
+                Err(e) => {
+                    let mut resp = HashMap::new();
+                    resp.insert("error", format!("{:?}", e));
+                    Ok(reply::with_status(reply::json(&resp), StatusCode::INTERNAL_SERVER_ERROR))
+                }
+            }
+        },
+        Ok(BLSSignMsg::AGGREGATION_SLOT(req)) => {
+            // handle "AGGREGATION_SLOT" type request
+            match handle_aggregation_slot_type(req, identifier) {
+                Ok(sig) => {
+                    let mut resp = HashMap::new();
+                    resp.insert("signature", hex::encode(&sig[..]));
+                    Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
+                },
+                // return 500 error
+                Err(e) => {
+                    let mut resp = HashMap::new();
+                    resp.insert("error", format!("{:?}", e));
+                    Ok(reply::with_status(reply::json(&resp), StatusCode::INTERNAL_SERVER_ERROR))
+                }
+            }
+        },
+        Ok(BLSSignMsg::DEPOSIT(req)) => {
+            // handle "DEPOSIT" type request
+            match handle_deposit_type(req, identifier) {
+                Ok(sig) => {
+                    let mut resp = HashMap::new();
+                    resp.insert("signature", hex::encode(&sig[..]));
+                    Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
+                },
+                // return 500 error
+                Err(e) => {
+                    let mut resp = HashMap::new();
+                    resp.insert("error", format!("{:?}", e));
+                    Ok(reply::with_status(reply::json(&resp), StatusCode::INTERNAL_SERVER_ERROR))
+                }
+            }
+        },
+        Ok(BLSSignMsg::VOLUNTARY_EXIT(req)) => {
+            // handle "VOLUNTARY_EXIT" type request
+            match handle_voluntary_exit_type(req, identifier) {
+                Ok(sig) => {
+                    let mut resp = HashMap::new();
+                    resp.insert("signature", hex::encode(&sig[..]));
+                    Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
+                },
+                // return 500 error
+                Err(e) => {
+                    let mut resp = HashMap::new();
+                    resp.insert("error", format!("{:?}", e));
+                    Ok(reply::with_status(reply::json(&resp), StatusCode::INTERNAL_SERVER_ERROR))
+                }
+            }
+        },
+        Ok(BLSSignMsg::SYNC_COMMITTEE_MESSAGE(req)) => {
+            // handle "SYNC_COMMITTEE_MESSAGE" type request
+            match handle_sync_committee_msg_type(req, identifier) {
+                Ok(sig) => {
+                    let mut resp = HashMap::new();
+                    resp.insert("signature", hex::encode(&sig[..]));
+                    Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
+                },
+                // return 500 error
+                Err(e) => {
+                    let mut resp = HashMap::new();
+                    resp.insert("error", format!("{:?}", e));
+                    Ok(reply::with_status(reply::json(&resp), StatusCode::INTERNAL_SERVER_ERROR))
+                }
+            }
+        },
+        Ok(BLSSignMsg::SYNC_COMMITTEE_SELECTION_PROOF(req)) => {
+            // handle "SYNC_COMMITTEE_SELECTION_PROOF" type request
+            match handle_sync_committee_selection_proof_type(req, identifier) {
+                Ok(sig) => {
+                    let mut resp = HashMap::new();
+                    resp.insert("signature", hex::encode(&sig[..]));
+                    Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
+                },
+                // return 500 error
+                Err(e) => {
+                    let mut resp = HashMap::new();
+                    resp.insert("error", format!("{:?}", e));
+                    Ok(reply::with_status(reply::json(&resp), StatusCode::INTERNAL_SERVER_ERROR))
+                }
+            }
+        },
+        Ok(BLSSignMsg::SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF(req)) => {
+            // handle "SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF" type request
+            match handle_sync_committee_contribution_and_proof_type(req, identifier) {
+                Ok(sig) => {
+                    let mut resp = HashMap::new();
+                    resp.insert("signature", hex::encode(&sig[..]));
+                    Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
+                },
+                // return 500 error
+                Err(e) => {
+                    let mut resp = HashMap::new();
+                    resp.insert("error", format!("{:?}", e));
+                    Ok(reply::with_status(reply::json(&resp), StatusCode::INTERNAL_SERVER_ERROR))
+                }
+            }
+        },
+        // Ok(BLSSignMsg::VALIDATOR_REGISTRATION(req)) => {
+        //     // handle "VALIDATOR_REGISTRATION" type request
+        //     match handle_validator_registration_type(req, identifier) {
+        //         Ok(sig) => {
+        //             let mut resp = HashMap::new();
+        //             resp.insert("signature", hex::encode(&sig[..]));
+        //             Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
+        //         },
+        //         // return 500 error
+        //         Err(e) => {
+        //             let mut resp = HashMap::new();
+        //             resp.insert("error", format!("{:?}", e));
+        //             Ok(reply::with_status(reply::json(&resp), StatusCode::INTERNAL_SERVER_ERROR))
+        //         }
+        //     }
+        // },
+        Err(e) => {
+            // catchall error if signing type not one of ['BLOCK', 'ATTESTATION', RANDAO_REVEAL']
+            let mut resp = HashMap::new();
+            resp.insert("error", "Type not in ['BLOCK', 'ATTESTATION', RANDAO_REVEAL', 'AGGREGATION_SLOT', 'AGGREGATE_AND_PROOF', 'DEPOSIT','VOLUNTARY_EXIT', 'SYNC_COMMITEE_MESSAGE', 'SYNC_COMMITEE_SELECTION_PROOF', 'SYNC_COMMITEE_CONTRIBUTION_AND_PROOF' 'VALIDATOR_REGISTRATION']");
+            Ok(reply::with_status(reply::json(&resp), StatusCode::BAD_REQUEST))
+        },
     }
 }
+
+// /// maintain compatibility with https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing 
+// pub async fn secure_sign_bls(identifier: String, req: bytes::Bytes) -> Result<impl warp::Reply, warp::Rejection> {
+//     match serde_json::from_slice::<ProposeBlockRequest>(&req) {
+//         Ok(req) => {
+//             // handle "BLOCK" type request
+//             match handle_block_type(req, identifier) {
+//                 Ok(sig) => {
+//                     let mut resp = HashMap::new();
+//                     resp.insert("signature", hex::encode(&sig[..]));
+//                     Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
+//                 },
+//                 // return 412 error
+//                 Err(e) => {
+//                     let mut resp = HashMap::new();
+//                     resp.insert("error", format!("{:?}, Signing operation failed due to slashing protection rules", e));
+//                     Ok(reply::with_status(reply::json(&resp), StatusCode::PRECONDITION_FAILED))
+//                 }
+//             }
+//         },
+//         Err(e) => {
+//             match serde_json::from_slice::<AttestBlockRequest>(&req) {
+//                 Ok(req) => {
+//                     // handle "ATTESTATION" type request
+//                     match handle_attestation_type(req, identifier) {
+//                         Ok(sig) => {
+//                             let mut resp = HashMap::new();
+//                             resp.insert("signature", hex::encode(&sig[..]));
+//                             Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
+//                         },
+//                         // return 412 error
+//                         Err(e) => {
+//                             let mut resp = HashMap::new();
+//                             resp.insert("error", format!("{:?}, Signing operation failed due to slashing protection rules", e));
+//                             Ok(reply::with_status(reply::json(&resp), StatusCode::PRECONDITION_FAILED))
+//                         }
+//                     }
+//                 },
+//                 Err(e) => {
+//                     match serde_json::from_slice::<RandaoRevealRequest>(&req) {
+//                         Ok(req) => {
+//                             // handle "RANDAO_REVEAL" type request
+//                             match handle_randao_reveal_type(req, identifier) {
+//                                 Ok(sig) => {
+//                                     let mut resp = HashMap::new();
+//                                     resp.insert("signature", hex::encode(&sig[..]));
+//                                     Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
+//                                 },
+//                                 // return 412 error
+//                                 Err(e) => {
+//                                     let mut resp = HashMap::new();
+//                                     resp.insert("error", format!("{:?}, Signing operation failed due to slashing protection rules", e));
+//                                     Ok(reply::with_status(reply::json(&resp), StatusCode::PRECONDITION_FAILED))
+//                                 }
+//                             }
+//                         },
+//                         Err(e) => {
+//                             // catchall error if signing type not one of ['BLOCK', 'ATTESTATION', RANDAO_REVEAL']
+//                             let mut resp = HashMap::new();
+//                             resp.insert("error", "Type not in ['BLOCK', 'ATTESTATION', RANDAO_REVEAL']");
+//                             Ok(reply::with_status(reply::json(&resp), StatusCode::BAD_REQUEST))
+//                         }
+//                     }
+//                 }
+//             }
+//         }
+//     }
+// }
 
 
 #[derive(Deserialize, Serialize, Debug)]
