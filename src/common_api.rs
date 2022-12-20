@@ -289,6 +289,7 @@ pub fn handle_sync_committee_contribution_and_proof_type(req: SyncCommitteeContr
 
 /// maintain compatibility with https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing 
 pub async fn secure_sign_bls(identifier: String, req: bytes::Bytes) -> Result<impl warp::Reply, warp::Rejection> {
+    println!("{:?}", req);
     match serde_json::from_slice(&req) {
         Ok(BLSSignMsg::BLOCK(req)) => {
             // handle "BLOCK" type request
@@ -474,74 +475,6 @@ pub async fn secure_sign_bls(identifier: String, req: bytes::Bytes) -> Result<im
         },
     }
 }
-
-// /// maintain compatibility with https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing 
-// pub async fn secure_sign_bls(identifier: String, req: bytes::Bytes) -> Result<impl warp::Reply, warp::Rejection> {
-//     match serde_json::from_slice::<ProposeBlockRequest>(&req) {
-//         Ok(req) => {
-//             // handle "BLOCK" type request
-//             match handle_block_type(req, identifier) {
-//                 Ok(sig) => {
-//                     let mut resp = HashMap::new();
-//                     resp.insert("signature", hex::encode(&sig[..]));
-//                     Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
-//                 },
-//                 // return 412 error
-//                 Err(e) => {
-//                     let mut resp = HashMap::new();
-//                     resp.insert("error", format!("{:?}, Signing operation failed due to slashing protection rules", e));
-//                     Ok(reply::with_status(reply::json(&resp), StatusCode::PRECONDITION_FAILED))
-//                 }
-//             }
-//         },
-//         Err(e) => {
-//             match serde_json::from_slice::<AttestBlockRequest>(&req) {
-//                 Ok(req) => {
-//                     // handle "ATTESTATION" type request
-//                     match handle_attestation_type(req, identifier) {
-//                         Ok(sig) => {
-//                             let mut resp = HashMap::new();
-//                             resp.insert("signature", hex::encode(&sig[..]));
-//                             Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
-//                         },
-//                         // return 412 error
-//                         Err(e) => {
-//                             let mut resp = HashMap::new();
-//                             resp.insert("error", format!("{:?}, Signing operation failed due to slashing protection rules", e));
-//                             Ok(reply::with_status(reply::json(&resp), StatusCode::PRECONDITION_FAILED))
-//                         }
-//                     }
-//                 },
-//                 Err(e) => {
-//                     match serde_json::from_slice::<RandaoRevealRequest>(&req) {
-//                         Ok(req) => {
-//                             // handle "RANDAO_REVEAL" type request
-//                             match handle_randao_reveal_type(req, identifier) {
-//                                 Ok(sig) => {
-//                                     let mut resp = HashMap::new();
-//                                     resp.insert("signature", hex::encode(&sig[..]));
-//                                     Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
-//                                 },
-//                                 // return 412 error
-//                                 Err(e) => {
-//                                     let mut resp = HashMap::new();
-//                                     resp.insert("error", format!("{:?}, Signing operation failed due to slashing protection rules", e));
-//                                     Ok(reply::with_status(reply::json(&resp), StatusCode::PRECONDITION_FAILED))
-//                                 }
-//                             }
-//                         },
-//                         Err(e) => {
-//                             // catchall error if signing type not one of ['BLOCK', 'ATTESTATION', RANDAO_REVEAL']
-//                             let mut resp = HashMap::new();
-//                             resp.insert("error", "Type not in ['BLOCK', 'ATTESTATION', RANDAO_REVEAL']");
-//                             Ok(reply::with_status(reply::json(&resp), StatusCode::BAD_REQUEST))
-//                         }
-//                     }
-//                 }
-//             }
-//         }
-//     }
-// }
 
 
 #[derive(Deserialize, Serialize, Debug)]

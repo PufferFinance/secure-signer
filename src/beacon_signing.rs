@@ -224,7 +224,9 @@ pub fn secure_sign_block(pk_hex: String, block: BeaconBlock, domain: Domain) -> 
 	let previous_block_slot = read_block_slot(&pk_hex)?;   
 
 	// The block slot number must be strictly increasing to prevent slashing
-	assert!(block.slot > previous_block_slot);
+	if block.slot <= previous_block_slot {
+        bail!("block.slot <= previous_block_slot")
+    }
  
     // write current slot to mem
 	write_block_slot(&pk_hex, block.slot)?;
@@ -240,10 +242,14 @@ pub fn secure_sign_attestation(pk_hex: String, attestation_data: AttestationData
     println!("src_epoch: {}, prev: {} ... tgt_epoch: {}, prev: {}", attestation_data.source.epoch, prev_src_epoch, attestation_data.target.epoch, prev_tgt_epoch);
 
 	// The attestation source epoch must be non-decreasing to prevent slashing
-	assert!(attestation_data.source.epoch >= prev_src_epoch);
+	if attestation_data.source.epoch < prev_src_epoch {
+        bail!("attestation_data.source.epoch < prev_src_epoch")
+    }
 
 	// The attestation target epoch must be strictly increasing to prevent slashing
-	assert!(attestation_data.target.epoch > prev_tgt_epoch);
+	if attestation_data.target.epoch <= prev_tgt_epoch {
+        bail!("attestation_data.target.epoch <= prev_tgt_epoch")
+    }
 
     write_attestation_data(&pk_hex, &attestation_data)?;
 
@@ -321,19 +327,12 @@ mod spec_tests {
 }
 
 #[cfg(test)]
-mod api_tests {
-    use super::*;
-
-
-}
-
-#[cfg(test)]
-mod slash_resistance_tests {
+pub mod slash_resistance_tests {
     use super::*;
     use std::fs;
 
     /// hardcoded bls sk
-    fn setup_keypair() -> String {
+    pub fn setup_keypair() -> String {
         let sk_hex: String = "3ee2224386c82ffea477e2adf28a2929f5c349165a4196158c7f3a2ecca40f35".into();
         let sk = keys::bls_sk_from_hex(sk_hex.clone()).unwrap();
         let pk = sk.sk_to_pk();
@@ -358,9 +357,9 @@ mod slash_resistance_tests {
         // println!("{:?}", y);
     }
 
-    fn mock_propose_block_request(slot: &str) -> String {
+    pub fn mock_propose_block_request(slot: &str) -> String {
         // let type_: String = "BlOcK".into(); // mixed case
-        let type_: String = "BLOCK".into(); // mixed case
+        let type_: String = "BLOCK".into(); 
 
         let req = format!(r#"
             {{
@@ -474,8 +473,9 @@ mod slash_resistance_tests {
         let sig : BLSSignature = secure_sign_block(bls_pk_hex.clone(), pbr.block, domain).unwrap();
     }
 
-    fn mock_attestation_request(src_epoch: &str, tgt_epoch: &str) -> String {
-        let type_: String = "aTteStatION".into(); // mixed case
+    pub fn mock_attestation_request(src_epoch: &str, tgt_epoch: &str) -> String {
+        // let type_: String = "aTteStatION".into(); // mixed case
+        let type_: String = "ATTESTATION".into(); 
 
         let req = format!(r#"
         {{

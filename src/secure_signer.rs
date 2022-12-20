@@ -63,6 +63,99 @@ async fn main() {
 
 
 
+#[cfg(test)]
+mod signing_api_tests {
+    use super::*;
+    use crate::keys::{new_bls_key, new_eth_key, CIPHER_SUITE, aggregate_uniform_bls_sigs};
+    use crate::attest::{AttestationEvidence, fetch_dummy_evidence};
+    use crate::routes::*;
+    use crate::common_api::*;
+    use ecies::{decrypt, encrypt};
+    use blst::min_pk::{SecretKey, PublicKey, Signature};
+    use ecies::PublicKey as EthPublicKey;
+    use ecies::SecretKey as EthSecretKey;
+    use std::fs;
+    use serde_json;
+    use crate::beacon_signing::slash_resistance_tests::*;
+
+    async fn mock_secure_sign_bls_route(bls_pk: &String, json_req: &String) -> warp::http::Response<bytes::Bytes> {
+        let filter = bls_sign_route();
+        let uri = format!("/api/v1/eth2/sign/{}", bls_pk);
+
+        let res = warp::test::request()
+            .method("POST")
+            .path(&uri)
+            .body(&json_req)
+            .reply(&filter)
+            .await;
+        res
+    }
+
+    #[tokio::test]
+    async fn test_bls_sign_route_block_type() {
+        // clear state
+        fs::remove_dir_all("./etc");
+
+        // new keypair
+        let bls_pk_hex = setup_keypair();
+
+        // mock data for a BLOCK request
+        let json_req = mock_propose_block_request("0xfe");
+        let resp = mock_secure_sign_bls_route(&bls_pk_hex, &json_req).await;
+        assert_eq!(resp.status(), 200);
+
+        // mock data for a BLOCK request (attempt a slashable offense - non-increasing slot)
+        let json_req = mock_propose_block_request("0xfe");
+        let resp = mock_secure_sign_bls_route(&bls_pk_hex, &json_req).await;
+        assert_eq!(resp.status(), 412);
+
+        // mock data for a BLOCK request (attempt a slashable offense - decreasing slot)
+        let json_req = mock_propose_block_request("0xfd");
+        let resp = mock_secure_sign_bls_route(&bls_pk_hex, &json_req).await;
+        assert_eq!(resp.status(), 412);
+
+        // mock data for a BLOCK request 
+        let json_req = mock_propose_block_request("0xff");
+        let resp = mock_secure_sign_bls_route(&bls_pk_hex, &json_req).await;
+        assert_eq!(resp.status(), 200);
+    }
+
+    #[tokio::test]
+    async fn test_bls_sign_route_attestation_type() {
+        // clear state
+        fs::remove_dir_all("./etc");
+
+        // new keypair
+        let bls_pk_hex = setup_keypair();
+
+        // mock data for ATTESTATION request
+        let json_req = mock_attestation_request("0x0a", "0x0b");
+        let resp = mock_secure_sign_bls_route(&bls_pk_hex, &json_req).await;
+        assert_eq!(resp.status(), 200);
+
+        // mock data for ATTESTATION request (attempt a slashable offense - decreasing source)
+        let json_req = mock_attestation_request("0x00", "0x0c");
+        let resp = mock_secure_sign_bls_route(&bls_pk_hex, &json_req).await;
+        assert_eq!(resp.status(), 412);
+
+        // mock data for ATTESTATION request (attempt a slashable offense - non-increasing target)
+        let json_req = mock_attestation_request("0x0a", "0x0b");
+        let resp = mock_secure_sign_bls_route(&bls_pk_hex, &json_req).await;
+        assert_eq!(resp.status(), 412);
+
+        // mock data for ATTESTATION request (non-increasing source + increasing target)
+        let json_req = mock_attestation_request("0x0a", "0x0c");
+        let resp = mock_secure_sign_bls_route(&bls_pk_hex, &json_req).await;
+        assert_eq!(resp.status(), 200);
+
+        // mock data for ATTESTATION request (increasing source + increasing target)
+        let json_req = mock_attestation_request("0x0b", "0x0d");
+        let resp = mock_secure_sign_bls_route(&bls_pk_hex, &json_req).await;
+        assert_eq!(resp.status(), 200);
+    }
+
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -232,109 +325,7 @@ mod tests {
         assert_eq!(list_keys_resp.data[0].pubkey, bls_pk_hex);
     }
 
-    // async fn mock_bls_sign_route(bls_pk: &String, req: BlsSignRequest) -> BlsSignResponse {
-    //     let filter = bls_sign_route();
-    //     let uri = format!("/api/v1/eth2/sign/{}", bls_pk);
 
-    //     let res = warp::test::request()
-    //         .method("POST")
-    //         .path(&uri)
-    //         .json(&req)
-    //         .reply(&filter)
-    //         .await;
-
-    //     println!("{:?}", res.body());
-    //     assert_eq!(res.status(), 200);
-    //     let resp: BlsSignResponse = serde_json::from_slice(&res.body()).unwrap();
-    //     resp
-    // }
-
-    // #[tokio::test]
-    // async fn test_bls_sign_route() {
-    //     // clear any existing local keys
-    //     fs::remove_dir_all("./etc");
-    //     let key_gen_resp = mock_request_bls_key_gen_route().await;
-    //     let bls_pk_hex = key_gen_resp.data[0].message.clone();
-    //     assert_eq!(key_gen_resp.data.len(), 1);
-
-    //     let list_keys_resp = mock_request_generated_bls_key_list_route().await;
-    //     assert_eq!(list_keys_resp.data.len(), 1);
-    //     assert_eq!(list_keys_resp.data[0].pubkey, bls_pk_hex);
-
-    //     let fork = Fork {
-    //         previous_version: "0".into(),
-    //         current_version: "0".into(),
-    //         epoch: "0".into(),
-    //     };
-
-    //     let fork_info = ForkInfo { 
-    //         fork,
-    //         genesis_validators_root: "0".into()    
-    //     };
-
-
-    //     let req = BlsSignRequest {
-    //         type_: "BLOCK".into(),
-    //         fork_info: fork_info,
-    //         signing_root: "adfasf".into(),
-    //         msg_hex: hex::encode(b"this is a message"),
-    //     };
-
-    //     let bls_sign_resp = mock_bls_sign_route(&bls_pk_hex, req).await;
-    // }
-
-
-    // async fn mock_secure_sign_randao() -> KeyImportResponse {
-    //     // 1) generate ETH secret key in enclave
-    //     let resp = call_eth_key_gen_route().await;
-    //     let enclave_eth_pk_hex = &resp.data[0].message;
-    //     let enclave_eth_pk_bytes = hex::decode(&enclave_eth_pk_hex).unwrap();
-
-    //     // 2) request enclave to do remote attestation
-    //     // let resp = enclave_remote_attestation();
-
-    //     // 3) verify evidence
-    //     // todo
-
-    //     // 4) extract ETH pub key
-    //     // todo
-
-    //     // 5) locally generate BLS key to import
-    //     let bls_sk = new_bls_key().unwrap();
-
-    //     // 6) encrypt BLS key with ETH pub key
-    //     let ct_bls_sk = encrypt(&enclave_eth_pk_bytes, &bls_sk.serialize()).unwrap();
-    //     let ct_bls_sk_hex = hex::encode(ct_bls_sk);
-    //     let bls_pk_hex = hex::encode(bls_sk.sk_to_pk().serialize());
-
-    //     // 7) make payload to send /eth/v1/keystores POST request
-    //     let req = KeyImportRequest {
-    //         ct_bls_sk_hex: ct_bls_sk_hex,
-    //         bls_pk_hex: bls_pk_hex.clone(),
-    //         encrypting_pk_hex: enclave_eth_pk_hex.clone(),
-    //     };
-    //     println!("making bls key import req: {:?}", req);
-
-    //     // 8) make the actual request
-    //     let filter = bls_key_import_route();
-    //     let res = warp::test::request()
-    //         .method("POST")
-    //         .header("accept", "application/json")
-    //         .path("/eth/v1/keystores")
-    //         .json(&req)
-    //         .reply(&filter)
-    //         .await;
-
-
-    //     println!{"{:?}", res.body()};
-    //     assert_eq!(res.status(), 200);
-
-    //     let resp: KeyImportResponse = serde_json::from_slice(&res.body()).unwrap();
-
-    //     assert_eq!(resp.data[0].status, "imported".to_string());
-    //     assert_eq!(resp.data[0].message, bls_pk_hex);
-    //     resp
-    // }
 
 }
 
