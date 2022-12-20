@@ -108,8 +108,7 @@ pub struct RandaoRevealRequest {
     pub fork_info: ForkInfo,
     #[serde(with = "SerHex::<StrictPfx>")]
     pub signingRoot: Root,
-    #[serde(with = "SerHex::<CompactPfx>")]
-    pub randao_reveal: Epoch,
+    pub randao_reveal: RandaoReveal,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -620,4 +619,77 @@ pub mod slash_resistance_tests {
         );
         let sig : BLSSignature = secure_sign_attestation(bls_pk_hex.clone(), abr.attestation, domain).unwrap();
     }
+}
+
+#[cfg(test)]
+pub mod non_slashing_signing_tests {
+    use super::*;
+    use std::fs;
+    use crate::beacon_types::MAX_VALIDATORS_PER_COMMITTEE;
+
+    pub fn mock_randao_reveal_request(epoch: &str) -> String {
+        let type_: String = "RANDAO_REVEAL".into(); 
+
+        let req = format!(r#"
+            {{
+               "type":"{type_}",
+               "fork_info":{{
+                  "fork":{{
+                     "previous_version":"0x00000001",
+                     "current_version":"0x00000001",
+                     "epoch":"{epoch}"
+                  }},
+                  "genesis_validators_root":"0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69"
+               }},
+               "signingRoot": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69",
+               "randao_reveal":{{
+                    "epoch": "{epoch}"
+               }}
+            }}"#);
+        // println!("{req}");
+        req
+    }
+
+    pub fn mock_aggregate_and_proof_request(src_epoch: &str, tgt_epoch: &str) -> String {
+        let type_: String = "AGGREGATE_AND_PROOF".into(); 
+        // let aggregation_bits: BitList<MAX_VALIDATORS_PER_COMMITTEE> = BitList::from(0);
+
+        let req = format!(r#"
+            {{
+               "type":"{type_}",
+               "fork_info":{{
+                  "fork":{{
+                     "previous_version":"0x00000001",
+                     "current_version":"0x00000001",
+                     "epoch":"0"
+                  }},
+                  "genesis_validators_root":"0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69"
+               }},
+               "signingRoot": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69",
+               "aggregate_and_proof":{{
+                    "aggregator_index": "0x12345",
+                    "aggregate": {{
+                        "aggregation_bits": "0xdeadbeef",
+                        "data": {{
+                            "slot": "0xff",
+                            "index": "0xffff",
+                            "beacon_block_root": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69",
+                            "source": {{
+                                "epoch": "{src_epoch}",
+                                "root": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69"
+                            }},
+                            "target": {{
+                                "epoch": "{tgt_epoch}",
+                                "root": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69"
+                            }}
+                        }},
+                        "signature": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69"
+                    }},
+                    "selection_proof": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69"
+               }}
+            }}"#);
+        // println!("{req}");
+        req
+    }
+
 }

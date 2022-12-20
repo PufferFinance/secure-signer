@@ -77,6 +77,7 @@ mod signing_api_tests {
     use std::fs;
     use serde_json;
     use crate::beacon_signing::slash_resistance_tests::*;
+    use crate::beacon_signing::non_slashing_signing_tests::*;
 
     async fn mock_secure_sign_bls_route(bls_pk: &String, json_req: &String) -> warp::http::Response<bytes::Bytes> {
         let filter = bls_sign_route();
@@ -151,6 +152,21 @@ mod signing_api_tests {
         // mock data for ATTESTATION request (increasing source + increasing target)
         let json_req = mock_attestation_request("0x0b", "0x0d");
         let resp = mock_secure_sign_bls_route(&bls_pk_hex, &json_req).await;
+        assert_eq!(resp.status(), 200);
+    }
+
+    #[tokio::test]
+    async fn test_bls_sign_route_randao_reveal_type() {
+        // clear state
+        fs::remove_dir_all("./etc");
+
+        // new keypair
+        let bls_pk_hex = setup_keypair();
+
+        // mock data for RANDAO_REVEAL request
+        let json_req = mock_randao_reveal_request("0x0a");
+        let resp = mock_secure_sign_bls_route(&bls_pk_hex, &json_req).await;
+        println!("{:?}", resp);
         assert_eq!(resp.status(), 200);
     }
 
@@ -324,8 +340,5 @@ mod tests {
         assert_eq!(list_keys_resp.data.len(), 1);
         assert_eq!(list_keys_resp.data[0].pubkey, bls_pk_hex);
     }
-
-
-
 }
 

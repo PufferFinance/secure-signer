@@ -196,7 +196,7 @@ pub fn handle_randao_reveal_type(req: RandaoRevealRequest, bls_pk_hex: String) -
         Some(req.fork_info.genesis_validators_root)
     );
 
-    secure_sign_randao_reveal(bls_pk_hex, req.randao_reveal, domain)
+    secure_sign_randao_reveal(bls_pk_hex, req.randao_reveal.epoch, domain)
 }
 
 /// Handler for secure_sign_aggregate_and_proof()

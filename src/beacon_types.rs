@@ -30,17 +30,17 @@ pub type Domain = Bytes32;
 pub type ExecutionAddress = Bytes20;
 
 // typenums for specifying the length of FixedVector
-type MAX_VALIDATORS_PER_COMMITTEE = typenum::U2048;
-type DEPOSIT_CONTRACT_TREE_DEPTH_PLUS_ONE = typenum::U33;
-type MAX_PROPOSER_SLASHINGS = typenum::U16;
-type MAX_ATTESTER_SLASHINGS = typenum::U2;
-type MAX_ATTESTATIONS = typenum::U128;
-type MAX_DEPOSITS = typenum::U16;
-type MAX_VOLUNTARY_EXITS = typenum::U16;
+pub type MAX_VALIDATORS_PER_COMMITTEE = typenum::U2048;
+pub type DEPOSIT_CONTRACT_TREE_DEPTH_PLUS_ONE = typenum::U33;
+pub type MAX_PROPOSER_SLASHINGS = typenum::U16;
+pub type MAX_ATTESTER_SLASHINGS = typenum::U2;
+pub type MAX_ATTESTATIONS = typenum::U128;
+pub type MAX_DEPOSITS = typenum::U16;
+pub type MAX_VOLUNTARY_EXITS = typenum::U16;
 
-type SYNC_COMMITTEE_SIZE = typenum::U512;
-type SYNC_COMMITTEE_SUBNET_COUNT = typenum::U4;
-type SYNC_COMMITTEE_SIZE_BY_SYNC_COMMITTEE_SUBNET_COUNT = typenum::U128;  // 512 / 4
+pub type SYNC_COMMITTEE_SIZE = typenum::U512;
+pub type SYNC_COMMITTEE_SUBNET_COUNT = typenum::U4;
+pub type SYNC_COMMITTEE_SIZE_BY_SYNC_COMMITTEE_SUBNET_COUNT = typenum::U128;  // 512 / 4
 
 pub const DOMAIN_BEACON_PROPOSER:                DomainType = [0_u8, 0_u8, 0_u8, 0_u8]; // '0x00000000'
 pub const DOMAIN_BEACON_ATTESTER:                DomainType = [1_u8, 0_u8, 0_u8, 0_u8]; // '0x01000000'
