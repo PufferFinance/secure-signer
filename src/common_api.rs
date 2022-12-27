@@ -168,24 +168,12 @@ pub async fn list_eth_keys_service() -> Result<impl warp::Reply, warp::Rejection
 
 /// Handler for secure_sign_block()
 pub fn handle_block_type(req: BlockRequest, bls_pk_hex: String) -> Result<BLSSignature> {
-    let domain = compute_domain(
-        DOMAIN_BEACON_PROPOSER, 
-        Some(req.fork_info.fork.current_version),
-        Some(req.fork_info.genesis_validators_root)
-    );
-
-    secure_sign_block(bls_pk_hex, req.block, domain)
+    get_block_signature(bls_pk_hex, req.fork_info, req.block)
 }
 
 /// Handler for ATTESTATION_TYPE
 pub fn handle_attestation_type(req: AttestationRequest, bls_pk_hex: String) -> Result<BLSSignature> {
-    let domain = compute_domain(
-        DOMAIN_BEACON_ATTESTER, 
-        Some(req.fork_info.fork.current_version),
-        Some(req.fork_info.genesis_validators_root)
-    );
-
-    secure_sign_attestation(bls_pk_hex, req.attestation, domain)
+    get_attestation_signature(bls_pk_hex, req.fork_info, req.attestation)
 }
 
 /// Handler for RANDAO_REVEAL type

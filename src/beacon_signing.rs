@@ -246,8 +246,16 @@ pub fn compute_domain(domain_type: DomainType, fork_version: Option<Version>, ge
     d
 }
 
-pub fn secure_sign_block(pk_hex: String, block: BeaconBlock, domain: Domain) -> Result<BLSSignature> {
-    println!("pk_hex: {:?}, block: {:?}, domain: {:?}", pk_hex, block, domain);
+/// Reusable signing function  
+pub fn secure_sign<T:Encode>(pk_hex: String, msg: T, domain: Domain) -> Result<BLSSignature> {
+    let root: Root = compute_signing_root(msg, domain);
+    let sig = keys::bls_sign(&pk_hex, &root)?;
+    Ok(<_>::from(sig.to_bytes().to_vec()))
+}
+
+/// bail statements prevent slashable offenses 
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#signature
+pub fn get_block_signature(pk_hex: String, fork_info: ForkInfo, block: BeaconBlock) -> Result<BLSSignature> {
     // read previous slot from mem
 	let previous_block_slot = read_block_slot(&pk_hex)?;   
 
@@ -255,17 +263,18 @@ pub fn secure_sign_block(pk_hex: String, block: BeaconBlock, domain: Domain) -> 
 	if block.slot <= previous_block_slot {
         bail!("block.slot <= previous_block_slot")
     }
- 
-    // write current slot to mem
+
+    let domain = get_domain(fork_info, DOMAIN_BEACON_PROPOSER, Some(compute_epoch_at_slot(block.slot)));
+
+    // Save the new block slot to persistent memory
 	write_block_slot(&pk_hex, block.slot)?;
 
-    let root: Root = compute_signing_root(block, domain);
-    let sig = keys::bls_sign(&pk_hex, &root)?;
-    Ok(<_>::from(sig.to_bytes().to_vec()))
+    secure_sign(pk_hex, block, domain)
 }
 
-pub fn secure_sign_attestation(pk_hex: String, attestation_data: AttestationData, domain: Domain) -> Result<BLSSignature> {
-    println!("pk_hex: {:?}, attestation_data: {:?}, domain: {:?}", pk_hex, attestation_data, domain);
+/// bail statements prevent slashable offenses 
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#aggregate-signature
+pub fn get_attestation_signature(pk_hex: String, fork_info: ForkInfo, attestation_data: AttestationData) -> Result<BLSSignature> {
 	let (prev_src_epoch, prev_tgt_epoch) = read_attestation_data(&pk_hex)?;
     println!("src_epoch: {}, prev: {} ... tgt_epoch: {}, prev: {}", attestation_data.source.epoch, prev_src_epoch, attestation_data.target.epoch, prev_tgt_epoch);
 
@@ -279,18 +288,12 @@ pub fn secure_sign_attestation(pk_hex: String, attestation_data: AttestationData
         bail!("attestation_data.target.epoch <= prev_tgt_epoch")
     }
 
+    // Save the new attestation data to persistent memory
     write_attestation_data(&pk_hex, &attestation_data)?;
 
-    let root: Root = compute_signing_root(attestation_data, domain);
-    let sig = keys::bls_sign(&pk_hex, &root)?;
-    Ok(<_>::from(sig.to_bytes().to_vec()))
-}
-
-/// Reusable signing function  
-pub fn secure_sign<T:Encode>(pk_hex: String, msg: T, domain: Domain) -> Result<BLSSignature> {
-    let root: Root = compute_signing_root(msg, domain);
-    let sig = keys::bls_sign(&pk_hex, &root)?;
-    Ok(<_>::from(sig.to_bytes().to_vec()))
+    // Sign the Attestation
+    let domain = get_domain(fork_info, DOMAIN_BEACON_ATTESTER, Some(attestation_data.target.epoch));
+    secure_sign(pk_hex, attestation_data, domain)
 }
 
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#randao-reveal
@@ -416,12 +419,7 @@ pub mod slash_resistance_tests {
             let pbr: BlockRequest = serde_json::from_str(&req).unwrap();
             assert_eq!(pbr.block.slot, s);
 
-            let domain = compute_domain(
-                DOMAIN_BEACON_PROPOSER, 
-                Some(pbr.fork_info.fork.current_version),
-                Some(pbr.fork_info.genesis_validators_root)
-            );
-            let sig : BLSSignature = secure_sign_block(bls_pk_hex.clone(), pbr.block, domain).unwrap();
+            let sig = get_block_signature(bls_pk_hex.clone(), pbr.fork_info, pbr.block).unwrap();
             println!("sig: {}", hex::encode(sig.to_vec()));
             sig
         }).collect();
@@ -448,12 +446,7 @@ pub mod slash_resistance_tests {
         let pbr: BlockRequest = serde_json::from_str(&req).unwrap();
         assert_eq!(pbr.block.slot, s);
 
-        let domain = compute_domain(
-            DOMAIN_BEACON_PROPOSER, 
-            Some(pbr.fork_info.fork.current_version),
-            Some(pbr.fork_info.genesis_validators_root)
-        );
-        let sig : BLSSignature = secure_sign_block(bls_pk_hex.clone(), pbr.block, domain).unwrap();
+        let sig = get_block_signature(bls_pk_hex.clone(), pbr.fork_info, pbr.block).unwrap();
     }
 
     #[test]
@@ -469,12 +462,7 @@ pub mod slash_resistance_tests {
         let pbr: BlockRequest = serde_json::from_str(&req).unwrap();
         assert_eq!(pbr.block.slot, s);
 
-        let domain = compute_domain(
-            DOMAIN_BEACON_PROPOSER, 
-            Some(pbr.fork_info.fork.current_version),
-            Some(pbr.fork_info.genesis_validators_root)
-        );
-        let sig : BLSSignature = secure_sign_block(bls_pk_hex.clone(), pbr.block, domain).unwrap();
+        let sig = get_block_signature(bls_pk_hex.clone(), pbr.fork_info, pbr.block).unwrap();
     }
 
     pub fn mock_attestation_request(src_epoch: &str, tgt_epoch: &str) -> String {
@@ -531,12 +519,7 @@ pub mod slash_resistance_tests {
             assert_eq!(abr.attestation.source.epoch, s);
             assert_eq!(abr.attestation.target.epoch, s);
 
-            let domain = compute_domain(
-                DOMAIN_BEACON_ATTESTER, 
-                Some(abr.fork_info.fork.current_version),
-                Some(abr.fork_info.genesis_validators_root)
-            );
-            let sig : BLSSignature = secure_sign_attestation(bls_pk_hex.clone(), abr.attestation, domain).unwrap();
+            let sig = get_attestation_signature(bls_pk_hex.clone(), abr.fork_info, abr.attestation).unwrap();
             println!("sig: {}", hex::encode(sig.to_vec()));
             sig
         }).collect();
@@ -565,12 +548,7 @@ pub mod slash_resistance_tests {
         let req = mock_attestation_request(&src_epoch, &tgt_epoch);
         let abr: AttestationRequest = serde_json::from_str(&req).unwrap();
 
-        let domain = compute_domain(
-            DOMAIN_BEACON_ATTESTER, 
-            Some(abr.fork_info.fork.current_version),
-            Some(abr.fork_info.genesis_validators_root)
-        );
-        let sig : BLSSignature = secure_sign_attestation(bls_pk_hex.clone(), abr.attestation, domain).unwrap();
+        let sig = get_attestation_signature(bls_pk_hex.clone(), abr.fork_info, abr.attestation).unwrap();
     }
 
     #[test]
@@ -591,12 +569,7 @@ pub mod slash_resistance_tests {
         assert_eq!(abr.attestation.source.epoch, n+1);
         assert_eq!(abr.attestation.target.epoch, n);
 
-        let domain = compute_domain(
-            DOMAIN_BEACON_ATTESTER, 
-            Some(abr.fork_info.fork.current_version),
-            Some(abr.fork_info.genesis_validators_root)
-        );
-        let sig : BLSSignature = secure_sign_attestation(bls_pk_hex.clone(), abr.attestation, domain).unwrap();
+        let sig = get_attestation_signature(bls_pk_hex.clone(), abr.fork_info, abr.attestation).unwrap();
     }
 
     #[test]
@@ -616,13 +589,8 @@ pub mod slash_resistance_tests {
         assert_eq!(abr.attestation.index, 65535);
         assert_eq!(abr.attestation.source.epoch, n + 1);
         assert_eq!(abr.attestation.target.epoch, 0);
-
-        let domain = compute_domain(
-            DOMAIN_BEACON_ATTESTER, 
-            Some(abr.fork_info.fork.current_version),
-            Some(abr.fork_info.genesis_validators_root)
-        );
-        let sig : BLSSignature = secure_sign_attestation(bls_pk_hex.clone(), abr.attestation, domain).unwrap();
+                                                                                                                  
+        let sig = get_attestation_signature(bls_pk_hex.clone(), abr.fork_info, abr.attestation).unwrap();
     }
 }
 
