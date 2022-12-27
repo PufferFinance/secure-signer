@@ -200,25 +200,19 @@ pub fn handle_randao_reveal_type(req: RandaoRevealRequest, bls_pk_hex: String) -
 }
 
 /// Handler for secure_sign_aggregate_and_proof()
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#broadcast-aggregate
 pub fn handle_aggregate_and_proof_type(req: AggregateAndProofRequest, bls_pk_hex: String) -> Result<BLSSignature> {
-    let domain = compute_domain(
+    let domain = get_domain(
+        req.fork_info, 
         DOMAIN_AGGREGATE_AND_PROOF, 
-        Some(req.fork_info.fork.current_version),
-        Some(req.fork_info.genesis_validators_root)
-    );
-
-    secure_sign_aggregate_and_proof(bls_pk_hex, req.aggregate_and_proof, domain)
+        Some(compute_epoch_at_slot(req.aggregate_and_proof.aggregate.data.slot)));
+        secure_sign(bls_pk_hex, req.aggregate_and_proof, domain)
 }
 
 /// Handler for secure_sign_aggregation_slot()
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#broadcast-aggregate
 pub fn handle_aggregation_slot_type(req: AggregationSlotRequest, bls_pk_hex: String) -> Result<BLSSignature> {
-    let domain = compute_domain(
-        DOMAIN_RANDAO, 
-        Some(req.fork_info.fork.current_version),
-        Some(req.fork_info.genesis_validators_root)
-    );
-
-    secure_sign_aggregation_slot(bls_pk_hex, req.aggregation_slot, domain)
+    get_slot_signature(bls_pk_hex, req.fork_info, req.aggregation_slot.slot)
 }
 
 /// Handler for secure_sign_deposit()
@@ -229,7 +223,7 @@ pub fn handle_deposit_type(req: DepositRequest, bls_pk_hex: String) -> Result<BL
         None // TODO verify this is correct
     );
 
-    secure_sign_deposit(bls_pk_hex, req.deposit, domain)
+    secure_sign(bls_pk_hex, req.deposit, domain)
 }
 
 /// Handler for secure_sign_voluntary_exit()
@@ -240,7 +234,7 @@ pub fn handle_voluntary_exit_type(req: VoluntaryExitRequest, bls_pk_hex: String)
         Some(req.fork_info.genesis_validators_root)
     );
 
-    secure_sign_voluntary_exit(bls_pk_hex, req.voluntary_exit, domain)
+    secure_sign(bls_pk_hex, req.voluntary_exit, domain)
 }
 
 /// Handler for secure_sign_sync_committee_msg()
@@ -251,7 +245,7 @@ pub fn handle_sync_committee_msg_type(req: SyncCommitteeMessageRequest, bls_pk_h
         Some(req.fork_info.genesis_validators_root)
     );
 
-    secure_sign_sync_committee_msg(bls_pk_hex, req.sync_committee_message, domain)
+    secure_sign(bls_pk_hex, req.sync_committee_message, domain)
 }
 
 /// Handler for secure_sign_sync_committee_selection_proof()
@@ -262,7 +256,7 @@ pub fn handle_sync_committee_selection_proof_type(req: SyncCommitteeSelectionPro
         Some(req.fork_info.genesis_validators_root)
     );
 
-    secure_sign_sync_committee_selection_proof(bls_pk_hex, req.sync_aggregator_selection_data, domain)
+    secure_sign(bls_pk_hex, req.sync_aggregator_selection_data, domain)
 }
 
 /// Handler for secure_sign_sync_committee_contribution_and_proof()
@@ -273,7 +267,7 @@ pub fn handle_sync_committee_contribution_and_proof_type(req: SyncCommitteeContr
         Some(req.fork_info.genesis_validators_root)
     );
 
-    secure_sign_sync_committee_contribution_and_proof(bls_pk_hex, req.contribution_and_proof, domain)
+    secure_sign(bls_pk_hex, req.contribution_and_proof, domain)
 }
 
 // /// Handler for secure_sign_validator_registration()

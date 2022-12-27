@@ -1,7 +1,9 @@
-use serde::de::value::Error;
 use serde::{Deserialize, Serialize};
 use serde::ser::{Serializer, SerializeStruct};
-use serde::de::Deserializer;
+use serde::de::Error;
+use serde::{Deserializer};
+// use serde::de::Deserializer;
+// use serde::de::value::Error;
 use serde_hex::{SerHex, StrictPfx, CompactPfx};
 use anyhow::{Result, Context, bail};
 
@@ -55,6 +57,7 @@ pub const DOMAIN_CONTRIBUTION_AND_PROOF:         DomainType = [9_u8, 0_u8, 0_u8,
 pub const DOMAIN_APPLICATION_MASK:               DomainType = [0_u8, 0_u8, 0_u8, 1_u8]; // '0x00000001'
 
 pub const GENESIS_FORK_VERSION: Version = [0_u8, 0_u8, 0_u8, 0_u8]; // '0x00000000'
+pub const SLOTS_PER_EPOCH: u64 = 32;
 
 pub fn from_bls_pk_hex<'de, D>(deserializer: D) -> Result<BLSPubkey, D::Error>
 where
@@ -99,6 +102,28 @@ where
     };
     let addr: ExecutionAddress = FixedVector::from(bytes);
     Ok(addr)
+}
+
+pub fn from_hex_to_bitlist<'de, D>(deserializer: D) -> Result<BitList<MAX_VALIDATORS_PER_COMMITTEE>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    println!("in from_hex_to_bitlist");
+    let hex_str: &str = Deserialize::deserialize(deserializer)?;
+    let bytes = match &hex_str[0..2] { 
+        "0x" => hex::decode(&hex_str[2..]).expect("failed to deserialize"),
+        _ => hex::decode(hex_str).expect("failed to deserialize")
+    };
+    unimplemented!()
+    // match BitList::from_bytes(bytes) {
+    //     Ok(agg_bits) => Ok(agg_bits),
+    //     Err(e) => Err(D::Error::TrailingCharacters)
+    // }
+    // let agg_bits: BitList<MAX_VALIDATORS_PER_COMMITTEE> = match BitList::from_bytes(bytes) {
+    //     Ok(agg_bits) => agg_bits,
+    //     Err(e) => bail!("asdfa"),
+    // }
+    // Ok(agg_bits)
 }
 
 #[derive(Debug)]
@@ -274,6 +299,7 @@ pub struct ValidatorRegistration {
 #[derive(Debug)]
 #[derive(Deserialize, Serialize, Encode, Decode, Clone)]
 pub struct Attestation {
+    #[serde(deserialize_with = "from_hex_to_bitlist")]
     pub aggregation_bits: BitList<MAX_VALIDATORS_PER_COMMITTEE>,
     pub data: AttestationData,
     #[serde(deserialize_with = "from_bls_sig_hex")]
@@ -337,6 +363,39 @@ pub struct BeaconBlock {
     pub body: BeaconBlockBody,
 }
 
+pub struct BeaconState {
+    //  Versioning
+    pub genesis_time: u64,
+    pub genesis_validators_root: Root,
+    pub slot: Slot,
+    pub fork: Fork,
+    //  History,
+    pub latest_block_header: BeaconBlockHeader,
+    // pub block_roots: Vector[Root, SLOTS_PER_HISTORICAL_ROOT],
+    // pub state_roots: Vector[Root, SLOTS_PER_HISTORICAL_ROOT],
+    // pub historical_roots: List[Root, HISTORICAL_ROOTS_LIMIT],
+    //  Eth1,
+    pub eth1_data: Eth1Data,
+    // pub eth1_data_votes: List[Eth1Data, EPOCHS_PER_ETH1_VOTING_PERIOD * SLOTS_PER_EPOCH],
+    pub eth1_deposit_index: u64,
+    //  Registry,
+    // pub validators: List[Validator, VALIDATOR_REGISTRY_LIMIT],
+    // pub balances: List[Gwei, VALIDATOR_REGISTRY_LIMIT],
+    //  Randomness,
+    // pub randao_mixes: Vector[Bytes32, EPOCHS_PER_HISTORICAL_VECTOR],
+    //  Slashings,
+    // pub slashings: Vector[Gwei, EPOCHS_PER_SLASHINGS_VECTOR]  # Per-epoch sums of slashed effective balances,
+    //  Attestations,
+    // pub previous_epoch_attestations: List[PendingAttestation, MAX_ATTESTATIONS * SLOTS_PER_EPOCH],
+    // pub current_epoch_attestations: List[PendingAttestation, MAX_ATTESTATIONS * SLOTS_PER_EPOCH],
+    //  Finality,
+    // pub justification_bits: Bitvector[JUSTIFICATION_BITS_LENGTH]  # Bit set for every recent justified epoch,
+    pub previous_justified_checkpoint: Checkpoint, // Previous epoch snapshot
+    pub current_justified_checkpoint: Checkpoint,
+    pub finalized_checkpoint: Checkpoint,
+}
+
+
 #[derive(Debug)]
 #[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
 pub struct SigningData {
@@ -354,8 +413,9 @@ pub struct AggregateAndProof {
     #[serde(with = "SerHex::<CompactPfx>")]
     pub aggregator_index: ValidatorIndex,
     pub aggregate: Attestation,
+    // get_slot_signature(state, aggregate.data.slot, privkey)
     #[serde(deserialize_with = "from_bls_sig_hex")]
-    pub selection_proof: BLSSignature,  
+    pub selection_proof: BLSSignature,
 }
 
 #[derive(Debug)]

@@ -170,6 +170,21 @@ mod signing_api_tests {
         assert_eq!(resp.status(), 200);
     }
 
+    #[tokio::test]
+    async fn test_bls_sign_route_aggregate_and_proof_type() {
+        // clear state
+        fs::remove_dir_all("./etc");
+
+        // new keypair
+        let bls_pk_hex = setup_keypair();
+
+        // mock data for RANDAO_REVEAL request
+        let json_req = mock_aggregate_and_proof_request("0x0", "0x1");
+        let resp = mock_secure_sign_bls_route(&bls_pk_hex, &json_req).await;
+        println!("{:?}", resp);
+        assert_eq!(resp.status(), 200);
+    }
+
 }
 
 

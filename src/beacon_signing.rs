@@ -199,6 +199,35 @@ pub fn compute_fork_data_root(current_version: Version, genesis_validators_root:
     hash_tree_root(f)
 }
 
+/// Return the epoch number at ``slot``.
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#compute_epoch_at_slot
+pub fn compute_epoch_at_slot(slot: Slot) -> Epoch {
+    slot / SLOTS_PER_EPOCH
+}
+
+/// Return the current epoch.
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#get_current_epoch
+pub fn get_current_epoch(state: &BeaconState) -> Epoch {
+    compute_epoch_at_slot(state.slot)
+}
+
+/// Return the signature domain (fork version concatenated with domain type) of a message.
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#get_domain
+/// Modified to adhere to https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing
+pub fn get_domain(fork_info: ForkInfo, domain_type: DomainType, epoch: Option<Epoch>) -> Domain {
+    let epoch = match epoch {
+        Some(epoch) => epoch,
+        None => fork_info.fork.epoch,
+    };
+
+    let fork_version = if epoch < fork_info.fork.epoch {
+        fork_info.fork.previous_version
+    } else {
+        fork_info.fork.current_version
+    };
+    compute_domain(domain_type, Some(fork_version), Some(fork_info.genesis_validators_root))
+}
+
 /// Return the domain for the ``domain_type`` and ``fork_version``.
 pub fn compute_domain(domain_type: DomainType, fork_version: Option<Version>, genesis_validators_root: Option<Root>) -> Domain {
     let fv = match fork_version {
@@ -264,51 +293,18 @@ pub fn secure_sign_randao_reveal(pk_hex: String, epoch: Epoch, domain: Domain) -
     Ok(<_>::from(sig.to_bytes().to_vec()))
 }
 
-pub fn secure_sign_aggregate_and_proof(pk_hex: String, aap: AggregateAndProof, domain: Domain) -> Result<BLSSignature> {
-    println!("pk_hex: {:?}, aap: {:?}, domain: {:?}", pk_hex, aap, domain);
-    let root: Root = compute_signing_root(aap, domain);
+pub fn secure_sign<T:Encode>(pk_hex: String, msg: T, domain: Domain) -> Result<BLSSignature> {
+    let root: Root = compute_signing_root(msg, domain);
     let sig = keys::bls_sign(&pk_hex, &root)?;
     Ok(<_>::from(sig.to_bytes().to_vec()))
 }
 
-pub fn secure_sign_aggregation_slot(pk_hex: String, ags: AggregationSlot, domain: Domain) -> Result<BLSSignature> {
-    println!("pk_hex: {:?}, ags: {:?}, domain: {:?}", pk_hex, ags, domain);
-    let root: Root = compute_signing_root(ags, domain);
-    let sig = keys::bls_sign(&pk_hex, &root)?;
-    Ok(<_>::from(sig.to_bytes().to_vec()))
-}
-
-pub fn secure_sign_deposit(pk_hex: String, d: DepositData, domain: Domain) -> Result<BLSSignature> {
-    println!("pk_hex: {:?}, d: {:?}, domain: {:?}", pk_hex, d, domain);
-    let root: Root = compute_signing_root(d, domain);
-    let sig = keys::bls_sign(&pk_hex, &root)?;
-    Ok(<_>::from(sig.to_bytes().to_vec()))
-}
-
-pub fn secure_sign_voluntary_exit(pk_hex: String, ve: VoluntaryExit, domain: Domain) -> Result<BLSSignature> {
-    println!("pk_hex: {:?}, ve: {:?}, domain: {:?}", pk_hex, ve, domain);
-    let root: Root = compute_signing_root(ve, domain);
-    let sig = keys::bls_sign(&pk_hex, &root)?;
-    Ok(<_>::from(sig.to_bytes().to_vec()))
-}
-
-pub fn secure_sign_sync_committee_msg(pk_hex: String, scm: SyncCommitteeMessage, domain: Domain) -> Result<BLSSignature> {
-    println!("pk_hex: {:?}, scm: {:?}, domain: {:?}", pk_hex, scm, domain);
-    let root: Root = compute_signing_root(scm, domain);
-    let sig = keys::bls_sign(&pk_hex, &root)?;
-    Ok(<_>::from(sig.to_bytes().to_vec()))
-}
-
-pub fn secure_sign_sync_committee_selection_proof(pk_hex: String, sasd: SyncAggregatorSelectionData, domain: Domain) -> Result<BLSSignature> {
-    println!("pk_hex: {:?}, sasd: {:?}, domain: {:?}", pk_hex, sasd, domain);
-    let root: Root = compute_signing_root(sasd, domain);
-    let sig = keys::bls_sign(&pk_hex, &root)?;
-    Ok(<_>::from(sig.to_bytes().to_vec()))
-}
-
-pub fn secure_sign_sync_committee_contribution_and_proof(pk_hex: String, cap: ContributionAndProof, domain: Domain) -> Result<BLSSignature> {
-    println!("pk_hex: {:?}, cap: {:?}, domain: {:?}", pk_hex, cap, domain);
-    let root: Root = compute_signing_root(cap, domain);
+/// Selection proofs are provided in AggregateAndProof to prove to the gossip channel that the validator has been selected as an aggregator
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#attestation-aggregation
+/// Modified to adhere to https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing
+pub fn get_slot_signature(pk_hex: String, fork_info: ForkInfo, slot: Slot) -> Result<BLSSignature> {
+    let domain = get_domain(fork_info, DOMAIN_SELECTION_PROOF, Some(compute_epoch_at_slot(slot)));
+    let root: Root = compute_signing_root(slot, domain);
     let sig = keys::bls_sign(&pk_hex, &root)?;
     Ok(<_>::from(sig.to_bytes().to_vec()))
 }
@@ -652,7 +648,7 @@ pub mod non_slashing_signing_tests {
 
     pub fn mock_aggregate_and_proof_request(src_epoch: &str, tgt_epoch: &str) -> String {
         let type_: String = "AGGREGATE_AND_PROOF".into(); 
-        // let aggregation_bits: BitList<MAX_VALIDATORS_PER_COMMITTEE> = BitList::from(0);
+        // let aggregation_bits: BitList<MAX_VALIDATORS_PER_COMMITTEE> = BitList::with_capacity(2048).unwrap();
 
         let req = format!(r#"
             {{
@@ -669,7 +665,7 @@ pub mod non_slashing_signing_tests {
                "aggregate_and_proof":{{
                     "aggregator_index": "0x12345",
                     "aggregate": {{
-                        "aggregation_bits": "0xdeadbeef",
+                        "aggregation_bits": "0x1234",
                         "data": {{
                             "slot": "0xff",
                             "index": "0xffff",
