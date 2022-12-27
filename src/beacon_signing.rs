@@ -286,17 +286,17 @@ pub fn secure_sign_attestation(pk_hex: String, attestation_data: AttestationData
     Ok(<_>::from(sig.to_bytes().to_vec()))
 }
 
-pub fn secure_sign_randao_reveal(pk_hex: String, epoch: Epoch, domain: Domain) -> Result<BLSSignature> {
-    println!("pk_hex: {:?}, epoch: {:?}, domain: {:?}", pk_hex, epoch, domain);
-    let root: Root = compute_signing_root(epoch, domain);
-    let sig = keys::bls_sign(&pk_hex, &root)?;
-    Ok(<_>::from(sig.to_bytes().to_vec()))
-}
-
+/// Reusable signing function  
 pub fn secure_sign<T:Encode>(pk_hex: String, msg: T, domain: Domain) -> Result<BLSSignature> {
     let root: Root = compute_signing_root(msg, domain);
     let sig = keys::bls_sign(&pk_hex, &root)?;
     Ok(<_>::from(sig.to_bytes().to_vec()))
+}
+
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#randao-reveal
+pub fn get_epoch_signature(pk_hex: String, fork_info: ForkInfo, epoch: Epoch) -> Result<BLSSignature> {
+    let domain = get_domain(fork_info, DOMAIN_RANDAO, Some(epoch));
+    secure_sign(pk_hex, epoch, domain)
 }
 
 /// Selection proofs are provided in AggregateAndProof to prove to the gossip channel that the validator has been selected as an aggregator
@@ -304,9 +304,18 @@ pub fn secure_sign<T:Encode>(pk_hex: String, msg: T, domain: Domain) -> Result<B
 /// Modified to adhere to https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing
 pub fn get_slot_signature(pk_hex: String, fork_info: ForkInfo, slot: Slot) -> Result<BLSSignature> {
     let domain = get_domain(fork_info, DOMAIN_SELECTION_PROOF, Some(compute_epoch_at_slot(slot)));
-    let root: Root = compute_signing_root(slot, domain);
-    let sig = keys::bls_sign(&pk_hex, &root)?;
-    Ok(<_>::from(sig.to_bytes().to_vec()))
+    secure_sign(pk_hex, slot, domain)
+}
+
+/// Selection proofs are provided in AggregateAndProof to prove to the gossip channel that the validator has been selected as an aggregator
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#attestation-aggregation
+/// Modified to adhere to https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing
+pub fn get_aggregate_and_proof(pk_hex: String, fork_info: ForkInfo, aggregate_and_proof: AggregateAndProof) -> Result<BLSSignature> {
+    let domain = get_domain(
+        fork_info, 
+        DOMAIN_AGGREGATE_AND_PROOF, 
+        Some(compute_epoch_at_slot(aggregate_and_proof.aggregate.data.slot)));
+    secure_sign(pk_hex, aggregate_and_proof, domain)
 }
 
 pub fn secure_sign_validator_registration(pk_hex: String, vr: ValidatorRegistration, domain: Domain) -> Result<BLSSignature> {

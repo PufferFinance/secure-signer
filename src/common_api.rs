@@ -177,7 +177,7 @@ pub fn handle_block_type(req: BlockRequest, bls_pk_hex: String) -> Result<BLSSig
     secure_sign_block(bls_pk_hex, req.block, domain)
 }
 
-/// Handler for secure_sign_attestation()
+/// Handler for ATTESTATION_TYPE
 pub fn handle_attestation_type(req: AttestationRequest, bls_pk_hex: String) -> Result<BLSSignature> {
     let domain = compute_domain(
         DOMAIN_BEACON_ATTESTER, 
@@ -188,25 +188,15 @@ pub fn handle_attestation_type(req: AttestationRequest, bls_pk_hex: String) -> R
     secure_sign_attestation(bls_pk_hex, req.attestation, domain)
 }
 
-/// Handler for secure_sign_randao_reveal()
+/// Handler for RANDAO_REVEAL type
 pub fn handle_randao_reveal_type(req: RandaoRevealRequest, bls_pk_hex: String) -> Result<BLSSignature> {
-    let domain = compute_domain(
-        DOMAIN_RANDAO, 
-        Some(req.fork_info.fork.current_version),
-        Some(req.fork_info.genesis_validators_root)
-    );
-
-    secure_sign_randao_reveal(bls_pk_hex, req.randao_reveal.epoch, domain)
+    get_epoch_signature(bls_pk_hex, req.fork_info, req.randao_reveal.epoch)
 }
 
 /// Handler for secure_sign_aggregate_and_proof()
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#broadcast-aggregate
 pub fn handle_aggregate_and_proof_type(req: AggregateAndProofRequest, bls_pk_hex: String) -> Result<BLSSignature> {
-    let domain = get_domain(
-        req.fork_info, 
-        DOMAIN_AGGREGATE_AND_PROOF, 
-        Some(compute_epoch_at_slot(req.aggregate_and_proof.aggregate.data.slot)));
-        secure_sign(bls_pk_hex, req.aggregate_and_proof, domain)
+    get_aggregate_and_proof(bls_pk_hex, req.fork_info, req.aggregate_and_proof)
 }
 
 /// Handler for secure_sign_aggregation_slot()
