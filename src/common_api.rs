@@ -167,16 +167,19 @@ pub async fn list_eth_keys_service() -> Result<impl warp::Reply, warp::Rejection
 }
 
 /// Handler for BLOCK_TYPE
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#signature
 pub fn handle_block_type(req: BlockRequest, bls_pk_hex: String) -> Result<BLSSignature> {
     get_block_signature(bls_pk_hex, req.fork_info, req.block)
 }
 
 /// Handler for ATTESTATION_TYPE
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#attesting
 pub fn handle_attestation_type(req: AttestationRequest, bls_pk_hex: String) -> Result<BLSSignature> {
     get_attestation_signature(bls_pk_hex, req.fork_info, req.attestation)
 }
 
 /// Handler for RANDAO_REVEAL type
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#randao-reveal
 pub fn handle_randao_reveal_type(req: RandaoRevealRequest, bls_pk_hex: String) -> Result<BLSSignature> {
     get_epoch_signature(bls_pk_hex, req.fork_info, req.randao_reveal.epoch)
 }
@@ -188,12 +191,13 @@ pub fn handle_aggregate_and_proof_type(req: AggregateAndProofRequest, bls_pk_hex
 }
 
 /// Handler for AGGREGATION_SLOT type
-/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#broadcast-aggregate
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#aggregation-selection
 pub fn handle_aggregation_slot_type(req: AggregationSlotRequest, bls_pk_hex: String) -> Result<BLSSignature> {
     get_slot_signature(bls_pk_hex, req.fork_info, req.aggregation_slot.slot)
 }
 
 /// Handler for DEPOSIT type
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#submit-deposit
 pub fn handle_deposit_type(req: DepositRequest, bls_pk_hex: String) -> Result<BLSSignature> {
     get_deposit_signature(bls_pk_hex, req.deposit)
 }
@@ -204,30 +208,28 @@ pub fn handle_voluntary_exit_type(req: VoluntaryExitRequest, bls_pk_hex: String)
 }
 
 /// Handler for SYNC_COMMITTEE_MESSAGE type
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#sync-committee-1
 pub fn handle_sync_committee_msg_type(req: SyncCommitteeMessageRequest, bls_pk_hex: String) -> Result<BLSSignature> {
     get_sync_committee_message(bls_pk_hex, req.fork_info, req.sync_committee_message)
 }
 
 /// Handler for SYNC_COMMITTEE_SELECTION_PROOF type
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#aggregation-selection
 pub fn handle_sync_committee_selection_proof_type(req: SyncCommitteeSelectionProofRequest, bls_pk_hex: String) -> Result<BLSSignature> {
     get_sync_committee_selection_proof(bls_pk_hex, req.fork_info, req.sync_aggregator_selection_data)
 }
 
 /// Handler for SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF type
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#broadcast-sync-committee-contribution
 pub fn handle_sync_committee_contribution_and_proof_type(req: SyncCommitteeContributionAndProofRequest, bls_pk_hex: String) -> Result<BLSSignature> {
     get_contribution_and_proof_signature(bls_pk_hex, req.fork_info, req.contribution_and_proof)
 }
 
-// /// Handler for secure_sign_validator_registration()
-// pub fn handle_validator_registration_type(req: ValidatorRegistrationRequest, bls_pk_hex: String) -> Result<BLSSignature> {
-//     let domain = compute_domain(
-//         DOMAIN_VOLUNTARY_EXIT,  // TODO
-//         None, // TODO verify this is correct
-//         None // TODO verify this is correct
-//     );
-
-//     secure_sign_validator_registration(bls_pk_hex, req.validator_registration, domain)
-// }
+/// Handler for VALIDATOR_REGISTRATION type
+/// https://github.com/ethereum/builder-specs/blob/main/specs/builder.md#signing
+pub fn handle_validator_registration_type(req: ValidatorRegistrationRequest, bls_pk_hex: String) -> Result<BLSSignature> {
+    get_validator_registration_signature(bls_pk_hex, req.validator_registration)
+}
 
 /// maintain compatibility with https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing 
 pub async fn secure_sign_bls(identifier: String, req: bytes::Bytes) -> Result<impl warp::Reply, warp::Rejection> {

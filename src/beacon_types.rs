@@ -55,6 +55,7 @@ pub const DOMAIN_SYNC_COMMITTEE:                 DomainType = [7_u8, 0_u8, 0_u8,
 pub const DOMAIN_SYNC_COMMITTEE_SELECTION_PROOF: DomainType = [8_u8, 0_u8, 0_u8, 0_u8]; // '0x08000000'
 pub const DOMAIN_CONTRIBUTION_AND_PROOF:         DomainType = [9_u8, 0_u8, 0_u8, 0_u8]; // '0x09000000'
 pub const DOMAIN_APPLICATION_MASK:               DomainType = [0_u8, 0_u8, 0_u8, 1_u8]; // '0x00000001'
+pub const DOMAIN_APPLICATION_BUILDER:            DomainType = [0_u8, 0_u8, 0_u8, 1_u8]; // '0x00000001'
 
 pub const GENESIS_FORK_VERSION: Version = [0_u8, 0_u8, 0_u8, 0_u8]; // '0x00000000'
 pub const SLOTS_PER_EPOCH: u64 = 32;
