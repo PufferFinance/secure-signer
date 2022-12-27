@@ -195,24 +195,12 @@ pub fn handle_aggregation_slot_type(req: AggregationSlotRequest, bls_pk_hex: Str
 
 /// Handler for DEPOSIT type
 pub fn handle_deposit_type(req: DepositRequest, bls_pk_hex: String) -> Result<BLSSignature> {
-    let domain = compute_domain(
-        DOMAIN_DEPOSIT, 
-        None, // TODO verify this is correct
-        None // TODO verify this is correct
-    );
-
-    secure_sign(bls_pk_hex, req.deposit, domain)
+    get_deposit_signature(bls_pk_hex, req.deposit)
 }
 
 /// Handler for VOLUNTARY_EXIT type
 pub fn handle_voluntary_exit_type(req: VoluntaryExitRequest, bls_pk_hex: String) -> Result<BLSSignature> {
-    let domain = compute_domain(
-        DOMAIN_VOLUNTARY_EXIT, 
-        Some(req.fork_info.fork.current_version),
-        Some(req.fork_info.genesis_validators_root)
-    );
-
-    secure_sign(bls_pk_hex, req.voluntary_exit, domain)
+    get_voluntary_exit_signature(bls_pk_hex, req.fork_info, req.voluntary_exit)
 }
 
 /// Handler for SYNC_COMMITTEE_MESSAGE type

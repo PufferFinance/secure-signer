@@ -339,6 +339,21 @@ pub fn get_contribution_and_proof_signature(pk_hex: String, fork_info: ForkInfo,
     secure_sign(pk_hex, contribution_and_proof, domain)
 }
 
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#broadcast-sync-committee-contribution
+/// Modified to adhere to https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing
+pub fn get_deposit_signature(pk_hex: String, deposit_message: DepositData) -> Result<BLSSignature> {
+    // Fork-agnostic domain since deposits are valid across forks
+    let domain = compute_domain(DOMAIN_DEPOSIT, None, None);
+    secure_sign(pk_hex, deposit_message, domain)
+}
+
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#broadcast-sync-committee-contribution
+/// Modified to adhere to https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing
+pub fn get_voluntary_exit_signature(pk_hex: String, fork_info: ForkInfo, voluntary_exit: VoluntaryExit) -> Result<BLSSignature> {
+    let domain = get_domain(fork_info, DOMAIN_VOLUNTARY_EXIT, Some(voluntary_exit.epoch));
+    secure_sign(pk_hex, voluntary_exit, domain)
+}
+
 pub fn secure_sign_validator_registration(pk_hex: String, vr: ValidatorRegistration, domain: Domain) -> Result<BLSSignature> {
     println!("pk_hex: {:?}, vr: {:?}, domain: {:?}", pk_hex, vr, domain);
     let root: Root = compute_signing_root(vr, domain);
