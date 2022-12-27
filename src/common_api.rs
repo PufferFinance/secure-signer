@@ -227,13 +227,7 @@ pub fn handle_sync_committee_selection_proof_type(req: SyncCommitteeSelectionPro
 
 /// Handler for SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF type
 pub fn handle_sync_committee_contribution_and_proof_type(req: SyncCommitteeContributionAndProofRequest, bls_pk_hex: String) -> Result<BLSSignature> {
-    let domain = compute_domain(
-        DOMAIN_CONTRIBUTION_AND_PROOF,
-        Some(req.fork_info.fork.current_version),
-        Some(req.fork_info.genesis_validators_root)
-    );
-
-    secure_sign(bls_pk_hex, req.contribution_and_proof, domain)
+    get_contribution_and_proof_signature(bls_pk_hex, req.fork_info, req.contribution_and_proof)
 }
 
 // /// Handler for secure_sign_validator_registration()

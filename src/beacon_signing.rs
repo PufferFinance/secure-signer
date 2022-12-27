@@ -331,6 +331,14 @@ pub fn get_sync_committee_selection_proof(pk_hex: String, fork_info: ForkInfo, s
     secure_sign(pk_hex, sync_aggregator_selection_data, domain)
 }
 
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#broadcast-sync-committee-contribution
+/// Modified to adhere to https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing
+pub fn get_contribution_and_proof_signature(pk_hex: String, fork_info: ForkInfo, contribution_and_proof: ContributionAndProof) -> Result<BLSSignature> {
+    let epoch = compute_epoch_at_slot(contribution_and_proof.contribution.slot);
+    let domain = get_domain(fork_info, DOMAIN_CONTRIBUTION_AND_PROOF, Some(epoch));
+    secure_sign(pk_hex, contribution_and_proof, domain)
+}
+
 pub fn secure_sign_validator_registration(pk_hex: String, vr: ValidatorRegistration, domain: Domain) -> Result<BLSSignature> {
     println!("pk_hex: {:?}, vr: {:?}, domain: {:?}", pk_hex, vr, domain);
     let root: Root = compute_signing_root(vr, domain);
