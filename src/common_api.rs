@@ -166,7 +166,7 @@ pub async fn list_eth_keys_service() -> Result<impl warp::Reply, warp::Rejection
     }
 }
 
-/// Handler for secure_sign_block()
+/// Handler for BLOCK_TYPE
 pub fn handle_block_type(req: BlockRequest, bls_pk_hex: String) -> Result<BLSSignature> {
     get_block_signature(bls_pk_hex, req.fork_info, req.block)
 }
@@ -181,19 +181,19 @@ pub fn handle_randao_reveal_type(req: RandaoRevealRequest, bls_pk_hex: String) -
     get_epoch_signature(bls_pk_hex, req.fork_info, req.randao_reveal.epoch)
 }
 
-/// Handler for secure_sign_aggregate_and_proof()
+/// Handler for AGGREGATE_AND_PROOF type
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#broadcast-aggregate
 pub fn handle_aggregate_and_proof_type(req: AggregateAndProofRequest, bls_pk_hex: String) -> Result<BLSSignature> {
     get_aggregate_and_proof(bls_pk_hex, req.fork_info, req.aggregate_and_proof)
 }
 
-/// Handler for secure_sign_aggregation_slot()
+/// Handler for AGGREGATION_SLOT type
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#broadcast-aggregate
 pub fn handle_aggregation_slot_type(req: AggregationSlotRequest, bls_pk_hex: String) -> Result<BLSSignature> {
     get_slot_signature(bls_pk_hex, req.fork_info, req.aggregation_slot.slot)
 }
 
-/// Handler for secure_sign_deposit()
+/// Handler for DEPOSIT type
 pub fn handle_deposit_type(req: DepositRequest, bls_pk_hex: String) -> Result<BLSSignature> {
     let domain = compute_domain(
         DOMAIN_DEPOSIT, 
@@ -204,7 +204,7 @@ pub fn handle_deposit_type(req: DepositRequest, bls_pk_hex: String) -> Result<BL
     secure_sign(bls_pk_hex, req.deposit, domain)
 }
 
-/// Handler for secure_sign_voluntary_exit()
+/// Handler for VOLUNTARY_EXIT type
 pub fn handle_voluntary_exit_type(req: VoluntaryExitRequest, bls_pk_hex: String) -> Result<BLSSignature> {
     let domain = compute_domain(
         DOMAIN_VOLUNTARY_EXIT, 
@@ -215,29 +215,17 @@ pub fn handle_voluntary_exit_type(req: VoluntaryExitRequest, bls_pk_hex: String)
     secure_sign(bls_pk_hex, req.voluntary_exit, domain)
 }
 
-/// Handler for secure_sign_sync_committee_msg()
+/// Handler for SYNC_COMMITTEE_MESSAGE type
 pub fn handle_sync_committee_msg_type(req: SyncCommitteeMessageRequest, bls_pk_hex: String) -> Result<BLSSignature> {
-    let domain = compute_domain(
-        DOMAIN_SYNC_COMMITTEE, 
-        Some(req.fork_info.fork.current_version),
-        Some(req.fork_info.genesis_validators_root)
-    );
-
-    secure_sign(bls_pk_hex, req.sync_committee_message, domain)
+    get_sync_committee_message(bls_pk_hex, req.fork_info, req.sync_committee_message)
 }
 
-/// Handler for secure_sign_sync_committee_selection_proof()
+/// Handler for SYNC_COMMITTEE_SELECTION_PROOF type
 pub fn handle_sync_committee_selection_proof_type(req: SyncCommitteeSelectionProofRequest, bls_pk_hex: String) -> Result<BLSSignature> {
-    let domain = compute_domain(
-        DOMAIN_SYNC_COMMITTEE_SELECTION_PROOF,
-        Some(req.fork_info.fork.current_version),
-        Some(req.fork_info.genesis_validators_root)
-    );
-
-    secure_sign(bls_pk_hex, req.sync_aggregator_selection_data, domain)
+    get_sync_committee_selection_proof(bls_pk_hex, req.fork_info, req.sync_aggregator_selection_data)
 }
 
-/// Handler for secure_sign_sync_committee_contribution_and_proof()
+/// Handler for SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF type
 pub fn handle_sync_committee_contribution_and_proof_type(req: SyncCommitteeContributionAndProofRequest, bls_pk_hex: String) -> Result<BLSSignature> {
     let domain = compute_domain(
         DOMAIN_CONTRIBUTION_AND_PROOF,

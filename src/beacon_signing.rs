@@ -205,12 +205,6 @@ pub fn compute_epoch_at_slot(slot: Slot) -> Epoch {
     slot / SLOTS_PER_EPOCH
 }
 
-/// Return the current epoch.
-/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#get_current_epoch
-pub fn get_current_epoch(state: &BeaconState) -> Epoch {
-    compute_epoch_at_slot(state.slot)
-}
-
 /// Return the signature domain (fork version concatenated with domain type) of a message.
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#get_domain
 /// Modified to adhere to https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing
@@ -319,6 +313,22 @@ pub fn get_aggregate_and_proof(pk_hex: String, fork_info: ForkInfo, aggregate_an
         DOMAIN_AGGREGATE_AND_PROOF, 
         Some(compute_epoch_at_slot(aggregate_and_proof.aggregate.data.slot)));
     secure_sign(pk_hex, aggregate_and_proof, domain)
+}
+
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#sync-committee-1
+/// Modified to adhere to https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing
+pub fn get_sync_committee_message(pk_hex: String, fork_info: ForkInfo, sync_committee_message: SyncCommitteeMessage) -> Result<BLSSignature> {
+    let epoch = compute_epoch_at_slot(sync_committee_message.slot);
+    let domain = get_domain(fork_info, DOMAIN_SYNC_COMMITTEE, Some(epoch));
+    secure_sign(pk_hex, sync_committee_message.beacon_block_root, domain)
+}
+
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#sync-committee-1
+/// Modified to adhere to https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing
+pub fn get_sync_committee_selection_proof(pk_hex: String, fork_info: ForkInfo, sync_aggregator_selection_data: SyncAggregatorSelectionData) -> Result<BLSSignature> {
+    let epoch = compute_epoch_at_slot(sync_aggregator_selection_data.slot);
+    let domain = get_domain(fork_info, DOMAIN_SYNC_COMMITTEE_SELECTION_PROOF, Some(epoch));
+    secure_sign(pk_hex, sync_aggregator_selection_data, domain)
 }
 
 pub fn secure_sign_validator_registration(pk_hex: String, vr: ValidatorRegistration, domain: Domain) -> Result<BLSSignature> {

@@ -363,39 +363,6 @@ pub struct BeaconBlock {
     pub body: BeaconBlockBody,
 }
 
-pub struct BeaconState {
-    //  Versioning
-    pub genesis_time: u64,
-    pub genesis_validators_root: Root,
-    pub slot: Slot,
-    pub fork: Fork,
-    //  History,
-    pub latest_block_header: BeaconBlockHeader,
-    // pub block_roots: Vector[Root, SLOTS_PER_HISTORICAL_ROOT],
-    // pub state_roots: Vector[Root, SLOTS_PER_HISTORICAL_ROOT],
-    // pub historical_roots: List[Root, HISTORICAL_ROOTS_LIMIT],
-    //  Eth1,
-    pub eth1_data: Eth1Data,
-    // pub eth1_data_votes: List[Eth1Data, EPOCHS_PER_ETH1_VOTING_PERIOD * SLOTS_PER_EPOCH],
-    pub eth1_deposit_index: u64,
-    //  Registry,
-    // pub validators: List[Validator, VALIDATOR_REGISTRY_LIMIT],
-    // pub balances: List[Gwei, VALIDATOR_REGISTRY_LIMIT],
-    //  Randomness,
-    // pub randao_mixes: Vector[Bytes32, EPOCHS_PER_HISTORICAL_VECTOR],
-    //  Slashings,
-    // pub slashings: Vector[Gwei, EPOCHS_PER_SLASHINGS_VECTOR]  # Per-epoch sums of slashed effective balances,
-    //  Attestations,
-    // pub previous_epoch_attestations: List[PendingAttestation, MAX_ATTESTATIONS * SLOTS_PER_EPOCH],
-    // pub current_epoch_attestations: List[PendingAttestation, MAX_ATTESTATIONS * SLOTS_PER_EPOCH],
-    //  Finality,
-    // pub justification_bits: Bitvector[JUSTIFICATION_BITS_LENGTH]  # Bit set for every recent justified epoch,
-    pub previous_justified_checkpoint: Checkpoint, // Previous epoch snapshot
-    pub current_justified_checkpoint: Checkpoint,
-    pub finalized_checkpoint: Checkpoint,
-}
-
-
 #[derive(Debug)]
 #[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
 pub struct SigningData {
