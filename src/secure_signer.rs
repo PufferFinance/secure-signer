@@ -12,6 +12,7 @@ mod beacon_types;
 mod beacon_signing;
 
 use warp::Filter;
+use std::fs;
 
     /// hardcoded bls sk
 pub fn setup_test_keypair() -> String {
@@ -34,6 +35,7 @@ async fn main() {
     println!("Starting SGX Secure-Signer: localhost:{}", port);
 
     // TEMP
+    fs::remove_dir_all("./etc");
     setup_test_keypair(); 
 
     let routes = 
@@ -96,7 +98,7 @@ mod signing_api_tests {
     use serde_json;
     use crate::beacon_signing::slash_resistance_tests::*;
     use crate::beacon_signing::non_slashing_signing_tests::*;
-    use crate::beacon_signing::RandaoRevealRequest;
+    use crate::beacon_signing::{RandaoRevealRequest, BlockV2Request};
 
     async fn mock_secure_sign_bls_route(bls_pk: &String, json_req: &String) -> warp::http::Response<bytes::Bytes> {
         let filter = bls_sign_route();
@@ -184,7 +186,7 @@ mod signing_api_tests {
         let bls_pk_hex = setup_test_keypair();
 
         // mock data for RANDAO_REVEAL request
-        let json_req = mock_randao_reveal_request("0x00");
+        let json_req = mock_randao_reveal_request();
         let parsed_req: RandaoRevealRequest = serde_json::from_str(&json_req).unwrap();
         assert_eq!(parsed_req.fork_info.fork.previous_version, [0,0,0,0]);
         assert_eq!(parsed_req.fork_info.fork.current_version, [0,0,0,0]);
@@ -208,6 +210,33 @@ mod signing_api_tests {
 
         // mock data for RANDAO_REVEAL request
         let json_req = mock_aggregate_and_proof_request("0x0", "0x1");
+        let resp = mock_secure_sign_bls_route(&bls_pk_hex, &json_req).await;
+        println!("{:?}", resp);
+        assert_eq!(resp.status(), 200);
+    }
+
+    #[tokio::test]
+    async fn test_bls_sign_route_block_V2_bellatrix_type() {
+        // clear state
+        fs::remove_dir_all("./etc");
+
+        // new keypair
+        let bls_pk_hex = setup_test_keypair();
+
+        // mock data for RANDAO_REVEAL request
+        let json_req = mock_block_v2_bellatrix_request();
+        let parsed_req: BlockV2Request = serde_json::from_str(&json_req).unwrap();
+        assert_eq!(parsed_req.fork_info.fork.previous_version, [128,0,0,112]);
+        assert_eq!(parsed_req.fork_info.fork.current_version, [128,0,0,113]);
+        assert_eq!(parsed_req.fork_info.fork.epoch, 750);
+        assert_eq!(parsed_req.fork_info.genesis_validators_root, [42_u8; 32]);
+        assert_eq!(parsed_req.signingRoot, [46, 191, 194, 215, 9, 68, 204, 47, 191, 246, 214, 124, 109, 156, 187, 4, 61, 127, 190, 10, 102, 13, 36, 139, 110, 102, 108, 225, 16, 175, 65, 138]);
+        assert_eq!(parsed_req.beacon_block.block_header.slot, 24000);
+        assert_eq!(parsed_req.beacon_block.block_header.proposer_index, 0);
+        assert_eq!(parsed_req.beacon_block.block_header.parent_root, [0_u8; 32]);
+        assert_eq!(parsed_req.beacon_block.block_header.state_root, [0_u8; 32]);
+        assert_eq!(parsed_req.beacon_block.block_header.body_root, [205, 124, 73, 150, 110, 190, 114, 177, 33, 78, 109, 71, 51, 173, 246, 191, 6, 147, 92, 95, 188, 59, 58, 208, 142, 132, 227, 8, 84, 40, 184, 47]);
+
         let resp = mock_secure_sign_bls_route(&bls_pk_hex, &json_req).await;
         println!("{:?}", resp);
         assert_eq!(resp.status(), 200);

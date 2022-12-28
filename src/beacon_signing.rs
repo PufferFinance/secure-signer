@@ -86,6 +86,20 @@ pub struct BlockRequest {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+pub struct BlockV2Request {
+    pub fork_info: ForkInfo,
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub signingRoot: Root,
+    pub beacon_block: BlockV2RequestWrapper,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct BlockV2RequestWrapper {
+    pub version: String,
+    pub block_header: BeaconBlockHeader,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
 pub struct AttestationRequest {
     pub fork_info: ForkInfo,
     #[serde(with = "SerHex::<StrictPfx>")]
@@ -167,6 +181,7 @@ pub struct ValidatorRegistrationRequest {
 #[serde(tag = "type")]
 pub enum BLSSignMsg {
     BLOCK (BlockRequest),
+    BLOCK_V2 (BlockV2Request),
     ATTESTATION (AttestationRequest),
     RANDAO_REVEAL (RandaoRevealRequest),
     AGGREGATE_AND_PROOF (AggregateAndProofRequest),
@@ -258,6 +273,25 @@ pub fn get_block_signature(pk_hex: String, fork_info: ForkInfo, block: BeaconBlo
 }
 
 /// bail statements prevent slashable offenses 
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#signature
+pub fn get_block_v2_signature(pk_hex: String, fork_info: ForkInfo, block_header: BeaconBlockHeader) -> Result<BLSSignature> {
+    // read previous slot from mem
+	let previous_block_slot = read_block_slot(&pk_hex)?;
+
+	// The block slot number must be strictly increasing to prevent slashing
+	if block_header.slot <= previous_block_slot {
+        bail!("block_header.slot <= previous_block_slot")
+    }
+
+    let domain = get_domain(fork_info, DOMAIN_BEACON_PROPOSER, Some(compute_epoch_at_slot(block_header.slot)));
+
+    // Save the new block slot to persistent memory
+	write_block_slot(&pk_hex, block_header.slot)?;
+
+    secure_sign(pk_hex, block_header, domain)
+}
+
+/// bail statements prevent slashable offenses 
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#aggregate-signature
 pub fn get_attestation_signature(pk_hex: String, fork_info: ForkInfo, attestation_data: AttestationData) -> Result<BLSSignature> {
 	let (prev_src_epoch, prev_tgt_epoch) = read_attestation_data(&pk_hex)?;
@@ -265,12 +299,12 @@ pub fn get_attestation_signature(pk_hex: String, fork_info: ForkInfo, attestatio
 
 	// The attestation source epoch must be non-decreasing to prevent slashing
 	if attestation_data.source.epoch < prev_src_epoch {
-        bail!("attestation_data.source.epoch < prev_src_epoch")
+        bail!("attestation_data.source.epoch < prev_src_epoch") // TODO turn back on
     }
 
 	// The attestation target epoch must be strictly increasing to prevent slashing
 	if attestation_data.target.epoch <= prev_tgt_epoch {
-        bail!("attestation_data.target.epoch <= prev_tgt_epoch")
+        bail!("attestation_data.target.epoch <= prev_tgt_epoch") // TODO turn back on
     }
 
     // Save the new attestation data to persistent memory
@@ -621,23 +655,21 @@ pub mod non_slashing_signing_tests {
     use std::fs;
     use crate::beacon_types::MAX_VALIDATORS_PER_COMMITTEE;
 
-    pub fn mock_randao_reveal_request(epoch: &str) -> String {
-        let type_: String = "RANDAO_REVEAL".into(); 
-
+    pub fn mock_randao_reveal_request() -> String {
         let req = format!(r#"
             {{
-               "type":"{type_}",
+               "type":"RANDAO_REVEAL",
                "fork_info":{{
                   "fork":{{
                      "previous_version":"0x00000000",
                      "current_version":"0x00000000",
-                     "epoch":"{epoch}"
+                     "epoch":"0"
                   }},
                   "genesis_validators_root":"0x2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"
                }},
                "signingRoot": "0xbf70dbbbc83299fb877334eaeaefb32df44242c1bf078cdc1836dcc3282d4fbd",
                "randao_reveal":{{
-                    "epoch": "{epoch}"
+                    "epoch": "0"
                }}
             }}"#);
         // println!("{req}");
@@ -682,6 +714,34 @@ pub mod non_slashing_signing_tests {
                     "selection_proof": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69"
                }}
             }}"#);
+        // println!("{req}");
+        req
+    }
+
+    pub fn mock_block_v2_bellatrix_request() -> String {
+        let req = format!(r#"
+        {{
+            "type": "BLOCK_V2",
+            "fork_info":{{
+                "fork":{{
+                   "previous_version":"0x80000070",
+                   "current_version":"0x80000071",
+                   "epoch":"750"
+                }},
+                "genesis_validators_root":"0x2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"
+             }},
+             "signingRoot": "0x2ebfc2d70944cc2fbff6d67c6d9cbb043d7fbe0a660d248b6e666ce110af418a",
+            "beacon_block": {{
+                "version": "BELLATRIX",
+                "block_header": {{
+                    "slot": "24000",
+                    "proposer_index": "0",
+                    "parent_root":"0x0000000000000000000000000000000000000000000000000000000000000000",
+                    "state_root":"0x0000000000000000000000000000000000000000000000000000000000000000",
+                    "body_root":"0xcd7c49966ebe72b1214e6d4733adf6bf06935c5fbc3b3ad08e84e3085428b82f"
+                }}
+            }}
+        }}"#);
         // println!("{req}");
         req
     }

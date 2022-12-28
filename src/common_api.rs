@@ -166,13 +166,20 @@ pub async fn list_eth_keys_service() -> Result<impl warp::Reply, warp::Rejection
     }
 }
 
-/// Handler for BLOCK_TYPE
+/// Handler for BLOCK type
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#signature
 pub fn handle_block_type(req: BlockRequest, bls_pk_hex: String) -> Result<BLSSignature> {
     get_block_signature(bls_pk_hex, req.fork_info, req.block)
 }
 
-/// Handler for ATTESTATION_TYPE
+/// Handler for BLOCK_V2 type
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#signature
+pub fn handle_block_v2_type(req: BlockV2Request, bls_pk_hex: String) -> Result<BLSSignature> {
+    println!("in handle_block_v2_type, req: {:?}", req);
+    get_block_v2_signature(bls_pk_hex, req.fork_info, req.beacon_block.block_header)
+}
+
+/// Handler for ATTESTATION type
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#attesting
 pub fn handle_attestation_type(req: AttestationRequest, bls_pk_hex: String) -> Result<BLSSignature> {
     get_attestation_signature(bls_pk_hex, req.fork_info, req.attestation)
@@ -247,6 +254,18 @@ pub async fn secure_sign_bls(bls_pk_hex: String, req: bytes::Bytes) -> Result<im
         Ok(BLSSignMsg::BLOCK(req)) => {
             // handle "BLOCK" type request
             match handle_block_type(req, bls_pk_hex) {
+                Ok(sig) => Ok(reply::with_status(reply::json(&success_response(&sig)), StatusCode::OK)),
+                // return 412 error
+                Err(e) => {
+                    let mut resp = HashMap::new();
+                    resp.insert("error", format!("{:?}, Signing operation failed due to slashing protection rules", e));
+                    Ok(reply::with_status(reply::json(&resp), StatusCode::PRECONDITION_FAILED))
+                }
+            }
+        },
+        Ok(BLSSignMsg::BLOCK_V2(req)) => {
+            // handle "BLOCK_V2" type request
+            match handle_block_v2_type(req, bls_pk_hex) {
                 Ok(sig) => Ok(reply::with_status(reply::json(&success_response(&sig)), StatusCode::OK)),
                 // return 412 error
                 Err(e) => {
