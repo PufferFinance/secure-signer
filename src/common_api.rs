@@ -203,12 +203,13 @@ pub fn handle_deposit_type(req: DepositRequest, bls_pk_hex: String) -> Result<BL
 }
 
 /// Handler for VOLUNTARY_EXIT type
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#voluntary-exits
 pub fn handle_voluntary_exit_type(req: VoluntaryExitRequest, bls_pk_hex: String) -> Result<BLSSignature> {
     get_voluntary_exit_signature(bls_pk_hex, req.fork_info, req.voluntary_exit)
 }
 
 /// Handler for SYNC_COMMITTEE_MESSAGE type
-/// https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#sync-committee-1
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#sync-committee-messages
 pub fn handle_sync_committee_msg_type(req: SyncCommitteeMessageRequest, bls_pk_hex: String) -> Result<BLSSignature> {
     get_sync_committee_message(bls_pk_hex, req.fork_info, req.sync_committee_message)
 }
@@ -231,18 +232,22 @@ pub fn handle_validator_registration_type(req: ValidatorRegistrationRequest, bls
     get_validator_registration_signature(bls_pk_hex, req.validator_registration)
 }
 
+pub fn success_response(sig: &[u8]) -> HashMap<&str, String> {
+    let mut resp = HashMap::new();
+    resp.insert("signature", format!("0x{}", hex::encode(sig)));
+    resp
+}
+
 /// maintain compatibility with https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing 
-pub async fn secure_sign_bls(identifier: String, req: bytes::Bytes) -> Result<impl warp::Reply, warp::Rejection> {
+pub async fn secure_sign_bls(bls_pk_hex: String, req: bytes::Bytes) -> Result<impl warp::Reply, warp::Rejection> {
+    // strip 0x prefix if exists
+    let bls_pk_hex = bls_pk_hex.strip_prefix("0x").unwrap_or(&bls_pk_hex).into();
     println!("{:?}", req);
     match serde_json::from_slice(&req) {
         Ok(BLSSignMsg::BLOCK(req)) => {
             // handle "BLOCK" type request
-            match handle_block_type(req, identifier) {
-                Ok(sig) => {
-                    let mut resp = HashMap::new();
-                    resp.insert("signature", hex::encode(&sig[..]));
-                    Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
-                },
+            match handle_block_type(req, bls_pk_hex) {
+                Ok(sig) => Ok(reply::with_status(reply::json(&success_response(&sig)), StatusCode::OK)),
                 // return 412 error
                 Err(e) => {
                     let mut resp = HashMap::new();
@@ -253,12 +258,8 @@ pub async fn secure_sign_bls(identifier: String, req: bytes::Bytes) -> Result<im
         },
         Ok(BLSSignMsg::ATTESTATION(req)) => {
             // handle "ATTESTATION" type request
-            match handle_attestation_type(req, identifier) {
-                Ok(sig) => {
-                    let mut resp = HashMap::new();
-                    resp.insert("signature", hex::encode(&sig[..]));
-                    Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
-                },
+            match handle_attestation_type(req, bls_pk_hex) {
+                Ok(sig) => Ok(reply::with_status(reply::json(&success_response(&sig)), StatusCode::OK)),
                 // return 412 error
                 Err(e) => {
                     let mut resp = HashMap::new();
@@ -269,12 +270,8 @@ pub async fn secure_sign_bls(identifier: String, req: bytes::Bytes) -> Result<im
         },
         Ok(BLSSignMsg::RANDAO_REVEAL(req)) => {
             // handle "RANDAO_REVEAL" type request
-            match handle_randao_reveal_type(req, identifier) {
-                Ok(sig) => {
-                    let mut resp = HashMap::new();
-                    resp.insert("signature", hex::encode(&sig[..]));
-                    Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
-                },
+            match handle_randao_reveal_type(req, bls_pk_hex) {
+                Ok(sig) => Ok(reply::with_status(reply::json(&success_response(&sig)), StatusCode::OK)),
                 // return 500 error
                 Err(e) => {
                     let mut resp = HashMap::new();
@@ -284,13 +281,12 @@ pub async fn secure_sign_bls(identifier: String, req: bytes::Bytes) -> Result<im
             }
         },
         Ok(BLSSignMsg::AGGREGATE_AND_PROOF(req)) => {
+            let ab = &req.aggregate_and_proof.aggregate.aggregation_bits;
+            
+            println!("agg bits: {:?}, {:?}", ab, hex::encode(ab.as_slice()));
             // handle "AGGREGATE_AND_PROOF" type request
-            match handle_aggregate_and_proof_type(req, identifier) {
-                Ok(sig) => {
-                    let mut resp = HashMap::new();
-                    resp.insert("signature", hex::encode(&sig[..]));
-                    Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
-                },
+            match handle_aggregate_and_proof_type(req, bls_pk_hex) {
+                Ok(sig) => Ok(reply::with_status(reply::json(&success_response(&sig)), StatusCode::OK)),
                 // return 500 error
                 Err(e) => {
                     let mut resp = HashMap::new();
@@ -301,12 +297,8 @@ pub async fn secure_sign_bls(identifier: String, req: bytes::Bytes) -> Result<im
         },
         Ok(BLSSignMsg::AGGREGATION_SLOT(req)) => {
             // handle "AGGREGATION_SLOT" type request
-            match handle_aggregation_slot_type(req, identifier) {
-                Ok(sig) => {
-                    let mut resp = HashMap::new();
-                    resp.insert("signature", hex::encode(&sig[..]));
-                    Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
-                },
+            match handle_aggregation_slot_type(req, bls_pk_hex) {
+                Ok(sig) => Ok(reply::with_status(reply::json(&success_response(&sig)), StatusCode::OK)),
                 // return 500 error
                 Err(e) => {
                     let mut resp = HashMap::new();
@@ -317,12 +309,8 @@ pub async fn secure_sign_bls(identifier: String, req: bytes::Bytes) -> Result<im
         },
         Ok(BLSSignMsg::DEPOSIT(req)) => {
             // handle "DEPOSIT" type request
-            match handle_deposit_type(req, identifier) {
-                Ok(sig) => {
-                    let mut resp = HashMap::new();
-                    resp.insert("signature", hex::encode(&sig[..]));
-                    Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
-                },
+            match handle_deposit_type(req, bls_pk_hex) {
+                Ok(sig) => Ok(reply::with_status(reply::json(&success_response(&sig)), StatusCode::OK)),
                 // return 500 error
                 Err(e) => {
                     let mut resp = HashMap::new();
@@ -333,12 +321,8 @@ pub async fn secure_sign_bls(identifier: String, req: bytes::Bytes) -> Result<im
         },
         Ok(BLSSignMsg::VOLUNTARY_EXIT(req)) => {
             // handle "VOLUNTARY_EXIT" type request
-            match handle_voluntary_exit_type(req, identifier) {
-                Ok(sig) => {
-                    let mut resp = HashMap::new();
-                    resp.insert("signature", hex::encode(&sig[..]));
-                    Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
-                },
+            match handle_voluntary_exit_type(req, bls_pk_hex) {
+                Ok(sig) => Ok(reply::with_status(reply::json(&success_response(&sig)), StatusCode::OK)),
                 // return 500 error
                 Err(e) => {
                     let mut resp = HashMap::new();
@@ -349,12 +333,8 @@ pub async fn secure_sign_bls(identifier: String, req: bytes::Bytes) -> Result<im
         },
         Ok(BLSSignMsg::SYNC_COMMITTEE_MESSAGE(req)) => {
             // handle "SYNC_COMMITTEE_MESSAGE" type request
-            match handle_sync_committee_msg_type(req, identifier) {
-                Ok(sig) => {
-                    let mut resp = HashMap::new();
-                    resp.insert("signature", hex::encode(&sig[..]));
-                    Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
-                },
+            match handle_sync_committee_msg_type(req, bls_pk_hex) {
+                Ok(sig) => Ok(reply::with_status(reply::json(&success_response(&sig)), StatusCode::OK)),
                 // return 500 error
                 Err(e) => {
                     let mut resp = HashMap::new();
@@ -365,12 +345,8 @@ pub async fn secure_sign_bls(identifier: String, req: bytes::Bytes) -> Result<im
         },
         Ok(BLSSignMsg::SYNC_COMMITTEE_SELECTION_PROOF(req)) => {
             // handle "SYNC_COMMITTEE_SELECTION_PROOF" type request
-            match handle_sync_committee_selection_proof_type(req, identifier) {
-                Ok(sig) => {
-                    let mut resp = HashMap::new();
-                    resp.insert("signature", hex::encode(&sig[..]));
-                    Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
-                },
+            match handle_sync_committee_selection_proof_type(req, bls_pk_hex) {
+                Ok(sig) => Ok(reply::with_status(reply::json(&success_response(&sig)), StatusCode::OK)),
                 // return 500 error
                 Err(e) => {
                     let mut resp = HashMap::new();
@@ -381,12 +357,8 @@ pub async fn secure_sign_bls(identifier: String, req: bytes::Bytes) -> Result<im
         },
         Ok(BLSSignMsg::SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF(req)) => {
             // handle "SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF" type request
-            match handle_sync_committee_contribution_and_proof_type(req, identifier) {
-                Ok(sig) => {
-                    let mut resp = HashMap::new();
-                    resp.insert("signature", hex::encode(&sig[..]));
-                    Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
-                },
+            match handle_sync_committee_contribution_and_proof_type(req, bls_pk_hex) {
+                Ok(sig) => Ok(reply::with_status(reply::json(&success_response(&sig)), StatusCode::OK)),
                 // return 500 error
                 Err(e) => {
                     let mut resp = HashMap::new();
@@ -395,22 +367,18 @@ pub async fn secure_sign_bls(identifier: String, req: bytes::Bytes) -> Result<im
                 }
             }
         },
-        // Ok(BLSSignMsg::VALIDATOR_REGISTRATION(req)) => {
-        //     // handle "VALIDATOR_REGISTRATION" type request
-        //     match handle_validator_registration_type(req, identifier) {
-        //         Ok(sig) => {
-        //             let mut resp = HashMap::new();
-        //             resp.insert("signature", hex::encode(&sig[..]));
-        //             Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
-        //         },
-        //         // return 500 error
-        //         Err(e) => {
-        //             let mut resp = HashMap::new();
-        //             resp.insert("error", format!("{:?}", e));
-        //             Ok(reply::with_status(reply::json(&resp), StatusCode::INTERNAL_SERVER_ERROR))
-        //         }
-        //     }
-        // },
+        Ok(BLSSignMsg::VALIDATOR_REGISTRATION(req)) => {
+            // handle "VALIDATOR_REGISTRATION" type request
+            match handle_validator_registration_type(req, bls_pk_hex) {
+                Ok(sig) => Ok(reply::with_status(reply::json(&success_response(&sig)), StatusCode::OK)),
+                // return 500 error
+                Err(e) => {
+                    let mut resp = HashMap::new();
+                    resp.insert("error", format!("{:?}", e));
+                    Ok(reply::with_status(reply::json(&resp), StatusCode::INTERNAL_SERVER_ERROR))
+                }
+            }
+        },
         Err(e) => {
             // catchall error if signing type not one of ['BLOCK', 'ATTESTATION', RANDAO_REVEAL']
             let mut resp = HashMap::new();

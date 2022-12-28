@@ -11,30 +11,20 @@ use anyhow::{Result, Context, bail};
 use ssz::{Decode, Encode};
 use ssz_derive::{Decode, Encode};
 use ssz_types::{FixedVector, typenum, BitList, Bitfield, BitVector};
+use tree_hash::TreeHash;
 use tree_hash::merkle_root;
 
 use std::path::PathBuf;
 use std::fs;
 
-
-fn hash_tree_root<T: Encode>(ssz_object: T) -> Root {
-    let bytes = ssz_object.as_ssz_bytes();
-    let minimum_leaf_count:usize = 0;
-    // `minimum_leaf_count` will only be used if it is greater than or equal to the minimum number of leaves that can be created from `bytes`.
-    let root = merkle_root(&bytes, minimum_leaf_count);
-    println!("Got hash_tree_root {:?}", root);
-    // println!("Got root {:?}", root.as_fixed_bytes());
-    *root.as_fixed_bytes()
-}
-
 /// Return the signing root for the corresponding signing data.
-fn compute_signing_root<T: Encode>(ssz_object: T, domain: Domain) -> Root {
-    let object_root = hash_tree_root(ssz_object);
+fn compute_signing_root<T: Encode + TreeHash>(ssz_object: T, domain: Domain) -> Root {
+    let object_root = ssz_object.tree_hash_root().to_fixed_bytes();
     let sign_data = SigningData { 
         object_root, 
         domain 
     };
-    hash_tree_root(sign_data)
+    sign_data.tree_hash_root().to_fixed_bytes()
 }
 
 fn write_block_slot(pk_hex: &String, slot: Slot) -> Result<()> {
@@ -186,7 +176,7 @@ pub enum BLSSignMsg {
     SYNC_COMMITTEE_MESSAGE (SyncCommitteeMessageRequest),
     SYNC_COMMITTEE_SELECTION_PROOF (SyncCommitteeSelectionProofRequest),
     SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF (SyncCommitteeContributionAndProofRequest),
-    // VALIDATOR_REGISTRATION (ValidatorRegistrationRequest), //todo
+    VALIDATOR_REGISTRATION (ValidatorRegistrationRequest), 
 }
 
 /// Return the 32-byte fork data root for the ``current_version`` and ``genesis_validators_root``.
@@ -196,7 +186,7 @@ pub fn compute_fork_data_root(current_version: Version, genesis_validators_root:
         current_version,
         genesis_validators_root,
     };
-    hash_tree_root(f)
+    f.tree_hash_root().to_fixed_bytes()
 }
 
 /// Return the epoch number at ``slot``.
@@ -241,8 +231,9 @@ pub fn compute_domain(domain_type: DomainType, fork_version: Option<Version>, ge
 }
 
 /// Reusable signing function  
-pub fn secure_sign<T:Encode>(pk_hex: String, msg: T, domain: Domain) -> Result<BLSSignature> {
+pub fn secure_sign<T:Encode + TreeHash>(pk_hex: String, msg: T, domain: Domain) -> Result<BLSSignature> {
     let root: Root = compute_signing_root(msg, domain);
+    println!("signing root: {:?}", hex::encode(root));
     let sig = keys::bls_sign(&pk_hex, &root)?;
     Ok(<_>::from(sig.to_bytes().to_vec()))
 }
@@ -296,26 +287,23 @@ pub fn get_epoch_signature(pk_hex: String, fork_info: ForkInfo, epoch: Epoch) ->
     secure_sign(pk_hex, epoch, domain)
 }
 
-/// Selection proofs are provided in AggregateAndProof to prove to the gossip channel that the validator has been selected as an aggregator
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#attestation-aggregation
 /// Modified to adhere to https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing
 pub fn get_slot_signature(pk_hex: String, fork_info: ForkInfo, slot: Slot) -> Result<BLSSignature> {
-    let domain = get_domain(fork_info, DOMAIN_SELECTION_PROOF, Some(compute_epoch_at_slot(slot)));
+    let epoch = compute_epoch_at_slot(slot);
+    let domain = get_domain(fork_info, DOMAIN_SELECTION_PROOF, Some(epoch));
     secure_sign(pk_hex, slot, domain)
 }
 
-/// Selection proofs are provided in AggregateAndProof to prove to the gossip channel that the validator has been selected as an aggregator
-/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#attestation-aggregation
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#broadcast-aggregate
 /// Modified to adhere to https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing
 pub fn get_aggregate_and_proof(pk_hex: String, fork_info: ForkInfo, aggregate_and_proof: AggregateAndProof) -> Result<BLSSignature> {
-    let domain = get_domain(
-        fork_info, 
-        DOMAIN_AGGREGATE_AND_PROOF, 
-        Some(compute_epoch_at_slot(aggregate_and_proof.aggregate.data.slot)));
+    let epoch = compute_epoch_at_slot(aggregate_and_proof.aggregate.data.slot);
+    let domain = get_domain(fork_info, DOMAIN_AGGREGATE_AND_PROOF, Some(epoch));
     secure_sign(pk_hex, aggregate_and_proof, domain)
 }
 
-/// https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#sync-committee-1
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#sync-committee-messages
 /// Modified to adhere to https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing
 pub fn get_sync_committee_message(pk_hex: String, fork_info: ForkInfo, sync_committee_message: SyncCommitteeMessage) -> Result<BLSSignature> {
     let epoch = compute_epoch_at_slot(sync_committee_message.slot);
@@ -323,7 +311,7 @@ pub fn get_sync_committee_message(pk_hex: String, fork_info: ForkInfo, sync_comm
     secure_sign(pk_hex, sync_committee_message.beacon_block_root, domain)
 }
 
-/// https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#sync-committee-1
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#aggregation-selection
 /// Modified to adhere to https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing
 pub fn get_sync_committee_selection_proof(pk_hex: String, fork_info: ForkInfo, sync_aggregator_selection_data: SyncAggregatorSelectionData) -> Result<BLSSignature> {
     let epoch = compute_epoch_at_slot(sync_aggregator_selection_data.slot);
@@ -641,13 +629,13 @@ pub mod non_slashing_signing_tests {
                "type":"{type_}",
                "fork_info":{{
                   "fork":{{
-                     "previous_version":"0x00000001",
-                     "current_version":"0x00000001",
+                     "previous_version":"0x00000000",
+                     "current_version":"0x00000000",
                      "epoch":"{epoch}"
                   }},
-                  "genesis_validators_root":"0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69"
+                  "genesis_validators_root":"0x2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"
                }},
-               "signingRoot": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69",
+               "signingRoot": "0xbf70dbbbc83299fb877334eaeaefb32df44242c1bf078cdc1836dcc3282d4fbd",
                "randao_reveal":{{
                     "epoch": "{epoch}"
                }}

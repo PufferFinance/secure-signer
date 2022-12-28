@@ -13,11 +13,29 @@ mod beacon_signing;
 
 use warp::Filter;
 
+    /// hardcoded bls sk
+pub fn setup_test_keypair() -> String {
+    // dummy key
+    let sk_hex = hex::encode(&[85, 40, 245, 17, 84, 193, 234, 155, 24, 234, 181, 58, 171, 193, 209, 164, 120, 147, 10, 174, 189, 228, 119, 48, 181, 19, 117, 223, 2, 240, 7, 108,]);
+    println!("DEBUG: using sk: {sk_hex}");
+    let sk = keys::bls_sk_from_hex(sk_hex.clone()).unwrap();
+
+    let sk = keys::bls_sk_from_hex(sk_hex.clone()).unwrap();
+    let pk = sk.sk_to_pk();
+    let pk_hex = hex::encode(pk.compress());
+    println!("DEBUG: using pk: {pk_hex}");
+    keys::write_key(&format!("bls_keys/generated/{}", pk_hex), &sk_hex).unwrap();
+    pk_hex
+}
 
 #[tokio::main]
 async fn main() {
     let port = std::env::args().nth(1).unwrap_or("3031".into()).parse::<u16>().expect("BAD PORT");
-    println!("Starting SGX-Signer enclave HTTP server: localhost:{}", port);
+    println!("Starting SGX Secure-Signer: localhost:{}", port);
+
+    // TEMP
+    setup_test_keypair(); 
+
     let routes = 
 
         // --------- Compatible with Web3Signer ---------
@@ -78,11 +96,13 @@ mod signing_api_tests {
     use serde_json;
     use crate::beacon_signing::slash_resistance_tests::*;
     use crate::beacon_signing::non_slashing_signing_tests::*;
+    use crate::beacon_signing::RandaoRevealRequest;
 
     async fn mock_secure_sign_bls_route(bls_pk: &String, json_req: &String) -> warp::http::Response<bytes::Bytes> {
         let filter = bls_sign_route();
         let uri = format!("/api/v1/eth2/sign/{}", bls_pk);
 
+        println!("mocking request to: {uri}");
         let res = warp::test::request()
             .method("POST")
             .path(&uri)
@@ -161,10 +181,18 @@ mod signing_api_tests {
         fs::remove_dir_all("./etc");
 
         // new keypair
-        let bls_pk_hex = setup_keypair();
+        let bls_pk_hex = setup_test_keypair();
 
         // mock data for RANDAO_REVEAL request
-        let json_req = mock_randao_reveal_request("0x0a");
+        let json_req = mock_randao_reveal_request("0x00");
+        let parsed_req: RandaoRevealRequest = serde_json::from_str(&json_req).unwrap();
+        assert_eq!(parsed_req.fork_info.fork.previous_version, [0,0,0,0]);
+        assert_eq!(parsed_req.fork_info.fork.current_version, [0,0,0,0]);
+        assert_eq!(parsed_req.fork_info.fork.epoch, 0);
+        assert_eq!(parsed_req.fork_info.genesis_validators_root, [42_u8; 32]);
+        assert_eq!(parsed_req.signingRoot, [191, 112, 219, 187, 200, 50, 153, 251, 135, 115, 52, 234, 234, 239, 179, 45, 244, 66, 66, 193, 191, 7, 140, 220, 24, 54, 220, 195, 40, 45, 79, 189]);
+        assert_eq!(parsed_req.randao_reveal.epoch, 0);
+
         let resp = mock_secure_sign_bls_route(&bls_pk_hex, &json_req).await;
         println!("{:?}", resp);
         assert_eq!(resp.status(), 200);

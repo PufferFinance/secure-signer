@@ -1,3 +1,4 @@
+use openssl::pkcs5::bytes_to_key;
 use serde::{Deserialize, Serialize};
 use serde::ser::{Serializer, SerializeStruct};
 use serde::de::Error;
@@ -7,6 +8,8 @@ use serde::{Deserializer};
 use serde_hex::{SerHex, StrictPfx, CompactPfx};
 use anyhow::{Result, Context, bail};
 
+use tree_hash::TreeHash;
+use tree_hash_derive::TreeHash;
 use ssz::{Decode, Encode};
 use ssz_derive::{Decode, Encode};
 use ssz_types::{FixedVector, typenum, BitList, Bitfield, BitVector};
@@ -67,7 +70,6 @@ where
     println!("in from_bls_pk_hex");
     let hex_str: &str = Deserialize::deserialize(deserializer)?;
     println!("hex_str: {:?}", hex_str);
-    // let bytes = hex::decode(hex_str).expect("failed to deserialize");
     let bytes = match &hex_str[0..2] { 
         "0x" => hex::decode(&hex_str[2..]).expect("failed to deserialize"),
         _ => hex::decode(hex_str).expect("failed to deserialize")
@@ -105,30 +107,61 @@ where
     Ok(addr)
 }
 
-pub fn from_hex_to_bitlist<'de, D>(deserializer: D) -> Result<BitList<MAX_VALIDATORS_PER_COMMITTEE>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    println!("in from_hex_to_bitlist");
-    let hex_str: &str = Deserialize::deserialize(deserializer)?;
-    let bytes = match &hex_str[0..2] { 
-        "0x" => hex::decode(&hex_str[2..]).expect("failed to deserialize"),
-        _ => hex::decode(hex_str).expect("failed to deserialize")
-    };
-    unimplemented!()
-    // match BitList::from_bytes(bytes) {
-    //     Ok(agg_bits) => Ok(agg_bits),
-    //     Err(e) => Err(D::Error::TrailingCharacters)
-    // }
-    // let agg_bits: BitList<MAX_VALIDATORS_PER_COMMITTEE> = match BitList::from_bytes(bytes) {
-    //     Ok(agg_bits) => agg_bits,
-    //     Err(e) => bail!("asdfa"),
-    // }
-    // Ok(agg_bits)
-}
+// type BitVector2048 = BitVector<typenum::U2048>;
+// type BitVector16 = BitVector<typenum::U16>;
+
+// pub fn from_hex_to_bitlist<'de, D>(deserializer: D) -> Result<BitList<MAX_VALIDATORS_PER_COMMITTEE>, D::Error>
+// where
+//     D: Deserializer<'de>,
+// {
+//     println!("in from_hex_to_bitlist");
+//     let hex_str: &str = Deserialize::deserialize(deserializer)?;
+//     let mut bytes = match &hex_str[0..2] { 
+//         "0x" => hex::decode(&hex_str[2..]).expect("failed to deserialize"),
+//         _ => hex::decode(hex_str).expect("failed to deserialize")
+//     };
+//     let max_bytes = 2048 / 8; // MAX_VALIDATORS_PER_COMMITTEE / 8
+//     assert!(bytes.len() <= max_bytes);
+//     let pad = vec![0_u8; max_bytes - bytes.len()];
+//     // bytes.extend(pad);
+//     println!("bytes: {:?}, {}", bytes, bytes.len());
+//     // let agg_bits: BitList<MAX_VALIDATORS_PER_COMMITTEE> = match BitList::from_bytes(bytes) {
+//     //     Ok(agg_bits) => agg_bits,
+//     //     Err(e) => bail!("asdfa"),
+//     // }
+//     // let mut container: BitList<MAX_VALIDATORS_PER_COMMITTEE> = BitList::with_capacity(2048).unwrap()
+//     // container.
+//     // let agg_bits  = BitList::<MAX_VALIDATORS_PER_COMMITTEE>::new();
+
+
+//     // let mut b = BitVector2048::new();
+//     let mut b = BitVector16::new();
+//     let mut b = BitVector16::from_bytes(vec![0_u8, 9_u8]).unwrap();
+//     // let mut b = BitVector2048::from_bytes(bytes.clone()).unwrap();
+//     // println!("{:?}", b);
+//     // b.set(0, true);
+//     println!("{:?}", b);
+//     println!("{:?}", b.as_ssz_bytes());
+//     // b.set(5, true);
+//     // b.set(9, true);
+//     println!("{:?}", b.get(0));
+//     println!("{:?}", b.get(9));
+//     println!("{:?}", b.into_bytes());
+//     // println!("{:?}", b.into_raw_bytes());
+//     // println!("{:?}", b.from_bytes());
+
+
+//     // let agg_bits: BitList<MAX_VALIDATORS_PER_COMMITTEE> = BitList::from_bytes(bytes).unwrap(); 
+//     // let agg_bits: BitList<MAX_VALIDATORS_PER_COMMITTEE> = BitList::from_bytes(bytes).unwrap().enco; 
+//     let agg_bits: BitList<MAX_VALIDATORS_PER_COMMITTEE> = BitList::from_bytes(bytes).unwrap(); 
+//     // let agg_bits = BitList::<MAX_VALIDATORS_PER_COMMITTEE>::from_bytes(bytes).unwrap(); 
+//     println!("{:?}", agg_bits);
+//     Ok(agg_bits)
+//     // unimplemented!()
+// }
 
 #[derive(Debug)]
-#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+#[derive(Deserialize, Serialize, Encode, Decode, TreeHash, Clone, Default)]
 pub struct Fork {
     #[serde(with = "SerHex::<StrictPfx>")]
     pub previous_version: Version,
@@ -138,7 +171,7 @@ pub struct Fork {
     pub epoch: Epoch,
 }
 
-#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+#[derive(Deserialize, Serialize, Encode, Decode, TreeHash, Clone, Default)]
 pub struct ForkData {
     #[serde(with = "SerHex::<StrictPfx>")]
     pub current_version: Version,
@@ -154,7 +187,7 @@ pub struct ForkInfo {
 }
 
 #[derive(Debug)]
-#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+#[derive(Deserialize, Serialize, Encode, Decode, TreeHash, Clone, Default)]
 pub struct Checkpoint {
     #[serde(with = "SerHex::<CompactPfx>")]
     pub epoch: Epoch,
@@ -163,7 +196,7 @@ pub struct Checkpoint {
 }
 
 #[derive(Debug)]
-#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+#[derive(Deserialize, Serialize, Encode, Decode, TreeHash, Clone, Default)]
 /// used by Web3Signer type = "RANDAO_REVEAL"
 pub struct RandaoReveal {
     #[serde(with = "SerHex::<CompactPfx>")]
@@ -171,7 +204,7 @@ pub struct RandaoReveal {
 }
 
 #[derive(Debug)]
-#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+#[derive(Deserialize, Serialize, Encode, Decode, TreeHash, Clone, Default)]
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#attestationdata
 /// used by Web3Signer type = "ATTESTATION"
 pub struct AttestationData {
@@ -188,7 +221,7 @@ pub struct AttestationData {
 }
 
 #[derive(Debug)]
-#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+#[derive(Deserialize, Serialize, Encode, Decode, TreeHash, Clone, Default)]
 pub struct BeaconBlockHeader {
     #[serde(with = "SerHex::<CompactPfx>")]
     pub slot: Slot,
@@ -203,7 +236,7 @@ pub struct BeaconBlockHeader {
 }
 
 #[derive(Debug)]
-#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+#[derive(Deserialize, Serialize, Encode, Decode, TreeHash, Clone, Default)]
 pub struct SignedBeaconBlockHeader {
     pub message: BeaconBlockHeader,
     #[serde(deserialize_with = "from_bls_sig_hex")]
@@ -211,14 +244,14 @@ pub struct SignedBeaconBlockHeader {
 }
 
 #[derive(Debug)]
-#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+#[derive(Deserialize, Serialize, Encode, Decode, TreeHash, Clone, Default)]
 pub struct ProposerSlashing {
     pub signed_header_1: SignedBeaconBlockHeader,
     pub signed_header_2: SignedBeaconBlockHeader,
 }
 
 #[derive(Debug)]
-#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+#[derive(Deserialize, Serialize, Encode, Decode, TreeHash, Clone, Default)]
 pub struct IndexedAttestation {
     pub attesting_indices: FixedVector<ValidatorIndex, MAX_VALIDATORS_PER_COMMITTEE>,
     pub data: AttestationData,
@@ -227,14 +260,14 @@ pub struct IndexedAttestation {
 }
 
 #[derive(Debug)]
-#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+#[derive(Deserialize, Serialize, Encode, Decode, TreeHash, Clone, Default)]
 pub struct AttesterSlashing {
     pub attestation_1: IndexedAttestation,
     pub attestation_2: IndexedAttestation,
 }
 
 #[derive(Debug)]
-#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+#[derive(Deserialize, Serialize, Encode, Decode, TreeHash, Clone, Default)]
 pub struct Eth1Data {
     #[serde(with = "SerHex::<StrictPfx>")]
     pub deposit_root: Root,
@@ -245,7 +278,7 @@ pub struct Eth1Data {
 }
 
 #[derive(Debug)]
-#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+#[derive(Deserialize, Serialize, Encode, Decode, TreeHash, Clone, Default)]
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#depositdata
 /// used by Web3Signer type = "DEPOSIT"
 pub struct DepositData {
@@ -260,14 +293,14 @@ pub struct DepositData {
 }
 
 #[derive(Debug)]
-#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+#[derive(Deserialize, Serialize, Encode, Decode, TreeHash, Clone, Default)]
 pub struct Deposit {
     pub proof: FixedVector<Bytes32, DEPOSIT_CONTRACT_TREE_DEPTH_PLUS_ONE>,  // Merkle path to deposit root
     pub data: DepositData,
 }
 
 #[derive(Debug)]
-#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+#[derive(Deserialize, Serialize, Encode, Decode, TreeHash, Clone, Default)]
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#voluntaryexit
 /// used by Web3Signer type = "VOLUNTARY_EXIT"
 pub struct VoluntaryExit {
@@ -278,7 +311,7 @@ pub struct VoluntaryExit {
 }
 
 #[derive(Debug)]
-#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+#[derive(Deserialize, Serialize, Encode, Decode, TreeHash, Clone, Default)]
 pub struct SignedVoluntaryExit {
     pub message: VoluntaryExit,
     #[serde(deserialize_with = "from_bls_sig_hex")]
@@ -286,7 +319,7 @@ pub struct SignedVoluntaryExit {
 }
 
 #[derive(Debug)]
-#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+#[derive(Deserialize, Serialize, Encode, Decode, TreeHash, Clone, Default)]
 /// used by Web3Signer type = "VALIDATOR_REGISTRATION"
 pub struct ValidatorRegistration { 
     #[serde(deserialize_with = "from_address_hex")]
@@ -298,9 +331,9 @@ pub struct ValidatorRegistration {
 }
 
 #[derive(Debug)]
-#[derive(Deserialize, Serialize, Encode, Decode, Clone)]
+#[derive(Deserialize, Serialize, Encode, Decode, TreeHash, Clone)]
 pub struct Attestation {
-    #[serde(deserialize_with = "from_hex_to_bitlist")]
+    // #[serde(deserialize_with = "from_hex_to_bitlist")]
     pub aggregation_bits: BitList<MAX_VALIDATORS_PER_COMMITTEE>,
     pub data: AttestationData,
     #[serde(deserialize_with = "from_bls_sig_hex")]
@@ -318,7 +351,7 @@ impl Default for Attestation {
 }
 
 #[derive(Debug)]
-#[derive(Deserialize, Serialize, Encode, Decode, Clone)]
+#[derive(Deserialize, Serialize, Encode, Decode, TreeHash, Clone)]
 pub struct BeaconBlockBody {
     #[serde(deserialize_with = "from_bls_sig_hex")]
     pub randao_reveal: BLSSignature,
@@ -349,7 +382,7 @@ impl Default for BeaconBlockBody {
 }
 
 #[derive(Debug)]
-#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+#[derive(Deserialize, Serialize, Encode, Decode, TreeHash, Clone, Default)]
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#beaconblock
 /// used by Web3Signer type = "BLOCK"
 pub struct BeaconBlock {
@@ -365,7 +398,7 @@ pub struct BeaconBlock {
 }
 
 #[derive(Debug)]
-#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+#[derive(Deserialize, Serialize, Encode, Decode, TreeHash, Clone, Default)]
 pub struct SigningData {
     #[serde(with = "SerHex::<StrictPfx>")]
     pub object_root: Root,
@@ -374,23 +407,22 @@ pub struct SigningData {
 }
 
 #[derive(Debug)]
-#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+#[derive(Deserialize, Serialize, Encode, Decode, TreeHash, Clone, Default)]
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#aggregateandproof
 /// used by Web3Signer type = "AGGREGATE_AND_PROOF"
 pub struct AggregateAndProof {
     #[serde(with = "SerHex::<CompactPfx>")]
     pub aggregator_index: ValidatorIndex,
     pub aggregate: Attestation,
-    // get_slot_signature(state, aggregate.data.slot, privkey)
     #[serde(deserialize_with = "from_bls_sig_hex")]
     pub selection_proof: BLSSignature,
 }
 
 #[derive(Debug)]
-#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+#[derive(Deserialize, Serialize, Encode, Decode, TreeHash, Clone, Default)]
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#synccommitteemessage
 /// used by Web3Signer type = "SYNC_COMMITTEE_MESSAGE"
-/// TODO: Eth spec's container differs from W3S API
+/// Web3Signer's API differs from the ETH2 spec by ommitting the validator_index and signature fields as they are not necessary to run get_sync_committee_message(). We are following this convention for compatibility.
 pub struct SyncCommitteeMessage {
     // Slot to which this contribution pertains
     #[serde(with = "SerHex::<CompactPfx>")]
@@ -398,16 +430,18 @@ pub struct SyncCommitteeMessage {
     // Block root for this signature
     #[serde(with = "SerHex::<StrictPfx>")]
     pub beacon_block_root: Root,
-    // Index of the validator that produced this signature
-    #[serde(with = "SerHex::<CompactPfx>")]
-    pub validator_index: ValidatorIndex,
-    // Signature by the validator over the block root of `slot`
-    #[serde(deserialize_with = "from_bls_sig_hex")]
-    pub signature: BLSSignature,
+    // -- begin difference from ETH2 spec -- 
+    // // Index of the validator that produced this signature
+    // #[serde(with = "SerHex::<CompactPfx>")]
+    // pub validator_index: ValidatorIndex,
+    // // Signature by the validator over the block root of `slot`
+    // #[serde(deserialize_with = "from_bls_sig_hex")]
+    // pub signature: BLSSignature,
+    // -- end difference from ETH2 spec -- 
 }
 
 #[derive(Debug)]
-#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+#[derive(Deserialize, Serialize, Encode, Decode, TreeHash, Clone, Default)]
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#synccommitteecontribution
 /// used by Web3Signer type = "SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF"
 pub struct SyncCommitteeContribution {
@@ -430,7 +464,7 @@ pub struct SyncCommitteeContribution {
 }
 
 #[derive(Debug)]
-#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+#[derive(Deserialize, Serialize, Encode, Decode, TreeHash, Clone, Default)]
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#contributionandproof
 /// used by Web3Signer type = "SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF"
 pub struct ContributionAndProof {
@@ -442,7 +476,7 @@ pub struct ContributionAndProof {
 }
 
 #[derive(Debug)]
-#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+#[derive(Deserialize, Serialize, Encode, Decode, TreeHash, Clone, Default)]
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#syncaggregatorselectiondata
 /// used by Web3Signer type = "SYNC_COMMITTEE_SELECTION_PROOF"
 pub struct SyncAggregatorSelectionData {
@@ -453,7 +487,7 @@ pub struct SyncAggregatorSelectionData {
 }
 
 #[derive(Debug)]
-#[derive(Deserialize, Serialize, Encode, Decode, Clone, Default)]
+#[derive(Deserialize, Serialize, Encode, Decode, TreeHash, Clone, Default)]
 /// used by Web3Signer type = "AGGREGATION_SLOT"
 pub struct AggregationSlot {
     #[serde(with = "SerHex::<CompactPfx>")]
