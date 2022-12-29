@@ -126,7 +126,7 @@ pub struct SigningData {
     pub domain: Domain,
 }
 
-#[derive(Debug, Deserialize, Serialize, Encode, Decode, TreeHash, Clone)]
+#[derive(Debug, Deserialize, Serialize, Encode, Decode, TreeHash, Clone, Default)]
 pub struct Fork {
     #[serde(with = "SerHex::<StrictPfx>")]
     pub previous_version: Version,
@@ -144,7 +144,7 @@ pub struct ForkData {
     pub genesis_validators_root: Root,
 }
 
-#[derive(Debug, Deserialize, Serialize, Encode, Decode, TreeHash, Clone)]
+#[derive(Debug, Deserialize, Serialize, Encode, Decode, TreeHash, Clone, Default)]
 pub struct ForkInfo {
     pub fork: Fork,
     #[serde(with = "SerHex::<StrictPfx>")]
@@ -417,121 +417,202 @@ pub struct AggregationSlot {
     pub slot: Slot,
 }
 
-// #[cfg(test)]
-// mod spec_tests {
-//     use super::*;
-//     use crate::{keys, route_handlers::ValidatorRegistrationRequest};
+#[derive(Deserialize, Serialize, Debug)]
+pub struct BlockRequest {
+    pub fork_info: ForkInfo,
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub signingRoot: Root,
+    pub block: BeaconBlock,
+}
 
-//     // #[test]
-//     // fn test_serialize() {
-//     //     let bb = BeaconBlock::default();
+#[derive(Deserialize, Serialize, Debug)]
+pub struct BlockV2Request {
+    pub fork_info: ForkInfo,
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub signingRoot: Root,
+    pub beacon_block: BlockV2RequestWrapper,
+}
 
-//     //     println!("{:?}", bb);
-//     //     let bytes = bb.as_ssz_bytes();
-//     //     println!("{:?}", bytes);
-//     //     println!("{:?}", BeaconBlock::from_ssz_bytes(&bytes).unwrap());
-//     // }
+#[derive(Deserialize, Serialize, Debug)]
+pub struct BlockV2RequestWrapper {
+    pub version: String,
+    pub block_header: BeaconBlockHeader,
+}
 
-//     // #[test]
-//     // fn test_secure_sign_randao() -> Result<()> {
-//     //     let pk_hex = String::from("8b17b1964fdfa87e8f172b09123f0e12cbc8195ee709bfb16545c7da2d98c9ab628ea74e786be0c08566efd366795a6a");
-//     //     let epoch = 123;
-//     //     let domain = Domain {  };
-//     //     secure_sign_randao(pk_hex, epoch, domain)?;
-//     //     Ok(())
-//     // }
+#[derive(Deserialize, Serialize, Debug)]
+pub struct AttestationRequest {
+    pub fork_info: ForkInfo,
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub signingRoot: Root,
+    pub attestation: AttestationData,
+}
 
-//     #[test]
-//     fn test_deserialize_fork() -> Result<()> {
-//         let req = r#"
-//             {
-//                 "previous_version":"0x00000001",
-//                 "current_version":"0x00000001",
-//                 "epoch":"10"
-//             }"#;
+#[derive(Deserialize, Serialize, Debug)]
+pub struct RandaoRevealRequest {
+    pub fork_info: ForkInfo,
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub signingRoot: Root,
+    pub randao_reveal: RandaoReveal,
+}
 
-//         let v: Fork = serde_json::from_str(req)?;
-//         assert_eq!(v.previous_version, [0, 0, 0, 1]);
-//         assert_eq!(v.current_version, [0, 0, 0, 1]);
-//         assert_eq!(v.epoch, 16); // 10 == 0x10 == 16
-//         Ok(())
-//     }
+#[derive(Deserialize, Serialize, Debug)]
+pub struct AggregateAndProofRequest {
+    pub fork_info: ForkInfo,
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub signingRoot: Root,
+    pub aggregate_and_proof: AggregateAndProof,
+}
 
-//     #[test]
-//     fn test_deserialize_fork_info() -> Result<()> {
-//         let req = r#"
-//             {
-//                 "fork":{
-//                     "previous_version":"0x00000001",
-//                     "current_version":"0x00000001",
-//                     "epoch":"0xff"
-//                 },
-//                 "genesis_validators_root": "0x04700007fabc8282644aed6d1c7c9e21d38a03a0c4ba193f3afe428824b3a673"
-//             }"#;
+#[derive(Deserialize, Serialize, Debug)]
+pub struct AggregationSlotRequest {
+    pub fork_info: ForkInfo,
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub signingRoot: Root,
+    pub aggregation_slot: AggregationSlot,
+}
 
-//         let v: ForkInfo = serde_json::from_str(req)?;
-//         assert_eq!(v.fork.previous_version, [0, 0, 0, 1]);
-//         assert_eq!(v.fork.current_version, [0, 0, 0, 1]);
-//         assert_eq!(v.fork.epoch, 255);
-//         // python: list(bytes.fromhex('04700007fabc8282644aed6d1c7c9e21d38a03a0c4ba193f3afe428824b3a673'))
-//         assert_eq!(v.genesis_validators_root, [4, 112, 0, 7, 250, 188, 130, 130, 100, 74, 237, 109, 28, 124, 158, 33, 211, 138, 3, 160, 196, 186, 25, 63, 58, 254, 66, 136, 36, 179, 166, 115]);
-//         assert_eq!(hex::encode(v.genesis_validators_root), "04700007fabc8282644aed6d1c7c9e21d38a03a0c4ba193f3afe428824b3a673");
-//         Ok(())
-//     }
+#[derive(Deserialize, Serialize, Debug)]
+pub struct DepositRequest {
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub signingRoot: Root,
+    pub deposit: DepositData,
+}
 
-//     #[test]
-//     fn test_deserialize_deposit_data() -> Result<()> {
-//         let pk = keys::bls_key_gen(true)?;
-//         let bls_pk_hex = hex::encode(pk.compress());
-//         let sig = keys::bls_sign(&bls_pk_hex, b"hello world")?;
-//         keys::verify_bls_sig(sig, pk, b"hello world").unwrap();
-//         let hex_sig = hex::encode(sig.compress());
-//         println!("pk: {bls_pk_hex}");
-//         println!("sig: {hex_sig}");
-//         let withdrawal = "0x0000000000000000000000000000000000000000000000000000000000000001";
-//         // test deserialize bls pk and bls sig
-//         let req = format!(r#"
-//             {{
-//                 "pubkey": "{bls_pk_hex}",
-//                 "withdrawal_credentials":"{withdrawal}",
-//                 "amount":"0xdeadbeef",
-//                 "signature": "{hex_sig}"
-//             }}"#);
+#[derive(Deserialize, Serialize, Debug)]
+pub struct VoluntaryExitRequest {
+    pub fork_info: ForkInfo,
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub signingRoot: Root,
+    pub voluntary_exit: VoluntaryExit,
+}
 
-//         let dd: DepositData = serde_json::from_str(&req)?;
-//         let mut exp_w = [0_u8; 32];
-//         exp_w[31] = 1;
-//         assert_eq!(dd.withdrawal_credentials, exp_w);
-//         assert_eq!(dd.amount, 3735928559); // 0xdeadbeef
+#[derive(Deserialize, Serialize, Debug)]
+pub struct SyncCommitteeMessageRequest {
+    pub fork_info: ForkInfo,
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub signingRoot: Root,
+    pub sync_committee_message: SyncCommitteeMessage,
+}
 
-//         let got_pk = dd.pubkey;
-//         let got_pk_hex = hex::encode(&got_pk[..]);
-//         let got_pk = keys::bls_pk_from_hex(got_pk_hex)?;
+#[derive(Deserialize, Serialize, Debug)]
+pub struct SyncCommitteeSelectionProofRequest {
+    pub fork_info: ForkInfo,
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub signingRoot: Root,
+    pub sync_aggregator_selection_data: SyncAggregatorSelectionData,
+}
 
-//         let got_sig = dd.signature;
-//         let got_sig_hex = hex::encode(&got_sig[..]);
-//         let got_sig = keys::bls_sig_from_hex(got_sig_hex)?;
-//         keys::verify_bls_sig(got_sig, got_pk, b"hello world")
-//     }
+#[derive(Deserialize, Serialize, Debug)]
+pub struct SyncCommitteeContributionAndProofRequest {
+    pub fork_info: ForkInfo,
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub signingRoot: Root,
+    pub contribution_and_proof: ContributionAndProof,
+}
 
-//     #[test]
-//     fn test_deserialize_validator_registration() -> Result<()> {
-//         let req = format!(r#"
-//         {{
-//             "type": "VALIDATOR_REGISTRATION",
-//             "signingRoot": "0x139d59dbb1770fdc582ff75193720352ccc76131e37ac69d0c10e7416f3f3050",
-//             "validator_registration": {{
-//                 "fee_recipient": "0x2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a",
-//                 "gas_limit": "30000000",
-//                 "timestamp":"100",
-//                 "pubkey": "0x8349434ad0700e79be65c0c7043945df426bd6d7e288c16671df69d822344f1b0ce8de80360a50550ad782b68035cb18"
-//             }}
-//         }}"#);
-//         let v: ValidatorRegistrationRequest = serde_json::from_str(&req).unwrap();
-//         assert_eq!(v.validator_registration.gas_limit, 30000000);
-//         assert_eq!(v.validator_registration.timestamp, 100);
-//         // todo
+#[derive(Deserialize, Serialize, Debug)]
+pub struct ValidatorRegistrationRequest {
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub signingRoot: Root,
+    pub validator_registration: ValidatorRegistration,
+}
 
-//         Ok(())
-//     }
-// }
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(tag = "type")]
+pub enum BLSSignMsg {
+    BLOCK(BlockRequest),
+    BLOCK_V2(BlockV2Request),
+    ATTESTATION(AttestationRequest),
+    RANDAO_REVEAL(RandaoRevealRequest),
+    AGGREGATE_AND_PROOF(AggregateAndProofRequest),
+    AGGREGATION_SLOT(AggregationSlotRequest),
+    DEPOSIT(DepositRequest),
+    VOLUNTARY_EXIT(VoluntaryExitRequest),
+    SYNC_COMMITTEE_MESSAGE(SyncCommitteeMessageRequest),
+    SYNC_COMMITTEE_SELECTION_PROOF(SyncCommitteeSelectionProofRequest),
+    SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF(SyncCommitteeContributionAndProofRequest),
+    VALIDATOR_REGISTRATION(ValidatorRegistrationRequest),
+}
+
+#[cfg(test)]
+mod serialization_tests {
+    use super::*;
+    use anyhow::Result;
+
+    #[test]
+    fn test_deserialize_fork() -> Result<()> {
+        let req = r#"
+            {
+                "previous_version":"0x00000001",
+                "current_version":"0x00000001",
+                "epoch":"10"
+            }"#;
+
+        let v: Fork = serde_json::from_str(req)?;
+        assert_eq!(v.previous_version, [0, 0, 0, 1]);
+        assert_eq!(v.current_version, [0, 0, 0, 1]);
+        assert_eq!(v.epoch, 10); 
+        Ok(())
+    }
+
+    #[test]
+    fn test_deserialize_fork_info() -> Result<()> {
+        let req = r#"
+            {
+                "fork":{
+                    "previous_version":"0x00000001",
+                    "current_version":"0x00000001",
+                    "epoch":"999"
+                },
+                "genesis_validators_root": "0x04700007fabc8282644aed6d1c7c9e21d38a03a0c4ba193f3afe428824b3a673"
+            }"#;
+
+        let v: ForkInfo = serde_json::from_str(req)?;
+        assert_eq!(v.fork.previous_version, [0, 0, 0, 1]);
+        assert_eq!(v.fork.current_version, [0, 0, 0, 1]);
+        assert_eq!(v.fork.epoch, 999);
+        // python: list(bytes.fromhex('04700007fabc8282644aed6d1c7c9e21d38a03a0c4ba193f3afe428824b3a673'))
+        assert_eq!(v.genesis_validators_root, [4, 112, 0, 7, 250, 188, 130, 130, 100, 74, 237, 109, 28, 124, 158, 33, 211, 138, 3, 160, 196, 186, 25, 63, 58, 254, 66, 136, 36, 179, 166, 115]);
+        assert_eq!(hex::encode(v.genesis_validators_root), "04700007fabc8282644aed6d1c7c9e21d38a03a0c4ba193f3afe428824b3a673");
+        Ok(())
+    }
+
+    #[test]
+    fn test_deserialize_deposit_data() -> Result<()> {
+        let req = format!(r#"
+            {{
+                "pubkey": "0x8349434ad0700e79be65c0c7043945df426bd6d7e288c16671df69d822344f1b0ce8de80360a50550ad782b68035cb18",
+                "withdrawal_credentials": "0x04700007fabc8282644aed6d1c7c9e21d38a03a0c4ba193f3afe428824b3a673",
+                "amount":"10000",
+                "signature": "0xb3baa751d0a9132cfe93e4e3d5ff9075111100e3789dca219ade5a24d27e19d16b3353149da1833e9b691bb38634e8dc04469be7032132906c927d7e1a49b414730612877bc6b2810c8f202daf793d1ab0d6b5cb21d52f9e52e883859887a5d9"
+            }}"#);
+
+        let dd: DepositData = serde_json::from_str(&req)?;
+        assert_eq!(dd.withdrawal_credentials, [4, 112, 0, 7, 250, 188, 130, 130, 100, 74, 237, 109, 28, 124, 158, 33, 211, 138, 3, 160, 196, 186, 25, 63, 58, 254, 66, 136, 36, 179, 166, 115]);
+        assert_eq!(dd.amount, 10000); 
+        assert_eq!(dd.signature[..], [179, 186, 167, 81, 208, 169, 19, 44, 254, 147, 228, 227, 213, 255, 144, 117, 17, 17, 0, 227, 120, 157, 202, 33, 154, 222, 90, 36, 210, 126, 25, 209, 107, 51, 83, 20, 157, 161, 131, 62, 155, 105, 27, 179, 134, 52, 232, 220, 4, 70, 155, 231, 3, 33, 50, 144, 108, 146, 125, 126, 26, 73, 180, 20, 115, 6, 18, 135, 123, 198, 178, 129, 12, 143, 32, 45, 175, 121, 61, 26, 176, 214, 181, 203, 33, 213, 47, 158, 82, 232, 131, 133, 152, 135, 165, 217]); 
+        Ok(())
+    }
+
+    #[test]
+    fn test_deserialize_validator_registration() -> Result<()> {
+        let req = format!(r#"
+        {{
+            "type": "VALIDATOR_REGISTRATION",
+            "signingRoot": "0x139d59dbb1770fdc582ff75193720352ccc76131e37ac69d0c10e7416f3f3050",
+            "validator_registration": {{
+                "fee_recipient": "0x2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a",
+                "gas_limit": "30000000",
+                "timestamp":"100",
+                "pubkey": "0x8349434ad0700e79be65c0c7043945df426bd6d7e288c16671df69d822344f1b0ce8de80360a50550ad782b68035cb18"
+            }}
+        }}"#);
+        let v: ValidatorRegistrationRequest = serde_json::from_str(&req).unwrap();
+        assert_eq!(v.signingRoot, [19, 157, 89, 219, 177, 119, 15, 220, 88, 47, 247, 81, 147, 114, 3, 82, 204, 199, 97, 49, 227, 122, 198, 157, 12, 16, 231, 65, 111, 63, 48, 80]);
+        assert_eq!(v.validator_registration.gas_limit, 30000000);
+        assert_eq!(v.validator_registration.timestamp, 100);
+        assert_eq!(v.validator_registration.fee_recipient[..], [42_u8; 20]);
+        assert_eq!(v.validator_registration.pubkey[..], [131, 73, 67, 74, 208, 112, 14, 121, 190, 101, 192, 199, 4, 57, 69, 223, 66, 107, 214, 215, 226, 136, 193, 102, 113, 223, 105, 216, 34, 52, 79, 27, 12, 232, 222, 128, 54, 10, 80, 85, 10, 215, 130, 182, 128, 53, 203, 24]);
+        Ok(())
+    }
+}
