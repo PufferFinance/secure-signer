@@ -27,7 +27,7 @@ sha3 = "0.10.1"
 openssl = "0.10.42"
 bytes = "1"
 
-# web3 deps
+# eth deps
 eth2_ssz = "0.4.0"
 eth2_ssz_derive = "0.3.0"
 eth2_ssz_types = "0.2.1"
@@ -38,24 +38,8 @@ tree_hash_derive = "0.4.0"
 tokio = { version = "1", features = ["full"] }
 warp = "0.3"
 
-# client deps
-reqwest = { version = "0.11", features = ["json"] }
-
 # misc
 anyhow = "1.0.65"
-
-#[dev-dependencies]
-#serde_yaml = "0.9"
-#snap = "1"
-
-
-[[bin]] # Bin to run the worker node
-name = "worker"
-path = "src/worker.rs"
-
-[[bin]] # Bin to run the leader node
-name = "leader"
-path = "src/leader.rs"
 
 [[bin]] # Bin to run the sgx-signer rpc
 name = "secure-signer"

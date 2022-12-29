@@ -31,8 +31,21 @@ pub fn eth_sk_to_hex(sk: &EthSecretKey) -> String {
     hex::encode(sk.serialize())
 }
 
+/// Converts SECP256K1 key to compressed 33 bytes
 pub fn eth_pk_to_hex(pk: &EthPublicKey) -> String {
-    hex::encode(pk.serialize())
+    hex::encode(pk.serialize_compressed())
+}
+
+pub fn eth_pk_from_hex(pk_hex: String) -> Result<EthPublicKey> {
+    let pk_hex: String = pk_hex.strip_prefix("0x").unwrap_or(&pk_hex).into();
+    let pk_bytes = hex::decode(&pk_hex)?;
+    let mut pk_compressed_bytes = [0_u8; 33];
+    pk_compressed_bytes.clone_from_slice(&pk_bytes);
+
+    match EthPublicKey::parse_compressed(&pk_compressed_bytes) {
+        Ok(pk) => Ok(pk),
+        Err(e) => bail!("failed to recover ETH pk from pk_hex: {}, error: {:?}", pk_hex, e)
+    }
 }
 
 /// keccak hash function to hash arbitrary bytes to 32 bytes 
@@ -104,10 +117,9 @@ pub fn checksum(address: &str) -> Result<String> {
 /// write the Eth SECP256K1 secret key to a secure file using the hex encoded pk as filename 
 fn save_eth_key(sk: EthSecretKey, pk: EthPublicKey) -> Result<EthPublicKey> {
     let pk_hex = eth_pk_to_hex(&pk);
-    println!("new enclave pk: {}", pk_hex);
+    println!("new enclave pk: 0x{}", pk_hex);
 
     let sk_hex = eth_sk_to_hex(&sk);
-    println!("debug sk_hex: {:?}", sk_hex);
 
     write_key(&format!("eth_keys/{}", pk_hex), &sk_hex).with_context(|| "eth sk failed to save")?;
 
@@ -149,6 +161,7 @@ pub fn bls_key_gen(save_key: bool) -> Result<PublicKey> {
 }
 
 pub fn bls_pk_from_hex(pk_hex: String) -> Result<PublicKey> {
+    let pk_hex: String = pk_hex.strip_prefix("0x").unwrap_or(&pk_hex).into();
     let pk_bytes = hex::decode(&pk_hex)?;
     match PublicKey::from_bytes(&pk_bytes) {
         Ok(pk) => Ok(pk),
@@ -157,6 +170,7 @@ pub fn bls_pk_from_hex(pk_hex: String) -> Result<PublicKey> {
 }
 
 pub fn bls_sk_from_hex(sk_hex: String) -> Result<SecretKey> {
+    let sk_hex: String = sk_hex.strip_prefix("0x").unwrap_or(&sk_hex).into();
     let sk_bytes = hex::decode(sk_hex)?;
     match SecretKey::from_bytes(&sk_bytes) {
         Ok(sk) => Ok(sk),
@@ -165,6 +179,7 @@ pub fn bls_sk_from_hex(sk_hex: String) -> Result<SecretKey> {
 }
 
 pub fn bls_sig_from_hex(sig_hex: String) -> Result<Signature> {
+    let sig_hex: String = sig_hex.strip_prefix("0x").unwrap_or(&sig_hex).into();
     let sig_bytes = hex::decode(sig_hex)?;
     match Signature::from_bytes(&sig_bytes) {
         Ok(sig) => Ok(sig),
@@ -227,6 +242,7 @@ pub fn write_key(fname: &String, sk_hex: &String) -> Result<()> {
 
 /// Reads hex-encoded secret key from a file named from `pk_hex` and converts it to a BLS SecretKey
 pub fn read_bls_key(pk_hex: &String) -> Result<SecretKey> {
+    let pk_hex: String = pk_hex.strip_prefix("0x").unwrap_or(&pk_hex).into();
     let file_path: PathBuf = ["./etc/keys/bls_keys/", pk_hex.as_str()].iter().collect();
     let sk_rec_bytes = fs::read(&file_path).with_context(|| format!("Unable to read bls sk from pk_hex {}", pk_hex))?;
     let sk_rec_dec = hex::decode(sk_rec_bytes).with_context(|| "Unable to decode sk hex")?;
@@ -242,6 +258,10 @@ pub fn read_bls_key(pk_hex: &String) -> Result<SecretKey> {
 
 /// Reads hex-encoded secret key from a file named from `pk_hex` and converts it to an Eth SecretKey
 pub fn read_eth_key(fname: &String) -> Result<EthSecretKey> {
+    let fname: String = fname.strip_prefix("0x").unwrap_or(&fname).into();
+    if fname.len() != 66 {
+        bail!("ETH key hex string should be derived from compressed (33 byte) pk")
+    }
     let file_path: PathBuf = ["./etc/keys/eth_keys", fname.as_str()].iter().collect();
     let sk_rec_bytes = fs::read(&file_path).with_context(|| "Unable to read eth secret key")?;
     let sk_rec_dec = hex::decode(sk_rec_bytes).with_context(|| "Unable to decode sk hex")?;

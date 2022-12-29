@@ -7,10 +7,10 @@ use crate::keys::{
 use crate::remote_attesation::{epid_remote_attestation, AttestationEvidence};
 
 use anyhow::{bail, Result};
+use blst::min_pk::PublicKey;
 use blst::min_pk::SecretKey;
-use ecies::decrypt;
+use ecies::{decrypt, PublicKey as EthPublicKey};
 use serde::{Deserialize, Serialize};
-use serde_hex::{SerHex, StrictPfx};
 use std::collections::HashMap;
 use warp::{http::StatusCode, reply};
 
@@ -56,10 +56,10 @@ impl ListKeysResponse {
         let inners = keys
             .iter()
             .map(|pk| {
-                // Strip leading 0x if included
+                // Prepend leading 0x if needed
                 let pubkey = match pk[0..2].into() {
-                    "0x" => pk[2..].to_string(),
-                    _ => pk.to_string(),
+                    "0x" => pk.to_string(),
+                    _ => "0x".to_owned() + &pk.to_string(),
                 };
                 ListKeysResponseInner {
                     pubkey: pubkey.into(),
@@ -76,8 +76,7 @@ pub async fn bls_key_gen_service() -> Result<impl warp::Reply, warp::Rejection> 
     let save_key = true;
     match bls_key_gen(save_key) {
         Ok(pk) => {
-            let mut resp = HashMap::new();
-            resp.insert("bls_pk_hex", format!("0x{}", hex::encode(pk.compress())));
+            let resp = KeyGenResponse::from_bls_key(pk);
             Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
         }
         Err(e) => {
@@ -91,12 +90,31 @@ pub async fn bls_key_gen_service() -> Result<impl warp::Reply, warp::Rejection> 
     }
 }
 
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct KeyGenResponse {
+    pub pk_hex: String,
+}
+
+impl KeyGenResponse {
+    pub fn from_eth_key(pk: EthPublicKey) -> Self {
+        KeyGenResponse {
+            pk_hex: format!("0x{}", hex::encode(pk.serialize_compressed()))
+        }
+    }
+
+    pub fn from_bls_key(pk: PublicKey) -> Self {
+        KeyGenResponse {
+            pk_hex: format!("0x{}", hex::encode(&pk.compress()))
+        }
+    }
+}
+
 /// Runs all the logic to generate and save a new ETH key. Returns a `KeyGenResponse` on success.
 pub async fn eth_key_gen_service() -> Result<impl warp::Reply, warp::Rejection> {
     match eth_key_gen() {
         Ok(pk) => {
-            let mut resp = HashMap::new();
-            resp.insert("eth_pk_hex", format!("0x{}", hex::encode(pk.serialize())));
+            let resp = KeyGenResponse::from_eth_key(pk);
             Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
         }
         Err(e) => {
@@ -194,8 +212,25 @@ pub struct KeyImportResponse {
     pub data: [KeyImportResponseInner; 1],
 }
 
+impl KeyImportResponse {
+    pub fn new(pk_hex: String) -> Self {
+        // prepend 0x
+        let msg = match pk_hex[0..2].into() {
+            "0x" => pk_hex.to_string(),
+            _ => "0x".to_owned() + &pk_hex.to_string(),
+        };
+        let data = KeyImportResponseInner {
+            status: "imported".to_string(),
+            message: msg,
+        };
+        let resp = KeyImportResponse { data: [data] };
+        resp
+    }
+}
+
 /// Decrypts a BLS private key that was encrypted via ECDH with an SECP256K1 key
-/// safeguarded by the TEE, then saves the BLS key.
+/// safeguarded by the TEE, then saves the BLS key. Expects the bls_pk_hex to be compressed (48 bytes),
+/// and the eth encrypting_pk_hex to be compressed (33 bytes)
 pub fn decrypt_and_save_imported_bls_key(req: &KeyImportRequest) -> Result<()> {
     println!("DEBUG: servicing req: {:?}", req);
     println!("reading eth key with pk: {}", req.encrypting_pk_hex);
@@ -203,7 +238,8 @@ pub fn decrypt_and_save_imported_bls_key(req: &KeyImportRequest) -> Result<()> {
     let sk = read_eth_key(&req.encrypting_pk_hex)?;
 
     // get plaintext bls key
-    let ct_bls_sk_bytes = hex::decode(&req.ct_bls_sk_hex)?;
+    let ct_bls_sk_hex: String = req.ct_bls_sk_hex.strip_prefix("0x").unwrap_or(&req.ct_bls_sk_hex).into();
+    let ct_bls_sk_bytes = hex::decode(&ct_bls_sk_hex)?;
     let bls_sk_bytes = decrypt(&sk.serialize(), &ct_bls_sk_bytes)?;
     let bls_sk = match SecretKey::from_bytes(&bls_sk_bytes) {
         Ok(sk) => sk,
@@ -214,12 +250,13 @@ pub fn decrypt_and_save_imported_bls_key(req: &KeyImportRequest) -> Result<()> {
     };
 
     // verify supplied pk is dervied from this sk
-    if hex::encode(bls_sk.sk_to_pk().serialize()) != req.bls_pk_hex {
+    let bls_pk_hex: String = req.bls_pk_hex.strip_prefix("0x").unwrap_or(&req.bls_pk_hex).into();
+    if hex::encode(bls_sk.sk_to_pk().compress()) != bls_pk_hex {
         bail!("The imported bls sk doesn't match the expected bls pk")
     }
 
     // save the bls key
-    let fname = format!("bls_keys/imported/{}", req.bls_pk_hex);
+    let fname = format!("bls_keys/imported/{}", bls_pk_hex);
     let bls_sk_hex = hex::encode(bls_sk.serialize());
     write_key(&fname, &bls_sk_hex)
 }
@@ -231,11 +268,7 @@ pub async fn bls_key_import_service(
     match decrypt_and_save_imported_bls_key(&req) {
         Ok(()) => {
             // The key has successfully been saved, formulate http response
-            let data = KeyImportResponseInner {
-                status: "imported".to_string(),
-                message: req.bls_pk_hex,
-            };
-            let resp = KeyImportResponse { data: [data] };
+            let resp = KeyImportResponse::new(req.bls_pk_hex);
             Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
         }
         Err(e) => {
@@ -249,122 +282,6 @@ pub async fn bls_key_import_service(
     }
 }
 
-#[derive(Deserialize, Serialize, Debug)]
-pub struct BlockRequest {
-    pub fork_info: ForkInfo,
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub signingRoot: Root,
-    pub block: BeaconBlock,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct BlockV2Request {
-    pub fork_info: ForkInfo,
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub signingRoot: Root,
-    pub beacon_block: BlockV2RequestWrapper,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct BlockV2RequestWrapper {
-    pub version: String,
-    pub block_header: BeaconBlockHeader,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct AttestationRequest {
-    pub fork_info: ForkInfo,
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub signingRoot: Root,
-    pub attestation: AttestationData,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct RandaoRevealRequest {
-    pub fork_info: ForkInfo,
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub signingRoot: Root,
-    pub randao_reveal: RandaoReveal,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct AggregateAndProofRequest {
-    pub fork_info: ForkInfo,
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub signingRoot: Root,
-    pub aggregate_and_proof: AggregateAndProof,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct AggregationSlotRequest {
-    pub fork_info: ForkInfo,
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub signingRoot: Root,
-    pub aggregation_slot: AggregationSlot,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct DepositRequest {
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub signingRoot: Root,
-    pub deposit: DepositData,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct VoluntaryExitRequest {
-    pub fork_info: ForkInfo,
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub signingRoot: Root,
-    pub voluntary_exit: VoluntaryExit,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct SyncCommitteeMessageRequest {
-    pub fork_info: ForkInfo,
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub signingRoot: Root,
-    pub sync_committee_message: SyncCommitteeMessage,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct SyncCommitteeSelectionProofRequest {
-    pub fork_info: ForkInfo,
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub signingRoot: Root,
-    pub sync_aggregator_selection_data: SyncAggregatorSelectionData,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct SyncCommitteeContributionAndProofRequest {
-    pub fork_info: ForkInfo,
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub signingRoot: Root,
-    pub contribution_and_proof: ContributionAndProof,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct ValidatorRegistrationRequest {
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub signingRoot: Root,
-    pub validator_registration: ValidatorRegistration,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(tag = "type")]
-pub enum BLSSignMsg {
-    BLOCK(BlockRequest),
-    BLOCK_V2(BlockV2Request),
-    ATTESTATION(AttestationRequest),
-    RANDAO_REVEAL(RandaoRevealRequest),
-    AGGREGATE_AND_PROOF(AggregateAndProofRequest),
-    AGGREGATION_SLOT(AggregationSlotRequest),
-    DEPOSIT(DepositRequest),
-    VOLUNTARY_EXIT(VoluntaryExitRequest),
-    SYNC_COMMITTEE_MESSAGE(SyncCommitteeMessageRequest),
-    SYNC_COMMITTEE_SELECTION_PROOF(SyncCommitteeSelectionProofRequest),
-    SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF(SyncCommitteeContributionAndProofRequest),
-    VALIDATOR_REGISTRATION(ValidatorRegistrationRequest),
-}
 
 /// Handler for BLOCK type
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#signature
@@ -735,4 +652,201 @@ pub async fn secure_sign_bls(
             ))
         }
     }
+}
+
+
+
+#[cfg(test)]
+pub mod mock_requests {
+    pub fn mock_attestation_request(src_epoch: &str, tgt_epoch: &str) -> String {
+        let req = format!(r#"
+        {{
+            "type": "ATTESTATION",
+            "fork_info":{{
+                "fork":{{
+                   "previous_version":"0x00000001",
+                   "current_version":"0x00000001",
+                   "epoch":"0"
+                }},
+                "genesis_validators_root":"0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69"
+            }},
+            "signingRoot": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69",
+            "attestation": {{
+                "slot": "255",
+                "index": "65535",
+                "beacon_block_root": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69",
+                "source": {{
+                    "epoch": "{src_epoch}",
+                    "root": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69"
+                }},
+                "target": {{
+                    "epoch": "{tgt_epoch}",
+                    "root": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69"
+                }}
+            }}
+        }}"#);
+        // println!("{req}");
+        req
+    }
+
+    pub fn mock_propose_block_request(slot: &str) -> String {
+        let req = format!(r#"
+            {{
+               "type":"BLOCK",
+               "fork_info":{{
+                  "fork":{{
+                     "previous_version":"0x00000001",
+                     "current_version":"0x00000001",
+                     "epoch":"0"
+                  }},
+                  "genesis_validators_root":"0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69"
+               }},
+               "block":{{
+                  "slot":"{slot}",
+                  "proposer_index":"5",
+                  "parent_root":"0xb2eedb01adbd02c828d5eec09b4c70cbba12ffffba525ebf48aca33028e8ad89",
+                  "state_root":"0x2b530d6262576277f1cc0dbe341fd919f9f8c5c92fc9140dff6db4ef34edea0d",
+                  "body":{{
+                     "randao_reveal":"0xa686652aed2617da83adebb8a0eceea24bb0d2ccec9cd691a902087f90db16aa5c7b03172a35e874e07e3b60c5b2435c0586b72b08dfe5aee0ed6e5a2922b956aa88ad0235b36dfaa4d2255dfeb7bed60578d982061a72c7549becab19b3c12f",
+                     "eth1_data":{{
+                        "deposit_root":"0x6a0f9d6cb0868daa22c365563bb113b05f7568ef9ee65fdfeb49a319eaf708cf",
+                        "deposit_count":"8",
+                        "block_hash":"0x4242424242424242424242424242424242424242424242424242424242424242"
+                     }},
+                     "graffiti":"0x74656b752f76302e31322e31302d6465762d6338316361363235000000000000",
+                     "proposer_slashings":[],
+                     "attester_slashings":[],
+                     "attestations":[],
+                     "deposits":[],
+                     "voluntary_exits":[]
+                  }}
+               }},
+               "signingRoot": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69"
+            }}"#);
+        req
+    }
+
+    pub fn mock_randao_reveal_request() -> String {
+        let req = format!(r#"
+            {{
+               "type":"RANDAO_REVEAL",
+               "fork_info":{{
+                  "fork":{{
+                     "previous_version":"0x00000000",
+                     "current_version":"0x00000000",
+                     "epoch":"0"
+                  }},
+                  "genesis_validators_root":"0x2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"
+               }},
+               "signingRoot": "0xbf70dbbbc83299fb877334eaeaefb32df44242c1bf078cdc1836dcc3282d4fbd",
+               "randao_reveal":{{
+                    "epoch": "0"
+               }}
+            }}"#);
+        // println!("{req}");
+        req
+    }
+
+    pub fn mock_aggregate_and_proof_request(src_epoch: &str, tgt_epoch: &str) -> String {
+        let type_: String = "AGGREGATE_AND_PROOF".into();
+        // let aggregation_bits: BitList<MAX_VALIDATORS_PER_COMMITTEE> = BitList::with_capacity(2048).unwrap();
+
+        let req = format!(r#"
+            {{
+               "type":"{type_}",
+               "fork_info":{{
+                  "fork":{{
+                     "previous_version":"0x00000001",
+                     "current_version":"0x00000001",
+                     "epoch":"0"
+                  }},
+                  "genesis_validators_root":"0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69"
+               }},
+               "signingRoot": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69",
+               "aggregate_and_proof":{{
+                    "aggregator_index": "5",
+                    "aggregate": {{
+                        "aggregation_bits": "0x1234",
+                        "data": {{
+                            "slot": "750",
+                            "index": "1",
+                            "beacon_block_root": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69",
+                            "source": {{
+                                "epoch": "{src_epoch}",
+                                "root": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69"
+                            }},
+                            "target": {{
+                                "epoch": "{tgt_epoch}",
+                                "root": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69"
+                            }}
+                        }},
+                        "signature": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69"
+                    }},
+                    "selection_proof": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69"
+               }}
+            }}"#);
+        req
+    }
+
+    pub fn mock_block_v2_bellatrix_request(slot: &str) -> String {
+        let req = format!(r#"
+        {{
+            "type": "BLOCK_V2",
+            "fork_info":{{
+                "fork":{{
+                   "previous_version":"0x80000070",
+                   "current_version":"0x80000071",
+                   "epoch":"750"
+                }},
+                "genesis_validators_root":"0x2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"
+             }},
+             "signingRoot": "0x2ebfc2d70944cc2fbff6d67c6d9cbb043d7fbe0a660d248b6e666ce110af418a",
+            "beacon_block": {{
+                "version": "BELLATRIX",
+                "block_header": {{
+                    "slot": "{slot}",
+                    "proposer_index": "0",
+                    "parent_root":"0x0000000000000000000000000000000000000000000000000000000000000000",
+                    "state_root":"0x0000000000000000000000000000000000000000000000000000000000000000",
+                    "body_root":"0xcd7c49966ebe72b1214e6d4733adf6bf06935c5fbc3b3ad08e84e3085428b82f"
+                }}
+            }}
+        }}"#);
+        req
+    }
+
+
+    pub fn mock_validator_registration_request() -> String {
+        let req = format!(r#"
+        {{
+            "type": "VALIDATOR_REGISTRATION",
+            "signingRoot": "0x139d59dbb1770fdc582ff75193720352ccc76131e37ac69d0c10e7416f3f3050",
+            "validator_registration": {{
+                "fee_recipient": "0x2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a",
+                "gas_limit": "30000000",
+                "timestamp":"100",
+                "pubkey": "0x8349434ad0700e79be65c0c7043945df426bd6d7e288c16671df69d822344f1b0ce8de80360a50550ad782b68035cb18"
+            }}
+        }}"#);
+        req
+    }
+
+
+    pub fn mock_aggregation_slot_request() -> String {
+        unimplemented!()
+    }
+
+    pub fn mock_sync_committee_message_request() -> String {
+        unimplemented!()
+    }
+
+    pub fn mock_sync_committee_selection_proof_request() -> String {
+        unimplemented!()
+    }
+
+    pub fn mock_sync_committee_contribution_and_proof_request() -> String {
+        unimplemented!()
+    }
+
+
 }
