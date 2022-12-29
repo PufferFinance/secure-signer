@@ -73,6 +73,7 @@ impl ListKeysResponse {
 
 /// Runs all the logic to generate and save a new BLS key. Returns a `KeyGenResponse` on success.
 pub async fn bls_key_gen_service() -> Result<impl warp::Reply, warp::Rejection> {
+    println!("log: bls_key_gen_service()");
     let save_key = true;
     match bls_key_gen(save_key) {
         Ok(pk) => {
@@ -112,6 +113,7 @@ impl KeyGenResponse {
 
 /// Runs all the logic to generate and save a new ETH key. Returns a `KeyGenResponse` on success.
 pub async fn eth_key_gen_service() -> Result<impl warp::Reply, warp::Rejection> {
+    println!("log: eth_key_gen_service()");
     match eth_key_gen() {
         Ok(pk) => {
             let resp = KeyGenResponse::from_eth_key(pk);
@@ -265,6 +267,7 @@ pub fn decrypt_and_save_imported_bls_key(req: &KeyImportRequest) -> Result<()> {
 pub async fn bls_key_import_service(
     req: KeyImportRequest,
 ) -> Result<impl warp::Reply, warp::Rejection> {
+    println!("log: bls_key_import_service()");
     match decrypt_and_save_imported_bls_key(&req) {
         Ok(()) => {
             // The key has successfully been saved, formulate http response

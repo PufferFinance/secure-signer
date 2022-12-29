@@ -11,16 +11,10 @@ mod route_handlers;
 use warp::Filter;
 use std::fs;
 
-// use crate::eth_signing::slash_resistance_tests::setup_keypair;
-
 #[tokio::main]
 async fn main() {
     let port = std::env::args().nth(1).unwrap_or("3031".into()).parse::<u16>().expect("BAD PORT");
     println!("Starting SGX Secure-Signer: localhost:{}", port);
-
-    // TEMP
-    // fs::remove_dir_all("./etc");
-    // setup_keypair(); 
 
     let routes = 
 
