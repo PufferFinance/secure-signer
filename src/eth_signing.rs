@@ -346,21 +346,24 @@ mod spec_tests {}
 #[cfg(test)]
 pub mod slash_resistance_tests {
 
+    use crate::keys::new_keystore;
+
     use super::*;
     use std::fs;
+    use std::path::Path;
 
     /// hardcoded bls sk
     pub fn setup_keypair() -> String {
         // dummy key
         let sk_hex = hex::encode(&[85, 40, 245, 17, 84, 193, 234, 155, 24, 234, 181, 58, 171, 193, 209, 164, 120, 147, 10, 174, 189, 228, 119, 48, 181, 19, 117, 223, 2, 240, 7, 108,]);
         println!("DEBUG: using sk: {sk_hex}");
-        let sk = keys::bls_sk_from_hex(sk_hex.clone()).unwrap();
-
+        
         let sk = keys::bls_sk_from_hex(sk_hex.clone()).unwrap();
         let pk = sk.sk_to_pk();
         let pk_hex = hex::encode(pk.compress());
+        // save keystore
+        let name = new_keystore(Path::new("./etc/keys/bls_keys/generated/"), "pufifish", &pk_hex, &sk.serialize()).unwrap();
         println!("DEBUG: using pk: {pk_hex}");
-        keys::write_key(&format!("bls_keys/generated/{}", pk_hex), &sk_hex).unwrap();
         pk_hex
     }
 
@@ -413,7 +416,7 @@ pub mod slash_resistance_tests {
 
     #[test]
     fn test_propose_block_request() -> Result<()>{
-        let n = 50;
+        let n = 5;
         let (bls_pk_hex, sigs) = send_n_proposals(n);
         Ok(())
     }
@@ -421,7 +424,7 @@ pub mod slash_resistance_tests {
     #[test]
     #[should_panic]
     fn test_propose_block_prevents_slash_when_decreasing_slot() {
-        let n = 50;
+        let n = 5;
         let (bls_pk_hex, sigs) = send_n_proposals(n);
 
         // make a request with slot < n and expect panic
@@ -440,7 +443,7 @@ pub mod slash_resistance_tests {
     #[test]
     #[should_panic]
     fn test_propose_block_prevents_slash_when_non_increasing_slot() {
-        let n = 50;
+        let n = 5;
         let (bls_pk_hex, sigs) = send_n_proposals(n);
 
         // make a request with slot = n and expect panic
@@ -503,7 +506,7 @@ pub mod slash_resistance_tests {
 
     #[test]
     fn test_attestation_request() -> Result<()>{
-        let n = 50;
+        let n = 5;
         let (bls_pk_hex, sigs) = send_n_attestations(n);
         Ok(())
     }
@@ -511,7 +514,7 @@ pub mod slash_resistance_tests {
     #[test]
     #[should_panic]
     fn test_attestation_request_prevents_slash_when_decreasing_src_epoch(){
-        let n = 50;
+        let n = 5;
         let (bls_pk_hex, sigs) = send_n_attestations(n);
 
         // prev src epoch should be 50, but send 0
@@ -531,7 +534,7 @@ pub mod slash_resistance_tests {
     #[test]
     #[should_panic]
     fn test_attestation_request_prevents_slash_when_non_increasing_tgt_epoch(){
-        let n = 50;
+        let n = 5;
         let (bls_pk_hex, sigs) = send_n_attestations(n);
 
         // prev src epoch should be non-decreasing
@@ -554,7 +557,7 @@ pub mod slash_resistance_tests {
     #[test]
     #[should_panic]
     fn test_attestation_request_prevents_slash_when_decreasing_tgt_epoch(){
-        let n = 50;
+        let n = 5;
         let (bls_pk_hex, sigs) = send_n_attestations(n);
 
         // prev src epoch should be non-decreasing

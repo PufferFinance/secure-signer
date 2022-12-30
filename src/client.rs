@@ -25,19 +25,6 @@ use std::path::{Path, PathBuf};
 // use crate::remote_attesation::{fetch_dummy_evidence, epid_remote_attestation};
 use crate::route_handlers::{KeyGenResponse, KeyImportRequest, KeyImportResponse};
 
-fn load_keystore(keystore_path: String, keystore_password: String) -> Result<(String, String)> {
-    let sk_bytes = decrypt_key(Path::new(&keystore_path), &keystore_password).unwrap();
-    let pk = keys::bls_sk_from_hex(hex::encode(&sk_bytes))?.sk_to_pk();
-
-    let sk_hex = "0x".to_string() + &hex::encode(&sk_bytes);
-    let pk_hex = "0x".to_string() + &hex::encode(pk.compress());
-    println!(
-        "DEBUG loaded keystore: public key: {:?}, private_key: {:?}",
-        pk_hex, sk_hex
-    );
-    Ok((sk_hex, pk_hex))
-}
-
 pub async fn post_request<T: Serialize>(url: &String, body: T) -> Result<reqwest::Response> {
     let client = reqwest::Client::new();
     client
@@ -208,7 +195,7 @@ async fn main() {
     // ------- for importing -------
     // Load validator keys
     let (client_bls_sk_hex, client_bls_pk_hex) =
-        load_keystore(keystore_path, keystore_password.clone()).unwrap();
+        keys::load_keystore(keystore_path, keystore_password.clone()).unwrap();
 
     // request a new ETH key from Secure-Signer
     let ss_eth_pk_hex = get_new_pk(host.clone()).await.unwrap();
@@ -246,12 +233,12 @@ async fn main() {
     // Build deposit JSON
     let dd = format!(
         r#"
-    {{
+    [{{
         "pubkey": "{client_bls_pk_hex}",
         "withdrawal_credentials": "{withdrawal_credentials}",
         "amount": "32000000000",
         "signature": "{deposit_sig}"
-    }}"#
+    }}]"#
     );
 
     fs::write(dir.join("deposit_data.json"), dd).unwrap();
