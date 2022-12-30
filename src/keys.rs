@@ -129,7 +129,7 @@ fn save_eth_key(sk: EthSecretKey, pk: EthPublicKey) -> Result<EthPublicKey> {
 /// Generates a new BLS secret key from randomness
 pub fn new_bls_key() -> Result<SecretKey> {
     // rng
-    let mut rng = ChaCha20Rng::from_entropy();
+    let mut rng = rand::thread_rng();
     let mut ikm = [0u8; 32];
     rng.fill_bytes(&mut ikm);
 

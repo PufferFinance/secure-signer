@@ -3,7 +3,6 @@ use blst::min_pk::PublicKey;
 use openssl::stack::{Stack, StackRef};
 use openssl::x509::{X509, X509StoreContext};
 use openssl::x509::store::X509StoreBuilder;
-use rand::AsByteSliceMut;
 use serde::Deserialize;
 use serde_derive::{Serialize};
 use ecies::PublicKey as EthPublicKey;

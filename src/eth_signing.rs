@@ -152,6 +152,7 @@ pub fn secure_sign<T: Encode + TreeHash>(
     let root: Root = compute_signing_root(msg, domain);
     println!("signing root: {:?}", hex::encode(root));
     let sig = keys::bls_sign(&pk_hex, &root)?;
+    println!("sig: {:?}", hex::encode(sig.to_bytes()));
     Ok(<_>::from(sig.to_bytes().to_vec()))
 }
 
@@ -312,7 +313,7 @@ pub fn get_contribution_and_proof_signature(
 
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#submit-deposit
 /// Modified to adhere to https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing
-pub fn get_deposit_signature(pk_hex: String, deposit_message: DepositData) -> Result<BLSSignature> {
+pub fn get_deposit_signature(pk_hex: String, deposit_message: DepositMessage) -> Result<BLSSignature> {
     // Fork-agnostic domain since deposits are valid across forks
     let domain = compute_domain(DOMAIN_DEPOSIT, None, None);
     secure_sign(pk_hex, deposit_message, domain)

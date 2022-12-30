@@ -107,3 +107,11 @@ Compatible with [Web3Signer's API endpoint](https://consensys.github.io/web3sign
 - [ ] run on Goerli and Shandong
 - [ ] run above but in enclave environment
 - [ ] dockerization / documentation
+
+
+# client.rs
+- usage:
+```
+cargo run --bin client 3031 0x5528f51154c1ea9b18eab53aabc1d1a478930aaebde47730b51375df02f0076c
+```
+Running this binary with the above command will securely import the 33-byte, hex-encoded) BLS key `0x5528f51154c1ea9b18eab53aabc1d1a478930aaebde47730b51375df02f0076c` into Secure-Signer on `localhost:3031`.

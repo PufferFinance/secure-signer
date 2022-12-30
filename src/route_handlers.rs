@@ -337,6 +337,7 @@ pub fn handle_aggregation_slot_type(
 /// Handler for DEPOSIT type
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#submit-deposit
 pub fn handle_deposit_type(req: DepositRequest, bls_pk_hex: String) -> Result<BLSSignature> {
+    println!("got deposit type");
     get_deposit_signature(bls_pk_hex, req.deposit)
 }
 
@@ -389,11 +390,22 @@ pub fn handle_validator_registration_type(
     get_validator_registration_signature(bls_pk_hex, req.validator_registration)
 }
 
+#[derive(Deserialize, Serialize, Debug)]
+pub struct SecureSignerSig {
+    pub signature: String
+}
+
+impl SecureSignerSig {
+    pub fn new(sig: &[u8]) -> Self {
+        SecureSignerSig {
+            signature: format!("0x{}", hex::encode(sig))
+        }
+    }
+}
+
 /// Return hex-encoded signature for easy JSON response
-pub fn success_response(sig: &[u8]) -> HashMap<&str, String> {
-    let mut resp = HashMap::new();
-    resp.insert("signature", format!("0x{}", hex::encode(sig)));
-    resp
+pub fn success_response(sig: &[u8]) -> SecureSignerSig {
+    SecureSignerSig::new(sig)
 }
 
 /// Signs the specific type of request
@@ -404,7 +416,9 @@ pub async fn secure_sign_bls(
 ) -> Result<impl warp::Reply, warp::Rejection> {
     // strip 0x prefix if exists
     let bls_pk_hex = bls_pk_hex.strip_prefix("0x").unwrap_or(&bls_pk_hex).into();
-    println!("{:?}", req);
+    println!("Signing pk {:#?}", bls_pk_hex);
+    println!("{:#?}", req);
+
 
     // Match over each possible datatype
     match serde_json::from_slice(&req) {
@@ -412,7 +426,7 @@ pub async fn secure_sign_bls(
             // handle "BLOCK" type request
             match handle_block_type(req, bls_pk_hex) {
                 Ok(sig) => Ok(reply::with_status(
-                    reply::json(&success_response(&sig)),
+                    reply::json::<SecureSignerSig>(&success_response(&sig)),
                     StatusCode::OK,
                 )),
                 // return 412 error
@@ -436,7 +450,7 @@ pub async fn secure_sign_bls(
             // handle "BLOCK_V2" type request
             match handle_block_v2_type(req, bls_pk_hex) {
                 Ok(sig) => Ok(reply::with_status(
-                    reply::json(&success_response(&sig)),
+                    reply::json::<SecureSignerSig>(&success_response(&sig)),
                     StatusCode::OK,
                 )),
                 // return 412 error
@@ -460,7 +474,7 @@ pub async fn secure_sign_bls(
             // handle "ATTESTATION" type request
             match handle_attestation_type(req, bls_pk_hex) {
                 Ok(sig) => Ok(reply::with_status(
-                    reply::json(&success_response(&sig)),
+                    reply::json::<SecureSignerSig>(&success_response(&sig)),
                     StatusCode::OK,
                 )),
                 // return 412 error
@@ -484,7 +498,7 @@ pub async fn secure_sign_bls(
             // handle "RANDAO_REVEAL" type request
             match handle_randao_reveal_type(req, bls_pk_hex) {
                 Ok(sig) => Ok(reply::with_status(
-                    reply::json(&success_response(&sig)),
+                    reply::json::<SecureSignerSig>(&success_response(&sig)),
                     StatusCode::OK,
                 )),
                 // return 500 error
@@ -505,7 +519,7 @@ pub async fn secure_sign_bls(
             // handle "AGGREGATE_AND_PROOF" type request
             match handle_aggregate_and_proof_type(req, bls_pk_hex) {
                 Ok(sig) => Ok(reply::with_status(
-                    reply::json(&success_response(&sig)),
+                    reply::json::<SecureSignerSig>(&success_response(&sig)),
                     StatusCode::OK,
                 )),
                 // return 500 error
@@ -523,7 +537,7 @@ pub async fn secure_sign_bls(
             // handle "AGGREGATION_SLOT" type request
             match handle_aggregation_slot_type(req, bls_pk_hex) {
                 Ok(sig) => Ok(reply::with_status(
-                    reply::json(&success_response(&sig)),
+                    reply::json::<SecureSignerSig>(&success_response(&sig)),
                     StatusCode::OK,
                 )),
                 // return 500 error
@@ -540,10 +554,17 @@ pub async fn secure_sign_bls(
         Ok(BLSSignMsg::DEPOSIT(req)) => {
             // handle "DEPOSIT" type request
             match handle_deposit_type(req, bls_pk_hex) {
-                Ok(sig) => Ok(reply::with_status(
-                    reply::json(&success_response(&sig)),
-                    StatusCode::OK,
-                )),
+                // Ok(sig) => Ok(reply::with_status(
+                //     reply::json::<SecureSignerSig>(&success_response(&sig)),
+                //     StatusCode::OK,
+                // )),
+                Ok(sig) => {
+                    let s = &success_response(&sig);
+                    println!("got s: {:?}", s);
+                    Ok(reply::with_status(
+                    reply::json::<SecureSignerSig>(s),
+                    StatusCode::OK))
+                },
                 // return 500 error
                 Err(e) => {
                     let mut resp = HashMap::new();
@@ -559,7 +580,7 @@ pub async fn secure_sign_bls(
             // handle "VOLUNTARY_EXIT" type request
             match handle_voluntary_exit_type(req, bls_pk_hex) {
                 Ok(sig) => Ok(reply::with_status(
-                    reply::json(&success_response(&sig)),
+                    reply::json::<SecureSignerSig>(&success_response(&sig)),
                     StatusCode::OK,
                 )),
                 // return 500 error
@@ -577,7 +598,7 @@ pub async fn secure_sign_bls(
             // handle "SYNC_COMMITTEE_MESSAGE" type request
             match handle_sync_committee_msg_type(req, bls_pk_hex) {
                 Ok(sig) => Ok(reply::with_status(
-                    reply::json(&success_response(&sig)),
+                    reply::json::<SecureSignerSig>(&success_response(&sig)),
                     StatusCode::OK,
                 )),
                 // return 500 error
@@ -595,7 +616,7 @@ pub async fn secure_sign_bls(
             // handle "SYNC_COMMITTEE_SELECTION_PROOF" type request
             match handle_sync_committee_selection_proof_type(req, bls_pk_hex) {
                 Ok(sig) => Ok(reply::with_status(
-                    reply::json(&success_response(&sig)),
+                    reply::json::<SecureSignerSig>(&success_response(&sig)),
                     StatusCode::OK,
                 )),
                 // return 500 error
@@ -613,7 +634,7 @@ pub async fn secure_sign_bls(
             // handle "SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF" type request
             match handle_sync_committee_contribution_and_proof_type(req, bls_pk_hex) {
                 Ok(sig) => Ok(reply::with_status(
-                    reply::json(&success_response(&sig)),
+                    reply::json::<SecureSignerSig>(&success_response(&sig)),
                     StatusCode::OK,
                 )),
                 // return 500 error
@@ -631,7 +652,7 @@ pub async fn secure_sign_bls(
             // handle "VALIDATOR_REGISTRATION" type request
             match handle_validator_registration_type(req, bls_pk_hex) {
                 Ok(sig) => Ok(reply::with_status(
-                    reply::json(&success_response(&sig)),
+                    reply::json::<SecureSignerSig>(&success_response(&sig)),
                     StatusCode::OK,
                 )),
                 // return 500 error
@@ -646,6 +667,7 @@ pub async fn secure_sign_bls(
             }
         }
         Err(e) => {
+            println!("LOG - catchall error");
             // catchall error if the request is not valid
             let mut resp = HashMap::new();
             resp.insert("error", format!("Type not in ['BLOCK', 'ATTESTATION', RANDAO_REVEAL', 'AGGREGATION_SLOT', 'AGGREGATE_AND_PROOF', 'DEPOSIT','VOLUNTARY_EXIT', 'SYNC_COMMITEE_MESSAGE', 'SYNC_COMMITEE_SELECTION_PROOF', 'SYNC_COMMITEE_CONTRIBUTION_AND_PROOF' 'VALIDATOR_REGISTRATION'], {:?}", e));
@@ -829,6 +851,21 @@ pub mod mock_requests {
                 "gas_limit": "30000000",
                 "timestamp":"100",
                 "pubkey": "0x8349434ad0700e79be65c0c7043945df426bd6d7e288c16671df69d822344f1b0ce8de80360a50550ad782b68035cb18"
+            }}
+        }}"#);
+        req
+    }
+
+
+    pub fn mock_deposit_request() -> String {
+        let req = format!(r#"
+        {{
+            "type": "DEPOSIT",
+            "signingRoot": "0x139d59dbb1770fdc582ff75193720352ccc76131e37ac69d0c10e7416f3f3050",
+            "deposit": {{
+                "pubkey": "0x8996c1117cb75927eb53db74b25c3668c0f7b08d34cdb8de1062bef578fb1c1e32032e0555e9f5be47cd5e8f0f2705d5",
+                "withdrawal_credentials": "0x75362a41a82133d71eee01e602ad564c73590557bb7c994cf9be5620d2023a58",
+                "amount":"32000000000"
             }}
         }}"#);
         req

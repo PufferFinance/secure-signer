@@ -280,6 +280,21 @@ mod api_signing_tests {
         assert_eq!(resp.status(), 200);
     }
 
+    #[tokio::test]
+    async fn test_bls_sign_deposit_type() {
+        // clear state
+        fs::remove_dir_all("./etc");
+
+        // new keypair
+        let bls_pk_hex = setup_keypair();
+
+        // mock data for RANDAO_REVEAL request
+        let json_req = mock_deposit_request();
+        let resp = mock_secure_sign_bls_route(&bls_pk_hex, &json_req).await;
+        println!("{:?}", resp);
+        assert_eq!(resp.status(), 200);
+    }
+
     
     // todo
     // async fn test_bls_sign_route_aggregation_slot_type() {}
@@ -291,7 +306,7 @@ mod api_signing_tests {
 
 
 #[cfg(test)]
-mod tests {
+mod key_management_tests {
     use super::*;
     use crate::keys::{new_bls_key, new_eth_key, CIPHER_SUITE, eth_pk_from_hex};
     use crate::remote_attesation::{AttestationEvidence, fetch_dummy_evidence};

@@ -8,17 +8,35 @@ mod remote_attesation;
 mod route_handlers;
 mod routes;
 
+use eth_types::{BLSSignMsg, DepositData, DepositRequest};
+use route_handlers::SecureSignerSig;
+
 use anyhow::{bail, Context, Result};
-use blst::min_pk::SecretKey;
+use blst::min_pk::{PublicKey, SecretKey};
 use ecies::{decrypt, encrypt};
 use reqwest;
 use serde::Serialize;
+
+use eth_keystore::{decrypt_key, new};
+use std::collections::HashMap;
 use std::fs;
-use warp::Filter;
-use warp::{http::StatusCode, reply};
+use std::path::{Path, PathBuf};
+
 // use crate::remote_attesation::{fetch_dummy_evidence, epid_remote_attestation};
 use crate::route_handlers::{KeyGenResponse, KeyImportRequest, KeyImportResponse};
-// use crate::keys::{eth_key_gen, pk_to_eth_addr, read_eth_key, new_eth_key, write_key};
+
+fn load_keystore(keystore_path: String, keystore_password: String) -> Result<(String, String)> {
+    let sk_bytes = decrypt_key(Path::new(&keystore_path), &keystore_password).unwrap();
+    let pk = keys::bls_sk_from_hex(hex::encode(&sk_bytes))?.sk_to_pk();
+
+    let sk_hex = "0x".to_string() + &hex::encode(&sk_bytes);
+    let pk_hex = "0x".to_string() + &hex::encode(pk.compress());
+    println!(
+        "DEBUG loaded keystore: public key: {:?}, private_key: {:?}",
+        pk_hex, sk_hex
+    );
+    Ok((sk_hex, pk_hex))
+}
 
 pub async fn post_request<T: Serialize>(url: &String, body: T) -> Result<reqwest::Response> {
     let client = reqwest::Client::new();
@@ -95,6 +113,84 @@ async fn import_bls_key(
     Ok(resp)
 }
 
+fn new_bls_keystore(dir: &Path, name: Option<&str>, password: &str) -> Result<PublicKey> {
+    let mut rng = rand::thread_rng();
+    let (private_key, fname) = new(&dir, &mut rng, password, name)?;
+    println!("New keystore: {fname}");
+    // get the public key
+    let pk = match keys::bls_sk_from_hex(hex::encode(&private_key)) {
+        Ok(sk) => sk.sk_to_pk(),
+        Err(e) => {
+            // sometimes generates bad encoded bls key, keep trying
+            fs::remove_file(dir.join(&fname))?;
+            new_bls_keystore(dir, name, password)?
+        }
+    };
+
+    // println!("New keystore: {fname}");
+    println!(
+        "DEBUG new keystore: public key: {:?}, private_key: {:?}",
+        hex::encode(pk.compress()),
+        hex::encode(private_key)
+    );
+    Ok(pk)
+}
+
+fn new_withdrawal_key(dir: &Path, password: &str) -> Result<(String, String)> {
+    let pk = new_bls_keystore(dir, None, password)?;
+    let withdrawal_bls_pk_hex = "0x".to_string() + &hex::encode(pk.compress());
+    let withdrawal_credentials = "0x".to_string() + &hex::encode(&keys::keccak(&pk.compress())?);
+    Ok((withdrawal_bls_pk_hex, withdrawal_credentials))
+}
+
+/// Makes a Reqwest POST request to the /eth/v1/keystores API endpoint to get a KeyImportResponse
+pub async fn deposit_post_request(
+    pk_hex: String,
+    req: String,
+    host: String,
+) -> Result<SecureSignerSig> {
+    let req: serde_json::Value = serde_json::from_str(&req).unwrap();
+    println!("{:#?}", req);
+    let url = format!("{host}/api/v1/eth2/sign/{pk_hex}");
+    let resp = post_request(&url, req)
+        .await
+        .with_context(|| format!("failed POST request to URL: {}", url))?
+        .json::<SecureSignerSig>()
+        .await
+        .with_context(|| format!("could not parse json response from  URL: {}", url))?;
+    println!("{:#?}", resp);
+    Ok(resp)
+}
+
+fn build_deposit_msg(validator_pk_hex: &String, withdrawal_credentials: &String) -> Result<String> {
+    // let fork_version = "00001020";
+    // "genesis_fork_version": "{fork_version}"
+    let amount: u64 = 32000000000;
+
+    let req = format!(
+        r#"
+    {{
+        "type": "DEPOSIT",  
+        "signingRoot": "0x139d59dbb1770fdc582ff75193720352ccc76131e37ac69d0c10e7416f3f3050",
+        "deposit": {{
+            "pubkey": "{validator_pk_hex}",
+            "withdrawal_credentials": "{withdrawal_credentials}",
+            "amount":"{amount}"
+        }}
+    }}"#
+    );
+    Ok(req)
+}
+
+pub async fn get_deposit_signature(
+    pk_hex: String,
+    req: String,
+    host: &str,
+) -> Result<SecureSignerSig> {
+    deposit_post_request(pk_hex, req, host.to_string()).await
+}
+
+const KEYSTORE_DIR: &str = "keys";
 
 #[tokio::main]
 async fn main() {
@@ -104,32 +200,60 @@ async fn main() {
         .parse::<u16>()
         .expect("BAD PORT");
 
-    println!("client connecting to Secure-Signer on port {}", port);
+    println!("Connecting to Secure-Signer on port {}", port);
+    let host = format!("http://localhost:{port}");
+    let keystore_path = std::env::args().nth(2).unwrap();
+    let keystore_password = std::env::args().nth(3).unwrap();
 
-    // future - get from password protected keystore
-    let client_bls_sk_hex = std::env::args()
-        .nth(2)
-        .unwrap_or("0x5528f51154c1ea9b18eab53aabc1d1a478930aaebde47730b51375df02f0076c".into());
-    println!("DEBUG: using sk: {client_bls_sk_hex}");
-
-    // check the status of Secure-Signer
-    // assert!(upcheck(host)) // TODO
-
-    // todo get from cli
-    let require_remote_attestation = false;
+    // ------- for importing -------
+    // Load validator keys
+    let (client_bls_sk_hex, client_bls_pk_hex) =
+        load_keystore(keystore_path, keystore_password.clone()).unwrap();
 
     // request a new ETH key from Secure-Signer
-    let host = format!("http://localhost:{port}");
     let ss_eth_pk_hex = get_new_pk(host.clone()).await.unwrap();
     println!("Secure-Signer ETH public key: {ss_eth_pk_hex}");
 
-    if require_remote_attestation {
-        // todo
-    }
+    // if require_remote_attestation {
+    //     // todo
+    // }
 
     // securely import BLS private key into Secure-Signer
-    let returned_bls_pk = import_bls_key(host, client_bls_sk_hex, ss_eth_pk_hex)
+    let returned_bls_pk = import_bls_key(host.clone(), client_bls_sk_hex, ss_eth_pk_hex)
         .await
         .unwrap();
     println!("Secure-Signer registered BLS pk: {:?}", returned_bls_pk);
+    // ------- for importing -------
+
+    // ------- for deposit -------
+    // Create withdrawal credentials
+    let dir = Path::new(KEYSTORE_DIR);
+    let (withdrawal_pk_hex, withdrawal_credentials) =
+        new_withdrawal_key(dir, &keystore_password).unwrap();
+    println!(
+        "Created withdrawal key {:?} with credentials {:?}",
+        withdrawal_pk_hex, withdrawal_credentials
+    );
+
+    // Send DEPOSIT message
+    let deposit_msg = build_deposit_msg(&client_bls_pk_hex, &withdrawal_credentials).unwrap();
+    println!("{:?}", deposit_msg);
+    let deposit_sig = get_deposit_signature(client_bls_pk_hex.clone(), deposit_msg, &host)
+        .await
+        .unwrap()
+        .signature;
+
+    // Build deposit JSON
+    let dd = format!(
+        r#"
+    {{
+        "pubkey": "{client_bls_pk_hex}",
+        "withdrawal_credentials": "{withdrawal_credentials}",
+        "amount": "32000000000",
+        "signature": "{deposit_sig}"
+    }}"#
+    );
+
+    fs::write(dir.join("deposit_data.json"), dd).unwrap();
+    // ------- for deposit -------
 }

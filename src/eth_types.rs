@@ -238,6 +238,18 @@ pub struct Eth1Data {
 #[derive(Debug, Deserialize, Serialize, Encode, Decode, TreeHash, Clone)]
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#depositdata
 /// used by Web3Signer type = "DEPOSIT"
+pub struct DepositMessage {
+    #[serde(deserialize_with = "from_bls_pk_hex")]
+    pub pubkey: BLSPubkey,
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub withdrawal_credentials: Bytes32,
+    #[serde(deserialize_with = "from_u64_string")]
+    pub amount: Gwei,
+}
+
+#[derive(Debug, Deserialize, Serialize, Encode, Decode, TreeHash, Clone)]
+/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#depositdata
+/// used by Web3Signer type = "DEPOSIT"
 pub struct DepositData {
     #[serde(deserialize_with = "from_bls_pk_hex")]
     pub pubkey: BLSPubkey,
@@ -248,6 +260,7 @@ pub struct DepositData {
     #[serde(deserialize_with = "from_bls_sig_hex")]
     pub signature: BLSSignature, // Signing over DepositMessage
 }
+
 
 #[derive(Debug, Deserialize, Serialize, Encode, Decode, TreeHash, Clone)]
 pub struct Deposit {
@@ -475,7 +488,7 @@ pub struct AggregationSlotRequest {
 pub struct DepositRequest {
     #[serde(with = "SerHex::<StrictPfx>")]
     pub signingRoot: Root,
-    pub deposit: DepositData,
+    pub deposit: DepositMessage,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -578,19 +591,17 @@ mod serialization_tests {
     }
 
     #[test]
-    fn test_deserialize_deposit_data() -> Result<()> {
+    fn test_deserialize_deposit_message() -> Result<()> {
         let req = format!(r#"
             {{
                 "pubkey": "0x8349434ad0700e79be65c0c7043945df426bd6d7e288c16671df69d822344f1b0ce8de80360a50550ad782b68035cb18",
                 "withdrawal_credentials": "0x04700007fabc8282644aed6d1c7c9e21d38a03a0c4ba193f3afe428824b3a673",
-                "amount":"10000",
-                "signature": "0xb3baa751d0a9132cfe93e4e3d5ff9075111100e3789dca219ade5a24d27e19d16b3353149da1833e9b691bb38634e8dc04469be7032132906c927d7e1a49b414730612877bc6b2810c8f202daf793d1ab0d6b5cb21d52f9e52e883859887a5d9"
+                "amount":"10000"
             }}"#);
 
-        let dd: DepositData = serde_json::from_str(&req)?;
+        let dd: DepositMessage = serde_json::from_str(&req)?;
         assert_eq!(dd.withdrawal_credentials, [4, 112, 0, 7, 250, 188, 130, 130, 100, 74, 237, 109, 28, 124, 158, 33, 211, 138, 3, 160, 196, 186, 25, 63, 58, 254, 66, 136, 36, 179, 166, 115]);
         assert_eq!(dd.amount, 10000); 
-        assert_eq!(dd.signature[..], [179, 186, 167, 81, 208, 169, 19, 44, 254, 147, 228, 227, 213, 255, 144, 117, 17, 17, 0, 227, 120, 157, 202, 33, 154, 222, 90, 36, 210, 126, 25, 209, 107, 51, 83, 20, 157, 161, 131, 62, 155, 105, 27, 179, 134, 52, 232, 220, 4, 70, 155, 231, 3, 33, 50, 144, 108, 146, 125, 126, 26, 73, 180, 20, 115, 6, 18, 135, 123, 198, 178, 129, 12, 143, 32, 45, 175, 121, 61, 26, 176, 214, 181, 203, 33, 213, 47, 158, 82, 232, 131, 133, 152, 135, 165, 217]); 
         Ok(())
     }
 
