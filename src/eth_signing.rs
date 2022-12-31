@@ -313,10 +313,31 @@ pub fn get_contribution_and_proof_signature(
 
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#submit-deposit
 /// Modified to adhere to https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing
-pub fn get_deposit_signature(pk_hex: String, deposit_message: DepositMessage) -> Result<BLSSignature> {
-    // Fork-agnostic domain since deposits are valid across forks
-    let domain = compute_domain(DOMAIN_DEPOSIT, None, None);
-    secure_sign(pk_hex, deposit_message, domain)
+pub fn get_deposit_signature(pk_hex: String, deposit_message: DepositMessage, fork_version: Version) -> Result<DepositResponse> {
+    let domain = compute_domain(DOMAIN_DEPOSIT, Some(fork_version), None); 
+    let sig = secure_sign(pk_hex, deposit_message.clone(), domain)?;
+
+    let dm_root = deposit_message.tree_hash_root().to_fixed_bytes();
+
+    let dd = DepositData {
+        pubkey: deposit_message.pubkey.clone(),
+        withdrawal_credentials: deposit_message.withdrawal_credentials,
+        amount: deposit_message.amount,
+        signature: sig.clone(),
+    };
+
+    let dd_root = dd.tree_hash_root().to_fixed_bytes();
+
+    let dr = DepositResponse {
+        pubkey: hex::encode(&deposit_message.pubkey[..]),
+        withdrawal_credentials: hex::encode(deposit_message.withdrawal_credentials),
+        amount: deposit_message.amount,
+        signature: hex::encode(&sig[..]),
+        deposit_message_root: hex::encode(dm_root),
+        deposit_data_root: hex::encode(dd_root),
+    };
+
+    Ok(dr)
 }
 
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#voluntary-exits

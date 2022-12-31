@@ -256,6 +256,7 @@ pub fn bls_sign(pk_hex: &String, msg: &[u8]) -> Result<Signature> {
             Err(e) => bail!("Secret key for pk: {} not found", pk_hex),
         },
     };
+    println!("DEBUG: bls_sign() got sk from keystore: {}", hex::encode(sk.serialize()));
 
     let exp_pk = bls_pk_from_hex(pk_hex.to_owned())
         .with_context(|| format!("failed to read pk: {} in bls_sign()", pk_hex))?;
@@ -264,7 +265,6 @@ pub fn bls_sign(pk_hex: &String, msg: &[u8]) -> Result<Signature> {
     if sk.sk_to_pk() != exp_pk {
         bail!("Mismatch with input and derived pk");
     }
-    println!("DEBUG: sk recovered {:?}", sk);
 
     // sign the message
     let sig = sk.sign(msg, CIPHER_SUITE, &[]);
@@ -289,6 +289,7 @@ pub fn write_key(fname: &String, sk_hex: &String) -> Result<()> {
 pub fn read_bls_key(pk_hex: &String) -> Result<SecretKey> {
     let pk_hex: String = pk_hex.strip_prefix("0x").unwrap_or(&pk_hex).into();
     let file_path: PathBuf = ["./etc/keys/bls_keys/", pk_hex.as_str()].iter().collect();
+    println!("Reading BLS keystore: {:?}", file_path);
     let sk_rec_bytes = decrypt_key(file_path, "pufifish")?; // todo
     let sk_res = SecretKey::from_bytes(&sk_rec_bytes);
 

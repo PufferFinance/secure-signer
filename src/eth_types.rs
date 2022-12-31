@@ -261,7 +261,6 @@ pub struct DepositData {
     pub signature: BLSSignature, // Signing over DepositMessage
 }
 
-
 #[derive(Debug, Deserialize, Serialize, Encode, Decode, TreeHash, Clone)]
 pub struct Deposit {
     pub proof: FixedVector<Bytes32, DEPOSIT_CONTRACT_TREE_DEPTH_PLUS_ONE>, // Merkle path to deposit root
@@ -489,6 +488,19 @@ pub struct DepositRequest {
     #[serde(with = "SerHex::<StrictPfx>")]
     pub signingRoot: Root,
     pub deposit: DepositMessage,
+    #[serde(with = "SerHex::<StrictPfx>")]
+    pub genesis_fork_version: Version,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
+/// Custom response to work with https://launchpad.ethereum.org/en/upload-deposit-data
+pub struct DepositResponse {
+    pub pubkey: String,
+    pub withdrawal_credentials: String,
+    pub amount: Gwei,
+    pub signature: String, // Signing over DepositMessage
+    pub deposit_message_root: String,
+    pub deposit_data_root: String,
 }
 
 #[derive(Deserialize, Serialize, Debug)]

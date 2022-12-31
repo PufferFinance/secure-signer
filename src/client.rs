@@ -8,7 +8,7 @@ mod remote_attesation;
 mod route_handlers;
 mod routes;
 
-use eth_types::{BLSSignMsg, DepositData, DepositRequest};
+use eth_types::{DepositResponse};
 use route_handlers::SecureSignerSig;
 
 use anyhow::{bail, Context, Result};
@@ -135,23 +135,21 @@ pub async fn deposit_post_request(
     pk_hex: String,
     req: String,
     host: String,
-) -> Result<SecureSignerSig> {
+) -> Result<DepositResponse> {
     let req: serde_json::Value = serde_json::from_str(&req).unwrap();
     println!("{:#?}", req);
     let url = format!("{host}/api/v1/eth2/sign/{pk_hex}");
     let resp = post_request(&url, req)
         .await
         .with_context(|| format!("failed POST request to URL: {}", url))?
-        .json::<SecureSignerSig>()
+        .json::<DepositResponse>()
         .await
-        .with_context(|| format!("could not parse json response from  URL: {}", url))?;
+        .with_context(|| format!("could not parse json response from : {}", url))?;
     println!("{:#?}", resp);
     Ok(resp)
 }
 
-fn build_deposit_msg(validator_pk_hex: &String, withdrawal_credentials: &String) -> Result<String> {
-    // let fork_version = "00001020";
-    // "genesis_fork_version": "{fork_version}"
+fn build_deposit_msg(validator_pk_hex: &str, withdrawal_credentials: &str, fork_version: &str) -> Result<String> {
     let amount: u64 = 32000000000;
 
     let req = format!(
@@ -163,7 +161,8 @@ fn build_deposit_msg(validator_pk_hex: &String, withdrawal_credentials: &String)
             "pubkey": "{validator_pk_hex}",
             "withdrawal_credentials": "{withdrawal_credentials}",
             "amount":"{amount}"
-        }}
+        }},
+        "genesis_fork_version": "{fork_version}"
     }}"#
     );
     Ok(req)
@@ -173,7 +172,7 @@ pub async fn get_deposit_signature(
     pk_hex: String,
     req: String,
     host: &str,
-) -> Result<SecureSignerSig> {
+) -> Result<DepositResponse> {
     deposit_post_request(pk_hex, req, host.to_string()).await
 }
 
@@ -223,21 +222,33 @@ async fn main() {
     );
 
     // Send DEPOSIT message
-    let deposit_msg = build_deposit_msg(&client_bls_pk_hex, &withdrawal_credentials).unwrap();
+    let fork_version = "00001020";
+    let deposit_msg = build_deposit_msg(&client_bls_pk_hex, &withdrawal_credentials, fork_version).unwrap();
     println!("{:?}", deposit_msg);
-    let deposit_sig = get_deposit_signature(client_bls_pk_hex.clone(), deposit_msg, &host)
+    let deposit_resp = get_deposit_signature(client_bls_pk_hex.clone(), deposit_msg, &host)
         .await
-        .unwrap()
-        .signature;
+        .unwrap();
+    
+    let pubkey = deposit_resp.pubkey;
+    let withdrawal_credentials = deposit_resp.withdrawal_credentials;
+    let amount = deposit_resp.amount;
+    let signature = deposit_resp.signature;
+    let deposit_message_root = deposit_resp.deposit_message_root;
+    let deposit_data_root = deposit_resp.deposit_data_root;
 
-    // Build deposit JSON
+    // Build deposit JSON that works with https://goerli.launchpad.ethereum.org/en/upload-deposit-data
     let dd = format!(
         r#"
     [{{
-        "pubkey": "{client_bls_pk_hex}",
+        "pubkey": "{pubkey}",
         "withdrawal_credentials": "{withdrawal_credentials}",
-        "amount": "32000000000",
-        "signature": "{deposit_sig}"
+        "amount": {amount},
+        "signature": "{signature}",
+        "deposit_message_root": "{deposit_message_root}",
+        "deposit_data_root": "{deposit_data_root}",
+        "fork_version": "{fork_version}",
+        "network_name": "goerli",
+        "deposit_cli_version": "2.3.0"
     }}]"#
     );
 

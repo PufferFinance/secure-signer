@@ -2,7 +2,7 @@ use crate::eth_signing::*;
 use crate::eth_types::*;
 use crate::keys::{
     bls_key_gen, eth_key_gen, list_eth_keys, list_generated_bls_keys,
-    list_imported_bls_keys, read_eth_key, write_key,
+    list_imported_bls_keys, read_eth_key, write_key, new_keystore
 };
 use crate::remote_attesation::{epid_remote_attestation, AttestationEvidence};
 
@@ -13,6 +13,7 @@ use ecies::{decrypt, PublicKey as EthPublicKey};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use warp::{http::StatusCode, reply};
+use std::path::Path;
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct RemoteAttestationRequest {
@@ -243,6 +244,7 @@ pub fn decrypt_and_save_imported_bls_key(req: &KeyImportRequest) -> Result<()> {
     let ct_bls_sk_hex: String = req.ct_bls_sk_hex.strip_prefix("0x").unwrap_or(&req.ct_bls_sk_hex).into();
     let ct_bls_sk_bytes = hex::decode(&ct_bls_sk_hex)?;
     let bls_sk_bytes = decrypt(&sk.serialize(), &ct_bls_sk_bytes)?;
+    println!("decrypted imported sk: {}", hex::encode(&bls_sk_bytes));
     let bls_sk = match SecretKey::from_bytes(&bls_sk_bytes) {
         Ok(sk) => sk,
         Err(e) => bail!(
@@ -258,9 +260,13 @@ pub fn decrypt_and_save_imported_bls_key(req: &KeyImportRequest) -> Result<()> {
     }
 
     // save the bls key
-    let fname = format!("bls_keys/imported/{}", bls_pk_hex);
-    let bls_sk_hex = hex::encode(bls_sk.serialize());
-    write_key(&fname, &bls_sk_hex)
+    let password = "pufifish"; // todo
+    let name = new_keystore(Path::new("./etc/keys/bls_keys/imported/"), password, &bls_pk_hex, &bls_sk_bytes)?;
+    println!("Imported BLS keystore with pk: {name}");
+    Ok(())
+    // let fname = format!("bls_keys/imported/{}", bls_pk_hex);
+    // let bls_sk_hex = hex::encode(bls_sk.serialize());
+    // write_key(&fname, &bls_sk_hex)
 }
 
 /// Decrypts and saves an incoming encrypted BLS key. Returns a `KeyImportResponse` on success.
@@ -336,9 +342,10 @@ pub fn handle_aggregation_slot_type(
 
 /// Handler for DEPOSIT type
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#submit-deposit
-pub fn handle_deposit_type(req: DepositRequest, bls_pk_hex: String) -> Result<BLSSignature> {
+// pub fn handle_deposit_type(req: DepositRequest, bls_pk_hex: String) -> Result<BLSSignature> {
+pub fn handle_deposit_type(req: DepositRequest, bls_pk_hex: String) -> Result<DepositResponse> {
     println!("got deposit type");
-    get_deposit_signature(bls_pk_hex, req.deposit)
+    get_deposit_signature(bls_pk_hex, req.deposit, req.genesis_fork_version)
 }
 
 /// Handler for VOLUNTARY_EXIT type
@@ -554,17 +561,12 @@ pub async fn secure_sign_bls(
         Ok(BLSSignMsg::DEPOSIT(req)) => {
             // handle "DEPOSIT" type request
             match handle_deposit_type(req, bls_pk_hex) {
-                // Ok(sig) => Ok(reply::with_status(
-                //     reply::json::<SecureSignerSig>(&success_response(&sig)),
-                //     StatusCode::OK,
-                // )),
-                Ok(sig) => {
-                    let s = &success_response(&sig);
-                    println!("got s: {:?}", s);
+                Ok(resp) => {
+                    println!("dr: {:?}", resp);
                     Ok(reply::with_status(
-                    reply::json::<SecureSignerSig>(s),
+                    reply::json(&resp),
                     StatusCode::OK))
-                },
+            },
                 // return 500 error
                 Err(e) => {
                     let mut resp = HashMap::new();
