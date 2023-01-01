@@ -20,10 +20,11 @@ async fn main() {
 
         // --------- Compatible with Web3Signer ---------
         // https://consensys.github.io/web3signer/web3signer-eth2.html
+        routes::upcheck_route()
 
         // Endpoint to securely import a BLS sk 
         // curl -X POST localhost:3031/eth/v1/keystores -H "Content-Type: application/json"  -d '{"ct_bls_sk_hex": "0x123123", "bls_pk_hex": "0x123", "encrypting_pk_hex": "0x123"}'  
-        routes::bls_key_import_route()
+        .or(routes::bls_key_import_route())
 
         // Endpoint to list pks of saved bls keys that were imported into the enclave
         // curl -X GET localhost:3031/eth/v1/keystores

@@ -18,6 +18,13 @@ pub fn bls_sign_route() -> impl Filter<Extract = impl warp::Reply, Error = warp:
         .and(warp::body::bytes())
         .and_then(secure_sign_bls)
 }
+use warp::{http::StatusCode, reply};
+/// Returns a 200 status code if server is alive
+pub fn upcheck_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    warp::get()
+        .and(warp::path("upcheck"))
+        .and(warp::any().map(warp::reply))
+}
 
 /// Imports a BLS private key to the Enclave. 
 /// https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Keymanager
