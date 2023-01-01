@@ -426,10 +426,9 @@ pub async fn secure_sign_bls(
     println!("Signing pk {:#?}", bls_pk_hex);
     println!("{:#?}", req);
 
-
     // Match over each possible datatype
     match serde_json::from_slice(&req) {
-        Ok(BLSSignMsg::BLOCK(req)) => {
+        Ok(BLSSignMsg::BLOCK(req)) | Ok(BLSSignMsg::block(req)) => {
             // handle "BLOCK" type request
             match handle_block_type(req, bls_pk_hex) {
                 Ok(sig) => Ok(reply::with_status(
@@ -453,7 +452,7 @@ pub async fn secure_sign_bls(
                 }
             }
         }
-        Ok(BLSSignMsg::BLOCK_V2(req)) => {
+        Ok(BLSSignMsg::BLOCK_V2(req)) | Ok(BLSSignMsg::block_v2(req)) => {
             // handle "BLOCK_V2" type request
             match handle_block_v2_type(req, bls_pk_hex) {
                 Ok(sig) => Ok(reply::with_status(
@@ -477,7 +476,7 @@ pub async fn secure_sign_bls(
                 }
             }
         }
-        Ok(BLSSignMsg::ATTESTATION(req)) => {
+        Ok(BLSSignMsg::ATTESTATION(req)) | Ok(BLSSignMsg::attestation(req)) => {
             // handle "ATTESTATION" type request
             match handle_attestation_type(req, bls_pk_hex) {
                 Ok(sig) => Ok(reply::with_status(
@@ -501,7 +500,7 @@ pub async fn secure_sign_bls(
                 }
             }
         }
-        Ok(BLSSignMsg::RANDAO_REVEAL(req)) => {
+        Ok(BLSSignMsg::RANDAO_REVEAL(req)) | Ok(BLSSignMsg::randao_reveal(req)) => {
             // handle "RANDAO_REVEAL" type request
             match handle_randao_reveal_type(req, bls_pk_hex) {
                 Ok(sig) => Ok(reply::with_status(
@@ -519,7 +518,7 @@ pub async fn secure_sign_bls(
                 }
             }
         }
-        Ok(BLSSignMsg::AGGREGATE_AND_PROOF(req)) => {
+        Ok(BLSSignMsg::AGGREGATE_AND_PROOF(req)) | Ok(BLSSignMsg::aggregate_and_proof(req)) => {
             let ab = &req.aggregate_and_proof.aggregate.aggregation_bits;
 
             println!("agg bits: {:?}, {:?}", ab, hex::encode(ab.as_slice()));
@@ -540,7 +539,7 @@ pub async fn secure_sign_bls(
                 }
             }
         }
-        Ok(BLSSignMsg::AGGREGATION_SLOT(req)) => {
+        Ok(BLSSignMsg::AGGREGATION_SLOT(req)) | Ok(BLSSignMsg::aggregation_slot(req)) => {
             // handle "AGGREGATION_SLOT" type request
             match handle_aggregation_slot_type(req, bls_pk_hex) {
                 Ok(sig) => Ok(reply::with_status(
@@ -558,7 +557,7 @@ pub async fn secure_sign_bls(
                 }
             }
         }
-        Ok(BLSSignMsg::DEPOSIT(req)) => {
+        Ok(BLSSignMsg::DEPOSIT(req)) | Ok(BLSSignMsg::deposit(req)) => {
             // handle "DEPOSIT" type request
             match handle_deposit_type(req, bls_pk_hex) {
                 Ok(resp) => {
@@ -578,7 +577,7 @@ pub async fn secure_sign_bls(
                 }
             }
         }
-        Ok(BLSSignMsg::VOLUNTARY_EXIT(req)) => {
+        Ok(BLSSignMsg::VOLUNTARY_EXIT(req)) | Ok(BLSSignMsg::voluntary_exit(req)) => {
             // handle "VOLUNTARY_EXIT" type request
             match handle_voluntary_exit_type(req, bls_pk_hex) {
                 Ok(sig) => Ok(reply::with_status(
@@ -596,7 +595,7 @@ pub async fn secure_sign_bls(
                 }
             }
         }
-        Ok(BLSSignMsg::SYNC_COMMITTEE_MESSAGE(req)) => {
+        Ok(BLSSignMsg::SYNC_COMMITTEE_MESSAGE(req)) | Ok(BLSSignMsg::sync_committee_message(req)) => {
             // handle "SYNC_COMMITTEE_MESSAGE" type request
             match handle_sync_committee_msg_type(req, bls_pk_hex) {
                 Ok(sig) => Ok(reply::with_status(
@@ -614,7 +613,7 @@ pub async fn secure_sign_bls(
                 }
             }
         }
-        Ok(BLSSignMsg::SYNC_COMMITTEE_SELECTION_PROOF(req)) => {
+        Ok(BLSSignMsg::SYNC_COMMITTEE_SELECTION_PROOF(req)) | Ok(BLSSignMsg::sync_committee_selection_proof(req)) => {
             // handle "SYNC_COMMITTEE_SELECTION_PROOF" type request
             match handle_sync_committee_selection_proof_type(req, bls_pk_hex) {
                 Ok(sig) => Ok(reply::with_status(
@@ -632,7 +631,7 @@ pub async fn secure_sign_bls(
                 }
             }
         }
-        Ok(BLSSignMsg::SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF(req)) => {
+        Ok(BLSSignMsg::SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF(req)) | Ok(BLSSignMsg::sync_committee_contribution_and_proof(req)) => {
             // handle "SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF" type request
             match handle_sync_committee_contribution_and_proof_type(req, bls_pk_hex) {
                 Ok(sig) => Ok(reply::with_status(
@@ -650,7 +649,7 @@ pub async fn secure_sign_bls(
                 }
             }
         }
-        Ok(BLSSignMsg::VALIDATOR_REGISTRATION(req)) => {
+        Ok(BLSSignMsg::VALIDATOR_REGISTRATION(req)) | Ok(BLSSignMsg::validator_registration(req)) => {
             // handle "VALIDATOR_REGISTRATION" type request
             match handle_validator_registration_type(req, bls_pk_hex) {
                 Ok(sig) => Ok(reply::with_status(
@@ -756,7 +755,7 @@ pub mod mock_requests {
     pub fn mock_randao_reveal_request() -> String {
         let req = format!(r#"
             {{
-               "type":"RANDAO_REVEAL",
+               "type":"randao_reveal",
                "fork_info":{{
                   "fork":{{
                      "previous_version":"0x00000000",

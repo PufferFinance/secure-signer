@@ -557,6 +557,20 @@ pub enum BLSSignMsg {
     SYNC_COMMITTEE_SELECTION_PROOF(SyncCommitteeSelectionProofRequest),
     SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF(SyncCommitteeContributionAndProofRequest),
     VALIDATOR_REGISTRATION(ValidatorRegistrationRequest),
+
+    // lower case
+    block(BlockRequest),
+    block_v2(BlockV2Request),
+    attestation(AttestationRequest),
+    randao_reveal(RandaoRevealRequest),
+    aggregate_and_proof(AggregateAndProofRequest),
+    aggregation_slot(AggregationSlotRequest),
+    deposit(DepositRequest),
+    voluntary_exit(VoluntaryExitRequest),
+    sync_committee_message(SyncCommitteeMessageRequest),
+    sync_committee_selection_proof(SyncCommitteeSelectionProofRequest),
+    sync_committee_contribution_and_proof(SyncCommitteeContributionAndProofRequest),
+    validator_registration(ValidatorRegistrationRequest),
 }
 
 #[cfg(test)]
