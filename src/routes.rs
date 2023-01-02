@@ -113,7 +113,7 @@ mod api_signing_tests {
     use std::fs;
     use serde_json;
     use crate::eth_signing::slash_resistance_tests::*;
-    use crate::route_handlers::mock_requests::*;
+    use crate::route_handlers::{mock_requests::*, SecureSignerSig};
     use crate::eth_types::{RandaoRevealRequest, BlockV2Request};
 
     async fn mock_secure_sign_bls_route(bls_pk: &String, json_req: &String) -> warp::http::Response<bytes::Bytes> {
@@ -300,6 +300,37 @@ mod api_signing_tests {
         let resp = mock_secure_sign_bls_route(&bls_pk_hex, &json_req).await;
         println!("{:?}", resp);
         assert_eq!(resp.status(), 200);
+    }
+
+
+    #[tokio::test]
+    async fn test_bls_sign_validator_registration_altair_type() {
+        // clear state
+        fs::remove_dir_all("./etc");
+
+        let json_req = format!(r#"
+        {{
+            "type": "VALIDATOR_REGISTRATION",
+            "signingRoot": "0xbaeddafaf70f1699e5abbafa1a15bb807de4f2c889b4e59be1ef62e23f1206a8",
+            "validator_registration": {{
+                "fee_recipient": "0x2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a",
+                "gas_limit": "30000000",
+                "timestamp":"100",
+                "pubkey": "0x8349434ad0700e79be65c0c7043945df426bd6d7e288c16671df69d822344f1b0ce8de80360a50550ad782b68035cb18"
+            }}
+        }}"#);
+
+        // new keypair
+        let bls_pk_hex = setup_keypair();
+
+        // mock data for RANDAO_REVEAL request
+        let resp = mock_secure_sign_bls_route(&bls_pk_hex, &json_req).await;
+        println!("{:?}", resp);
+        assert_eq!(resp.status(), 200);
+        let sig: SecureSignerSig = serde_json::from_slice(resp.body()).unwrap();
+        assert_eq!(sig.signature, "0x94dc67c0ada5effb5fbca4a29f48a4805df96b4e05418dc7846d73aceb0d1800cb1a6100410da7fecf42798a2e3ab0620abf3ef7aed5987970294fe3ad84995a232d3d0758f44be362a4351666e01b6444146f26d19ebc7e30d1534e0f702d9b".to_string());
+
+
     }
 
     

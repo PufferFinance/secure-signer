@@ -357,7 +357,8 @@ pub fn get_validator_registration_signature(
     pk_hex: String,
     validator_registration: ValidatorRegistration,
 ) -> Result<BLSSignature> {
-    let domain = compute_domain(DOMAIN_APPLICATION_BUILDER, None, None);
+    let altair_fork_version: Version = [128, 0, 0, 105]; 
+    let domain = compute_domain(DOMAIN_APPLICATION_BUILDER, Some(altair_fork_version), None);
     secure_sign(pk_hex, validator_registration, domain)
 }
 
@@ -386,6 +387,12 @@ pub mod slash_resistance_tests {
         let name = new_keystore(Path::new("./etc/keys/bls_keys/generated/"), "pufifish", &pk_hex, &sk.serialize()).unwrap();
         println!("DEBUG: using pk: {pk_hex}");
         pk_hex
+    }
+
+    
+    #[test]
+    fn load_dummy_keys() {
+        setup_keypair();
     }
 
     pub fn mock_beacon_block(slot: &str) -> String {
