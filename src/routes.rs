@@ -333,6 +333,36 @@ mod api_signing_tests {
 
     }
 
+    #[tokio::test]
+    async fn test_bls_sign_validator_registration_type_mevboost_test() {
+        // clear state
+        fs::remove_dir_all("./etc");
+
+        let json_req = format!(r#"
+        {{
+            "type": "VALIDATOR_REGISTRATION",
+            "signingRoot": "0xbaeddafaf70f1699e5abbafa1a15bb807de4f2c889b4e59be1ef62e23f1206a8",
+            "validator_registration": {{
+                "fee_recipient": "0xdb65fEd33dc262Fe09D9a2Ba8F80b329BA25f941",
+                "gas_limit": "278234191203",
+                "timestamp":"1234356",
+                "pubkey": "0x8a1d7b8dd64e0aafe7ea7b6c95065c9364cf99d38470c12ee807d55f7de1529ad29ce2c422e0b65e3d5a05c02caca249"
+            }}
+        }}"#);
+
+        // new keypair
+        let bls_pk_hex = setup_keypair2();
+
+        // mock data for RANDAO_REVEAL request
+        let resp = mock_secure_sign_bls_route(&bls_pk_hex, &json_req).await;
+        println!("{:?}", resp);
+        assert_eq!(resp.status(), 200);
+        let sig: SecureSignerSig = serde_json::from_slice(resp.body()).unwrap();
+        assert_eq!(sig.signature, "0x8209b5391cd69f392b1f02dbc03bab61f574bb6bb54bf87b59e2a85bdc0756f7db6a71ce1b41b727a1f46ccc77b213bf0df1426177b5b29926b39956114421eaa36ec4602969f6f6370a44de44a6bce6dae2136e5fb594cce2a476354264d1ea".to_string());
+
+
+    }
+
     
     // todo
     // async fn test_bls_sign_route_aggregation_slot_type() {}

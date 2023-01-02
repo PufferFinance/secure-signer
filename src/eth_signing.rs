@@ -357,8 +357,13 @@ pub fn get_validator_registration_signature(
     pk_hex: String,
     validator_registration: ValidatorRegistration,
 ) -> Result<BLSSignature> {
-    let altair_fork_version: Version = [128, 0, 0, 105]; 
-    let domain = compute_domain(DOMAIN_APPLICATION_BUILDER, Some(altair_fork_version), None);
+    // altair - works with Lighthouse Web3Signer test...
+    // let fork_version: Version = [128, 0, 0, 105]; 
+
+    // works with mev-boost test...
+    let fork_version: Version = [0_u8, 0_u8, 0_u8, 0_u8];  // 0x00000000
+
+    let domain = compute_domain(DOMAIN_APPLICATION_BUILDER, Some(fork_version), None);
     secure_sign(pk_hex, validator_registration, domain)
 }
 
@@ -374,13 +379,30 @@ pub mod slash_resistance_tests {
     use std::fs;
     use std::path::Path;
 
-    /// hardcoded bls sk
+    /// hardcoded bls sk from Lighthouse Web3Signer tests
     pub fn setup_keypair() -> String {
         // dummy key
         let sk_hex = hex::encode(&[85, 40, 245, 17, 84, 193, 234, 155, 24, 234, 181, 58, 171, 193, 209, 164, 120, 147, 10, 174, 189, 228, 119, 48, 181, 19, 117, 223, 2, 240, 7, 108,]);
         println!("DEBUG: using sk: {sk_hex}");
         
         let sk = keys::bls_sk_from_hex(sk_hex.clone()).unwrap();
+        let pk = sk.sk_to_pk();
+        let pk_hex = hex::encode(pk.compress());
+        // save keystore
+        let name = new_keystore(Path::new("./etc/keys/bls_keys/generated/"), "pufifish", &pk_hex, &sk.serialize()).unwrap();
+        println!("DEBUG: using pk: {pk_hex}");
+        pk_hex
+    }
+
+    /// hardcoded bls sk from mev-boost tests
+    /// https://github.com/flashbots/mev-boost/blob/33c9b946c940ef279fe2b8bf1492e913cc0b0c49/server/service_test.go#L165
+    pub fn setup_keypair2() -> String {
+        // dummy key
+        let sk_hex = "0x4e343a647c5a5c44d76c2c58b63f02cdf3a9a0ec40f102ebc26363b4b1b95033".to_string();
+        
+        println!("DEBUG: using sk: {sk_hex}");
+        
+        let sk = keys::bls_sk_from_hex(sk_hex).unwrap();
         let pk = sk.sk_to_pk();
         let pk_hex = hex::encode(pk.compress());
         // save keystore
