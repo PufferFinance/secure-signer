@@ -4,8 +4,8 @@
 # Dev Usage:
 ## Installing Rust
 > Running the [Warp HTTP server](https://github.com/seanmonstar/warp) requires rust 1.64, to update your rust toolchain run:
-- `rustup update stable`  
-- `rustup default stable`
+- `rustup update`  
+- `rustup target add x86_64-unknown-linux-musl`
 
 ## Docker
 > TODO

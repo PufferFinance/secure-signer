@@ -4,6 +4,9 @@ THISDIR=$(PWD)
 # the name of the .json file that has epid remote attestation credentials
 RA_CONFIG_NAME=ra_config.json
 
+# name of occlum instance
+ENCLAVE_NAME=secure_signer_occlum
+
 # the path to the occlum instance
 INSTANCE_PATH=$(THISDIR)/$(ENCLAVE_NAME)
 
@@ -22,8 +25,11 @@ FLAGS?=""
 # optional flag for debugging
 LEVEL?=""
 
+# binary name
+BINARY_NAME=secure-signer
+
 .PHONY: all
-all: build measure run
+all: build measure
 
 .PHONY: build
 build:
@@ -67,15 +73,3 @@ measure:
 	@cat $(ENCLAVE_NAME)/MRENCLAVE
 	@sed -n -e '/mrsigner->/,/*/p' ./$(ENCLAVE_NAME)/measurements.txt |head -3|tail -2|xargs|sed 's/0x//g'|sed 's/ //g' > $(ENCLAVE_NAME)/MRSIGNER
 	@cat $(ENCLAVE_NAME)/MRSIGNER
-
-.PHONY: leader
-leader:
-	@ENCLAVE_NAME=leader_instance \
-	BINARY_NAME=leader \
-	make;
-
-.PHONY: worker
-worker:
-	@ENCLAVE_NAME=worker_$(ID)_instance \
-	BINARY_NAME=worker \
-	make;
