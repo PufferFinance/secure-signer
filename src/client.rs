@@ -4,7 +4,7 @@ extern crate anyhow;
 mod eth_signing;
 mod eth_types;
 mod keys;
-mod remote_attesation;
+mod remote_attestation;
 mod route_handlers;
 mod routes;
 

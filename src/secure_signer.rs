@@ -1,10 +1,12 @@
 // #[macro_use]
 extern crate anyhow;
 
+extern crate libc;
+
 mod eth_signing;
 mod eth_types;
 mod keys;
-mod remote_attesation;
+mod remote_attestation;
 mod routes;
 mod route_handlers;
 
