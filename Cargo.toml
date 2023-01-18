@@ -5,6 +5,9 @@ authors = ["Jason Vranek <jason@portalcompute.com>"]
 build = "build.rs"
 edition = "2021"
 
+[build]
+target = "x86_64-unknown-linux-musl"
+
 [build-dependencies]
 cc = "1.0"
 

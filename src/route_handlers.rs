@@ -29,12 +29,12 @@ pub struct RemoteAttestationResponse {
 /// Performs remote attestation, committing to the supplied public key (SECP256K1 or BLS) 
 /// iff the key's corresponding private key already exists in enclave. Returns a `RemoteAttestationResponse` on success.
 pub async fn epid_remote_attestation_service(
-    req: RemoteAttestationRequest,
+    pk_hex: String,
 ) -> Result<impl warp::Reply, warp::Rejection> {
-    match epid_remote_attestation(&req.pub_key) {
+    match epid_remote_attestation(&pk_hex) {
         Ok(evidence) => {
             let resp = RemoteAttestationResponse {
-                pub_key: req.pub_key,
+                pub_key: pk_hex,
                 evidence: evidence,
             };
             Ok(reply::with_status(reply::json(&resp), StatusCode::OK))

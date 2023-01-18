@@ -163,6 +163,13 @@ impl AttestationEvidence {
         Ok(pk)
     }
 
+    pub fn get_mrenclave(&self) -> Result<String> {
+        let report: AttestationReport = serde_json::from_slice(self.raw_report.as_bytes()).with_context(|| "Couldn't get AttestationReport from AttestationEvidence.raw_report")?;
+        let body = report.deserialize_quote_body()?;
+        // println!("{:?}", body);
+        Ok(body.MRENCLAVE)
+    }
+
 
 }
 

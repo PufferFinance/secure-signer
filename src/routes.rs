@@ -55,7 +55,7 @@ pub fn epid_remote_attestation_route() -> impl Filter<Extract = impl warp::Reply
         .and(warp::path("eth"))
         .and(warp::path("v1"))
         .and(warp::path("remote-attestation"))
-        .and(warp::body::json::<RemoteAttestationRequest>())
+        .and(warp::path::param())
         .and_then(epid_remote_attestation_service)
 }
 
@@ -102,11 +102,6 @@ pub fn list_generated_bls_keys_route() -> impl Filter<Extract = impl warp::Reply
         .and(warp::path("bls"))
         .and_then(list_generated_bls_keys_service)
 }
-
-
-// TODO /upcheck
-
-
 
 #[cfg(test)]
 mod api_signing_tests {

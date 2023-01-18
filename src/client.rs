@@ -8,7 +8,7 @@ mod remote_attestation;
 mod route_handlers;
 mod routes;
 
-use eth_types::{DepositResponse};
+use eth_types::DepositResponse;
 use route_handlers::SecureSignerSig;
 
 use anyhow::{bail, Context, Result};
@@ -22,8 +22,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-// use crate::remote_attesation::{fetch_dummy_evidence, epid_remote_attestation};
-use crate::route_handlers::{KeyGenResponse, KeyImportRequest, KeyImportResponse};
+use crate::route_handlers::{KeyGenResponse, KeyImportRequest, KeyImportResponse, RemoteAttestationResponse};
+use crate::keys::{eth_pk_to_hex};
 
 pub async fn post_request<T: Serialize>(url: &String, body: T) -> Result<reqwest::Response> {
     let client = reqwest::Client::new();
@@ -149,7 +149,11 @@ pub async fn deposit_post_request(
     Ok(resp)
 }
 
-fn build_deposit_msg(validator_pk_hex: &str, withdrawal_credentials: &str, fork_version: &str) -> Result<String> {
+fn build_deposit_msg(
+    validator_pk_hex: &str,
+    withdrawal_credentials: &str,
+    fork_version: &str,
+) -> Result<String> {
     let amount: u64 = 32000000000;
 
     let req = format!(
@@ -176,6 +180,43 @@ pub async fn get_deposit_signature(
     deposit_post_request(pk_hex, req, host.to_string()).await
 }
 
+/// Makes a Reqwest POST request to the /eth/v1/remote-attestation/0xdeadbeef... API endpoint to get a RemoteAttestationResponse
+pub async fn remote_attestation_post_request(
+    pk_hex: String,
+    host: String,
+) -> Result<RemoteAttestationResponse> {
+    let url = format!("{host}/eth/v1/remote-attestation/{pk_hex}");
+    let resp = post_request(&url, {})
+        .await
+        .with_context(|| format!("failed POST request to URL: {}", url))?
+        .json::<RemoteAttestationResponse>()
+        .await
+        .with_context(|| format!("could not parse json response from : {}", url))?;
+    println!("{:#?}", resp);
+    Ok(resp)
+}
+
+pub async fn verify_eth_remote_attestation(
+    pk_hex: String,
+    host: String,
+    mrenclave: String,
+) -> Result<()> {
+    let resp: RemoteAttestationResponse = remote_attestation_post_request(pk_hex.clone(), host).await?;
+    assert_eq!(pk_hex, resp.pub_key);
+    let evidence = resp.evidence;
+    // verify rpt signed by valid intel cert  
+    evidence.verify_intel_signing_certificate()?;
+    let got_pk = evidence.get_eth_pk()?;
+    let got_pk_hex = eth_pk_to_hex(&got_pk);
+    let pk_hex: String = pk_hex.strip_prefix("0x").unwrap_or(&pk_hex).into();
+    assert_eq!(pk_hex, got_pk_hex);
+
+    let got_mre = evidence.get_mrenclave()?;
+    println!("got MRENCLAVE: {got_mre}");
+    // assert_eq!(mrenclave, ); // todo
+    Ok(())
+}
+
 const KEYSTORE_DIR: &str = "keys";
 
 #[tokio::main]
@@ -200,9 +241,9 @@ async fn main() {
     let ss_eth_pk_hex = get_new_pk(host.clone()).await.unwrap();
     println!("Secure-Signer ETH public key: {ss_eth_pk_hex}");
 
-    // if require_remote_attestation {
-    //     // todo
-    // }
+    // request Secure-Signer to perform Remote Attestation with their ETH key
+    let mrenclave = "".into();
+    assert!(verify_eth_remote_attestation(ss_eth_pk_hex.clone(), host.clone(), mrenclave).await.is_ok());
 
     // securely import BLS private key into Secure-Signer
     let returned_bls_pk = import_bls_key(host.clone(), client_bls_sk_hex, ss_eth_pk_hex)
@@ -223,12 +264,13 @@ async fn main() {
 
     // Send DEPOSIT message
     let fork_version = "00001020";
-    let deposit_msg = build_deposit_msg(&client_bls_pk_hex, &withdrawal_credentials, fork_version).unwrap();
+    let deposit_msg =
+        build_deposit_msg(&client_bls_pk_hex, &withdrawal_credentials, fork_version).unwrap();
     println!("{:?}", deposit_msg);
     let deposit_resp = get_deposit_signature(client_bls_pk_hex.clone(), deposit_msg, &host)
         .await
         .unwrap();
-    
+
     let pubkey = deposit_resp.pubkey;
     let withdrawal_credentials = deposit_resp.withdrawal_credentials;
     let amount = deposit_resp.amount;
