@@ -100,7 +100,7 @@ libcurl_build() {
 }
 
 secure_signer_check() {
-  return 1  # return false to always build it
+  [ -f "$INSTALLDIR/lib/libepid.a" ] || return 1 
 }
 
 secure_signer_build() {
@@ -114,6 +114,19 @@ secure_signer_build() {
     make -j $BUILDVERBOSE && \
     cp $THISDIR/build/libocclumra.a $INSTALLDIR/lib
     cp $THISDIR/build/libepid_ra.a $INSTALLDIR/lib # added by me
+    cp $THISDIR/build/libepid.so $INSTALLDIR/lib # added by me
+
+
+    # combine the static libs into a single one to link to in rust
+    COMBINED_LIB="libepid.a"
+    ar -x ${INSTALLDIR}/lib/libocclumra.a
+    ar -x ${INSTALLDIR}/lib/libepid_ra.a
+    ar -x ${INSTALLDIR}/lib/libcurl.a
+    ar -x ${INSTALLDIR}/lib/libcrypto.a
+    ar -x ${INSTALLDIR}/lib/libssl.a
+    ar -crs ${COMBINED_LIB} *.o
+    rm *.o
+    cp $THISDIR/build/${COMBINED_LIB} $INSTALLDIR/lib 
 }
 
 # Show help menu
@@ -144,14 +157,3 @@ for i in $BUILD_COMPONENTS ; do
     LOG_DEBUG "Build $i successfully" || ERROR_EXIT "Fail to build $i"
 done
 
-
-# combine the static libs into a single one to import to rust
-COMBINED_LIB="libepid.a"
-ar -x ${INSTALLDIR}/lib/libocclumra.a
-ar -x ${INSTALLDIR}/lib/libepid_ra.a
-ar -x ${INSTALLDIR}/lib/libcurl.a
-ar -x ${INSTALLDIR}/lib/libcrypto.a
-ar -x ${INSTALLDIR}/lib/libssl.a
-ar -crs ${COMBINED_LIB} *.o
-rm *.o
-cp $THISDIR/build/${COMBINED_LIB} $INSTALLDIR/lib 

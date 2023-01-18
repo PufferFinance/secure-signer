@@ -47,7 +47,8 @@ pub fn list_imported_bls_keys_route() -> impl Filter<Extract = impl warp::Reply,
         .and_then(list_imported_bls_keys_service)
 }
 
-/// Performs EPID remote attestation, committing to a public key
+/// Performs EPID remote attestation, committing to a public key (SECP256k1 or BLS) if the corresponding
+/// private key is safeguarded by the enclave.
 /// Route added by Secure-Signer
 pub fn epid_remote_attestation_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::post()
@@ -377,7 +378,7 @@ mod api_signing_tests {
 mod key_management_tests {
     use super::*;
     use crate::keys::{new_bls_key, new_eth_key, CIPHER_SUITE, eth_pk_from_hex};
-    use crate::remote_attesation::{AttestationEvidence, fetch_dummy_evidence};
+    use crate::remote_attestation::{AttestationEvidence, fetch_dummy_evidence};
     use crate::routes::*;
     use crate::route_handlers::*;
     use ecies::{decrypt, encrypt};

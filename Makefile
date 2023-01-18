@@ -14,10 +14,7 @@ INSTANCE_PATH=$(THISDIR)/$(ENCLAVE_NAME)
 MUSL_DIR=/usr/local/occlum/x86_64-linux-musl/
 
 # occlum executable
-OCCLUM=/root/occlum/build/bin/occlum
-
-# worker id
-ID?=0
+OCCLUM=occlum
 
 # optional flags to run
 FLAGS?=""
@@ -27,6 +24,12 @@ LEVEL?=""
 
 # binary name
 BINARY_NAME=secure-signer
+
+# port to run secure signer
+PORT = 9001
+
+LEVEL=""
+
 
 .PHONY: all
 all: build measure
@@ -63,13 +66,10 @@ build:
 .PHONY: run
 run: 
 	@cd $(INSTANCE_PATH) && \
-	OCCLUM_LOG_LEVEL=$(LEVEL) $(OCCLUM) run /bin/$(BINARY_NAME) $(FLAGS)
+	OCCLUM_LOG_LEVEL=$(LEVEL) $(OCCLUM) run /bin/$(BINARY_NAME) $(PORT)
 
 .PHONY: measure
 measure: 
-	@sgx_sign dump -enclave $(INSTANCE_PATH)/build/lib/libocclum-libos.signed.so -dumpfile $(ENCLAVE_NAME)/measurements.txt
-	@echo "enclave measurements dumped to 'measurements.txt', (MRENCLAVE, MRSIGNER):"
-	@sed -n -e '/enclave_hash.m/,/metadata->enclave_css.body.isv_prod_id/p' ./$(ENCLAVE_NAME)/measurements.txt |head -3|tail -2|xargs|sed 's/0x//g'|sed 's/ //g' > $(ENCLAVE_NAME)/MRENCLAVE
-	@cat $(ENCLAVE_NAME)/MRENCLAVE
-	@sed -n -e '/mrsigner->/,/*/p' ./$(ENCLAVE_NAME)/measurements.txt |head -3|tail -2|xargs|sed 's/0x//g'|sed 's/ //g' > $(ENCLAVE_NAME)/MRSIGNER
-	@cat $(ENCLAVE_NAME)/MRSIGNER
+	@cd $(INSTANCE_PATH) && \
+	echo "MRENCLAVE: 0x$$($(OCCLUM) print mrenclave)" && \
+	echo "MRSIGNER: 0x$$($(OCCLUM) print mrsigner)"
