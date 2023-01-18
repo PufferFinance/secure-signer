@@ -32,7 +32,7 @@ LEVEL=""
 
 
 .PHONY: all
-all: build measure
+all: build measure run
 
 .PHONY: build
 build:
