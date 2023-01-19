@@ -19,7 +19,7 @@
 
 project = 'secure-signer'
 # copyright = '2023, Puffer'
-author = 'Puffer'
+author = 'Puffer Finance'
 
 
 # -- General configuration ---------------------------------------------------

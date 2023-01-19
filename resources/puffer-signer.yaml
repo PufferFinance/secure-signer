@@ -15,14 +15,10 @@ servers:
 paths:
   /api/v1/eth2/sign/{identifier}:
     $ref: './signing/paths/sign.yaml'
-  /api/v1/eth2/publicKeys:
-    $ref: './signing/paths/public_keys.yaml'
-  /reload:
-    $ref: './signing/paths/reload.yaml'
   /upcheck:
     $ref: './signing/paths/upcheck.yaml'
-  /healthcheck:
-    $ref: './signing/paths/healthcheck.yaml'
+  /eth/v1/keystores:
+    $ref: './keymanager/paths/keygen.yaml'
   /eth/v1/keystores:
     $ref: './keymanager/paths/keystores.yaml'
 
