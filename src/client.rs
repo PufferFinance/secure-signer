@@ -17,7 +17,7 @@ use blst::min_pk::{PublicKey, SecretKey};
 use clap::Parser;
 use ecies::{decrypt, encrypt};
 use reqwest;
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use serde_json;
 use std::fs::File;
 use std::io::prelude::*;
@@ -25,6 +25,7 @@ use std::io::prelude::*;
 use eth_keystore::{decrypt_key};
 use std::collections::HashMap;
 use std::fs;
+use std::io::BufReader;
 use std::path::{Path, PathBuf};
 
 
@@ -45,6 +46,20 @@ pub async fn get_request(url: &String) -> Result<reqwest::Response> {
         .send()
         .await
         .with_context(|| "Failed GET reqwest with body")
+}
+
+async fn run_upcheck(
+    host: String,
+) -> Result<()> {
+    let url = format!("{host}/upcheck");
+    let resp = get_request(&url)
+        .await
+        .with_context(|| format!("failed GET request to URL: {}", url))?;
+    if resp.status().is_success() {
+        Ok(())
+    } else {
+        bail!("{url} did not return 200, is Secure-Signer running?")
+    }
 }
 
 /// Makes a Reqwest POST request to the /eth/v1/keystores API endpoint to get a KeyImportResponse
@@ -110,7 +125,7 @@ async fn list_keys(
     };
     let resp = get_request(&url)
         .await
-        .with_context(|| format!("failed POST request to URL: {}", url))?
+        .with_context(|| format!("failed GET request to URL: {}", url))?
         .json::<ListKeysResponse>()
         .await
         .with_context(|| format!("could not parse json response from : {}", url))?;
@@ -280,7 +295,20 @@ pub async fn verify_remote_attestation(
     write_evidence_to_file(&evidence, filename)
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct NetworkConfig {
+    network_name: String,
+    fork_version: String,
+    deposit_cli_version: String,
+}
 
+impl NetworkConfig {
+    fn new(path: String) -> Self {
+        let file = File::open(path).expect("bad config path");
+        let reader = BufReader::new(file);
+        serde_json::from_reader(reader).expect("bad deserialize config")
+    }
+}
 
 /// Secure-Signer Client Interface
 #[derive(Parser, Debug)]
@@ -310,13 +338,17 @@ struct Args {
    #[arg(short, long)]
    deposit: bool,
 
-   /// The password to the keystore
+   /// The validator public key in hex
    #[arg(short, long)]
    validator_pk_hex: Option<String>,
 
    /// The expected MRENCLAVE value
    #[arg(long)]
    mrenclave: Option<String>,
+
+    /// The path to the JSON network config file
+    #[arg(short, long, default_value = "network_config.json")]
+    config: String,
 }
 
 #[tokio::main]
@@ -324,14 +356,15 @@ async fn main() {
     let args = Args::parse();
     let dir = Path::new(&args.outdir);
     let dir_str = &dir.to_str().unwrap();
+
+    let config = NetworkConfig::new(args.config); 
+
     let port = args.port;
     println!("- Connecting to Secure-Signer on port {}", port);
     let host = format!("http://localhost:{port}");
 
-
-    // run /upcheck
-    // todo
-
+    // run /upcheck to see if SS online
+    run_upcheck(host.clone()).await.unwrap();
 
     // ------- for generating BLS key in SS -------
     if args.bls_keygen {
@@ -396,7 +429,7 @@ async fn main() {
         );
 
         // Send DEPOSIT message
-        let fork_version = "00001020";
+        let fork_version = &config.fork_version; 
         let deposit_msg =
             build_deposit_msg(&validator_pk_hex, &withdrawal_credentials, fork_version).unwrap();
         // println!("{:?}", deposit_msg);
@@ -410,6 +443,8 @@ async fn main() {
         let signature = deposit_resp.signature;
         let deposit_message_root = deposit_resp.deposit_message_root;
         let deposit_data_root = deposit_resp.deposit_data_root;
+        let network_name = config.network_name;
+        let deposit_cli_version = config.deposit_cli_version;
 
         // Build deposit JSON that works with https://goerli.launchpad.ethereum.org/en/upload-deposit-data
         let dd = format!(
@@ -422,8 +457,8 @@ async fn main() {
             "deposit_message_root": "{deposit_message_root}",
             "deposit_data_root": "{deposit_data_root}",
             "fork_version": "{fork_version}",
-            "network_name": "goerli",
-            "deposit_cli_version": "2.3.0"
+            "network_name": "{network_name}",
+            "deposit_cli_version": "{deposit_cli_version}"
         }}]"#
         );
         
