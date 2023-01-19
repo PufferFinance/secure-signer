@@ -13,7 +13,7 @@ void do_epid_ra(uint8_t data[64], char * report, char * signature, char * signin
   sgx_report_data_t report_data = {0};
   for (int i = 0; i < 64; ++i) {
       report_data.d[i] = data[i];
-      std::cout << "data[" << i << "]: " << (int) report_data.d[i] << std::endl; 
+      // std::cout << "data[" << i << "]: " << (int) report_data.d[i] << std::endl; 
    }
 
   // Don't need to set IAS key/cert when we used accesskey authentication

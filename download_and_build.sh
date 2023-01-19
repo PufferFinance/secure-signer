@@ -12,7 +12,7 @@ export PKG_CONFIG_LIBDIR=$PKG_CONFIG_LIBDIR:$INSTALLDIR/lib
 
 DEPSDIR="$THISDIR/deps"
 
-ALL_COMPONENTS="openssl libcurl portal_server"
+ALL_COMPONENTS="openssl libcurl secure_signer"
 OPENSSLDIR=openssl
 CURLDIR=curl
 CPPCODECDIR=cppcodec
@@ -99,11 +99,11 @@ libcurl_build() {
     make -j && make install
 }
 
-portal_server_check() {
-  return 1  # return false to always build it
+secure_signer_check() {
+  [ -f "$INSTALLDIR/lib/libepid.a" ] || return 1 
 }
 
-portal_server_build() {
+secure_signer_build() {
     cd "$THISDIR"
     rm -rf build && mkdir build && cd build && \
     echo "[+] Cleaned libocclum.ra and libepid.ra"
@@ -113,7 +113,20 @@ portal_server_build() {
       -DBUILD_MODE=${BUILDMODE} && \
     make -j $BUILDVERBOSE && \
     cp $THISDIR/build/libocclumra.a $INSTALLDIR/lib
-    cp $THISDIR/build/libepid_ra.a $INSTALLDIR/lib # added
+    cp $THISDIR/build/libepid_ra.a $INSTALLDIR/lib # added by me
+    cp $THISDIR/build/libepid.so $INSTALLDIR/lib # added by me
+
+
+    # combine the static libs into a single one to link to in rust
+    COMBINED_LIB="libepid.a"
+    ar -x ${INSTALLDIR}/lib/libocclumra.a
+    ar -x ${INSTALLDIR}/lib/libepid_ra.a
+    ar -x ${INSTALLDIR}/lib/libcurl.a
+    ar -x ${INSTALLDIR}/lib/libcrypto.a
+    ar -x ${INSTALLDIR}/lib/libssl.a
+    ar -crs ${COMBINED_LIB} *.o
+    rm *.o
+    cp $THISDIR/build/${COMBINED_LIB} $INSTALLDIR/lib 
 }
 
 # Show help menu
@@ -144,15 +157,3 @@ for i in $BUILD_COMPONENTS ; do
     LOG_DEBUG "Build $i successfully" || ERROR_EXIT "Fail to build $i"
 done
 
-
-# combine the static libs into a single one to import to rust
-COMBINED_LIB="libepid.a"
-ar -x ${INSTALLDIR}/lib/libocclumra.a
-ar -x ${INSTALLDIR}/lib/libepid_ra.a
-ar -x ${INSTALLDIR}/lib/libcurl.a
-ar -x ${INSTALLDIR}/lib/libcrypto.a
-ar -x ${INSTALLDIR}/lib/libssl.a
-ar -crs ${COMBINED_LIB} *.o
-
-rm *.o
-cp $THISDIR/build/${COMBINED_LIB} $INSTALLDIR/lib 

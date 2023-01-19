@@ -13,18 +13,17 @@ use std::os::raw::c_char;
 
 
 use crate::keys;
-// use super::do_epid_ra;
 
-// #[link(name = "epid")]
-// extern "C" {
-//    /// The cpp function for epid remote attestation with IAS defined in src/ra_wrapper.cpp
-//    fn do_epid_ra(data: *const u8, report: *mut c_char, signature: *mut c_char, signing_cert: *mut c_char);
-// }
+#[link(name = "epid")]
+extern "C" {
+   /// The cpp function for epid remote attestation with IAS defined in src/ra_wrapper.cpp
+   fn do_epid_ra(data: *const u8, report: *mut c_char, signature: *mut c_char, signing_cert: *mut c_char);
+}
 
 // Use this func sig for local development
-pub fn do_epid_ra(data: *const u8, report: *mut c_char, signature: *mut c_char, signing_cert: *mut c_char) {}
+// pub fn do_epid_ra(data: *const u8, report: *mut c_char, signature: *mut c_char, signing_cert: *mut c_char) {}
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct AttestationEvidence {
     pub raw_report:    String,
     pub signed_report: String,
@@ -32,16 +31,19 @@ pub struct AttestationEvidence {
 }
 
 impl AttestationEvidence {
-    /// TODO clean up expects with anyhow crate
-    /// currently accepts a compressed pk (33B) as the data to commit to the report
-    // pub fn new(data: [u8; 33]) -> Result<Self> {
     pub fn new(data: &[u8]) -> Result<Self> {
         if data.len() > 64 {
             bail!("remote attestation report data exceed 64B limit!")
         }
 
+        let mut sized_data: Vec<u8> = Vec::with_capacity(64);
+        // add the data
+        sized_data.extend_from_slice(data);
+        // pad any remaining bytes with 0
+        sized_data.extend_from_slice(&vec![0; 64 - data.len()]);
+
         let mut report_data = [0_u8; 64];
-        report_data.clone_from_slice(&data[..data.len()]);
+        report_data.clone_from_slice(&sized_data[..]);
 
         // sufficient sized buffers
         let a = [1_u8; 5000].to_vec();
@@ -63,7 +65,6 @@ impl AttestationEvidence {
 
         unsafe {
             // call cpp EPID remote attestation lib
-            // do_epid_ra(&data as *const u8, raw_rpt, raw_sig, raw_cert);
             do_epid_ra(&report_data as *const u8, raw_rpt, raw_sig, raw_cert);
             rpt = CString::from_raw(raw_rpt);
             sig = CString::from_raw(raw_sig);
@@ -162,23 +163,43 @@ impl AttestationEvidence {
         Ok(pk)
     }
 
+    pub fn get_mrenclave(&self) -> Result<String> {
+        let report: AttestationReport = serde_json::from_slice(self.raw_report.as_bytes()).with_context(|| "Couldn't get AttestationReport from AttestationEvidence.raw_report")?;
+        let body = report.deserialize_quote_body()?;
+        // println!("{:?}", body);
+        Ok(body.MRENCLAVE)
+    }
+
 
 }
 
-pub fn epid_remote_attestation(pk_hex: &String, from_file: bool) -> Result<AttestationEvidence> {
-    let pk_bytes = match from_file {
-        true => {
-            let pk_bytes = hex::decode(pk_hex)?;
-            pk_bytes
-            // EthPublicKey::parse_slice(k_bytes, None)?
-        },
-        false => {
-            let sk = keys::read_eth_key(pk_hex)?;
+pub fn epid_remote_attestation(pk_hex: &String) -> Result<AttestationEvidence> {
+    let pk_hex: String = pk_hex.strip_prefix("0x").unwrap_or(&pk_hex).into();
+    let len = pk_hex.len();
+    let pk_bytes = match len {
+        66 => { // Compressed SECP256K1 Key = 33B * 2 for hex = 66
+            // Check the key exists
+            println!("DEBUG: RA for ETH key {pk_hex}");
+            let sk = keys::read_eth_key(&pk_hex)?;
             EthPublicKey::from_secret_key(&sk).serialize_compressed().to_vec()
+        },
+        96 => { // BLS public key = 48B * 2 for hex = 96
+            println!("DEBUG: RA for BLS key {pk_hex}");
+            // Check the key exists
+            let sk = match keys::read_bls_key(&format!("generated/{pk_hex}")) {
+                Ok(sk) => sk,
+                Err(e) => keys::read_bls_key(&format!("imported/{pk_hex}"))?
+            };
+            sk.sk_to_pk().compress().to_vec()
         }
+        _ => {
+            // ERROR
+            bail!(format!("RA for key {pk_hex}, bad length"))
+        }
+
     };
     let proof = AttestationEvidence::new(&pk_bytes)?;
-    // println!("{:?}", proof.signed_report);
+    println!("Got RA evidence {:?}", proof);
     Ok(proof)
 }
 
