@@ -23,7 +23,7 @@ extern "C" {
 // Use this func sig for local development
 // pub fn do_epid_ra(data: *const u8, report: *mut c_char, signature: *mut c_char, signing_cert: *mut c_char) {}
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct AttestationEvidence {
     pub raw_report:    String,
     pub signed_report: String,

@@ -10,6 +10,7 @@ mod routes;
 use eth_types::DepositResponse;
 use route_handlers::{SecureSignerSig, KeyGenResponse, KeyImportRequest, KeyImportResponse, RemoteAttestationResponse, ListKeysResponse};
 use keys::{eth_pk_to_hex, bls_pk_to_hex};
+use remote_attestation::{AttestationEvidence};
 
 use anyhow::{bail, Context, Result};
 use blst::min_pk::{PublicKey, SecretKey};
@@ -17,14 +18,14 @@ use clap::Parser;
 use ecies::{decrypt, encrypt};
 use reqwest;
 use serde::Serialize;
+use serde_json;
+use std::fs::File;
+use std::io::prelude::*;
 
 use eth_keystore::{decrypt_key};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-
-
-const KEYSTORE_DIR: &str = "keys";
 
 
 pub async fn post_request<T: Serialize>(url: &String, body: T) -> Result<reqwest::Response> {
@@ -241,11 +242,17 @@ pub async fn remote_attestation_post_request(
     Ok(resp)
 }
 
+fn write_evidence_to_file(evidence: &AttestationEvidence, filename: &str) -> Result<()> {
+    let json = serde_json::to_string(evidence).with_context(|| "failed to convert evidence to json string")?;
+    fs::write(filename, json).with_context(|| "failed to write evidence to file")
+}
+
 pub async fn verify_remote_attestation(
     pk_hex: String,
     host: String,
     mrenclave: String,
     bls: bool,
+    filename: &str,
 ) -> Result<()> {
     let resp: RemoteAttestationResponse = remote_attestation_post_request(pk_hex.clone(), host).await?;
     println!("{:#?}", resp);
@@ -269,8 +276,10 @@ pub async fn verify_remote_attestation(
     let got_mre = evidence.get_mrenclave()?;
     println!("got MRENCLAVE: {got_mre}");
     // assert_eq!(mrenclave, ); // todo
-    Ok(())
+
+    write_evidence_to_file(&evidence, filename)
 }
+
 
 
 /// Secure-Signer Client Interface
@@ -280,6 +289,10 @@ struct Args {
    /// The port that Secure-Signer is exposing
    #[arg(short, long, default_value_t = 9001)]
    port: u16,
+
+   /// The path to the directory to save Secure-Signer outputs
+   #[arg(short, long, default_value = "./ss_out")]
+   outdir: String,
 
    /// Requests Secure-Signer to generate BLS key perform remote attestation
    #[arg(short, long)]
@@ -309,10 +322,15 @@ struct Args {
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
-
+    let dir = Path::new(&args.outdir);
+    let dir_str = &dir.to_str().unwrap();
     let port = args.port;
     println!("- Connecting to Secure-Signer on port {}", port);
     let host = format!("http://localhost:{port}");
+
+
+    // run /upcheck
+    // todo
 
 
     // ------- for generating BLS key in SS -------
@@ -323,7 +341,7 @@ async fn main() {
 
         // request Secure-Signer to perform Remote Attestation with their ETH key
         let mrenclave = "".into(); // TODO from CLI
-        assert!(verify_remote_attestation(ss_bls_pk_hex.clone(), host.clone(), mrenclave, true).await.is_ok());
+        verify_remote_attestation(ss_bls_pk_hex.clone(), host.clone(), mrenclave, true, &format!("{dir_str}/bls-ra-evidence.json")).await.unwrap();
         println!("- Secure-Signer BLS public key passed remote attestation");
 
         let url = format!("{host}/eth/v1/keystores");
@@ -343,17 +361,23 @@ async fn main() {
 
         // request Secure-Signer to perform Remote Attestation with their ETH key
         let mrenclave = "".into(); // TODO from CLI
-        assert!(verify_remote_attestation(ss_eth_pk_hex.clone(), host.clone(), mrenclave, false).await.is_ok());
+        verify_remote_attestation(ss_eth_pk_hex.clone(), host.clone(), mrenclave, false, &format!("{dir_str}/eth-ra-evidence.json")).await.unwrap();
         println!("- Secure-Signer ETH public key passed remote attestation");
 
         // securely import BLS private key into Secure-Signer
-        let returned_bls_pk = import_bls_key(host.clone(), client_bls_sk_hex, ss_eth_pk_hex)
+        let returned_bls_pk_resp = import_bls_key(host.clone(), client_bls_sk_hex, ss_eth_pk_hex)
             .await
             .unwrap();
+        let returned_bls_pk_raw = returned_bls_pk_resp.data[0].message.clone();
+        let returned_bls_pk = returned_bls_pk_raw.strip_prefix("0x").unwrap_or(&returned_bls_pk_raw).into();
         println!("- Securely transfered validator key to Secure-Signer: {:?}", returned_bls_pk);
 
         let url = format!("{host}/eth/v1/keystores");
         list_keys(host.clone(), true, true).await;
+
+        let mrenclave = "".into(); // TODO from CLI
+        verify_remote_attestation(returned_bls_pk, host.clone(), mrenclave, true, &format!("{dir_str}/bls-ra-evidence.json")).await.unwrap();
+        println!("- Imported BLS public key passed remote attestation");
         return 
     }
 
@@ -363,7 +387,6 @@ async fn main() {
         let validator_pk_hex = args.validator_pk_hex.expect("Validator public key (hex) required for DepositData");
 
         // Create withdrawal credentials
-        let dir = Path::new(KEYSTORE_DIR);
         let (withdrawal_pk_hex, withdrawal_credentials) =
             new_withdrawal_key(dir, &pw).unwrap();
 
