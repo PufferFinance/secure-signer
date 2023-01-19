@@ -4,7 +4,7 @@ use crate::keys::{
     bls_key_gen, eth_key_gen, list_eth_keys, list_generated_bls_keys,
     list_imported_bls_keys, read_eth_key, write_key, new_keystore
 };
-use crate::remote_attesation::{epid_remote_attestation, AttestationEvidence};
+use crate::remote_attestation::{epid_remote_attestation, AttestationEvidence};
 
 use anyhow::{bail, Result};
 use blst::min_pk::PublicKey;
@@ -20,16 +20,24 @@ pub struct RemoteAttestationRequest {
     pub pub_key: String,
 }
 
-//todo
-/// Runs all the logic to generate and save a new BLS key. Returns a `KeyGenResponse` on success.
+#[derive(Deserialize, Serialize, Debug)]
+pub struct RemoteAttestationResponse {
+    pub pub_key: String,
+    pub evidence: AttestationEvidence,
+}
+
+/// Performs remote attestation, committing to the supplied public key (SECP256K1 or BLS) 
+/// iff the key's corresponding private key already exists in enclave. Returns a `RemoteAttestationResponse` on success.
 pub async fn epid_remote_attestation_service(
-    req: RemoteAttestationRequest,
+    pk_hex: String,
 ) -> Result<impl warp::Reply, warp::Rejection> {
-    let from_file = true;
-    match epid_remote_attestation(&req.pub_key, from_file) {
+    match epid_remote_attestation(&pk_hex) {
         Ok(evidence) => {
-            // TODO can embed AttestationEvidence into parent data structure
-            Ok(reply::with_status(reply::json(&evidence), StatusCode::OK))
+            let resp = RemoteAttestationResponse {
+                pub_key: pk_hex,
+                evidence: evidence,
+            };
+            Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
         }
         Err(e) => {
             let mut resp = HashMap::new();
@@ -260,13 +268,9 @@ pub fn decrypt_and_save_imported_bls_key(req: &KeyImportRequest) -> Result<()> {
     }
 
     // save the bls key
-    let password = "pufifish"; // todo
-    let name = new_keystore(Path::new("./etc/keys/bls_keys/imported/"), password, &bls_pk_hex, &bls_sk_bytes)?;
+    let name = new_keystore(Path::new("./etc/keys/bls_keys/imported/"), "", &bls_pk_hex, &bls_sk_bytes)?;
     println!("Imported BLS keystore with pk: {name}");
     Ok(())
-    // let fname = format!("bls_keys/imported/{}", bls_pk_hex);
-    // let bls_sk_hex = hex::encode(bls_sk.serialize());
-    // write_key(&fname, &bls_sk_hex)
 }
 
 /// Decrypts and saves an incoming encrypted BLS key. Returns a `KeyImportResponse` on success.

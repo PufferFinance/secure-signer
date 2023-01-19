@@ -485,8 +485,8 @@ pub struct AggregationSlotRequest {
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct DepositRequest {
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub signingRoot: Root,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signingRoot: Option<Root>,
     pub deposit: DepositMessage,
     #[serde(with = "SerHex::<StrictPfx>")]
     pub genesis_fork_version: Version,

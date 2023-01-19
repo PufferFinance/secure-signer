@@ -145,16 +145,16 @@ pub fn new_keystore(p: &Path, password: &str, name: &str, sk_bytes: &[u8]) -> Re
     Ok(name)
 }
 
-pub fn load_keystore(keystore_path: String, keystore_password: String) -> Result<(String, String)> {
-    let sk_bytes = decrypt_key(Path::new(&keystore_path), &keystore_password)?;
+pub fn load_keystore(keystore_path: &String, keystore_password: &String) -> Result<(String, String)> {
+    let sk_bytes = decrypt_key(Path::new(keystore_path), keystore_password)?;
     let pk = bls_sk_from_hex(hex::encode(&sk_bytes))?.sk_to_pk();
 
     let sk_hex = "0x".to_string() + &hex::encode(&sk_bytes);
     let pk_hex = "0x".to_string() + &hex::encode(pk.compress());
-    println!(
-        "DEBUG loaded keystore: public key: {:?}, private_key: {:?}",
-        pk_hex, sk_hex
-    );
+    // println!(
+    //     "DEBUG loaded keystore: public key: {:?}, private_key: {:?}",
+    //     pk_hex, sk_hex
+    // );
     Ok((sk_hex, pk_hex))
 }
 
@@ -188,7 +188,7 @@ pub fn bls_key_gen(save_key: bool) -> Result<PublicKey> {
     if save_key {
         let name = new_keystore(
             &Path::new("./etc/keys/bls_keys/generated"),
-            "pufifish", // todo
+            "",
             &pk_hex,
             &sk.serialize()
         )?;
@@ -196,6 +196,11 @@ pub fn bls_key_gen(save_key: bool) -> Result<PublicKey> {
     }
 
     Ok(pk)
+}
+
+/// Converts SECP256K1 key to compressed 33 bytes
+pub fn bls_pk_to_hex(pk: &PublicKey) -> String {
+    hex::encode(pk.compress())
 }
 
 pub fn bls_pk_from_hex(pk_hex: String) -> Result<PublicKey> {
@@ -290,7 +295,7 @@ pub fn read_bls_key(pk_hex: &String) -> Result<SecretKey> {
     let pk_hex: String = pk_hex.strip_prefix("0x").unwrap_or(&pk_hex).into();
     let file_path: PathBuf = ["./etc/keys/bls_keys/", pk_hex.as_str()].iter().collect();
     println!("Reading BLS keystore: {:?}", file_path);
-    let sk_rec_bytes = decrypt_key(file_path, "pufifish")?; // todo
+    let sk_rec_bytes = decrypt_key(file_path, "")?; 
     let sk_res = SecretKey::from_bytes(&sk_rec_bytes);
 
     match sk_res.as_ref().err() {
