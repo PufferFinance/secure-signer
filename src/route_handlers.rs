@@ -268,13 +268,9 @@ pub fn decrypt_and_save_imported_bls_key(req: &KeyImportRequest) -> Result<()> {
     }
 
     // save the bls key
-    let password = "pufifish"; // todo
-    let name = new_keystore(Path::new("./etc/keys/bls_keys/imported/"), password, &bls_pk_hex, &bls_sk_bytes)?;
+    let name = new_keystore(Path::new("./etc/keys/bls_keys/imported/"), "", &bls_pk_hex, &bls_sk_bytes)?;
     println!("Imported BLS keystore with pk: {name}");
     Ok(())
-    // let fname = format!("bls_keys/imported/{}", bls_pk_hex);
-    // let bls_sk_hex = hex::encode(bls_sk.serialize());
-    // write_key(&fname, &bls_sk_hex)
 }
 
 /// Decrypts and saves an incoming encrypted BLS key. Returns a `KeyImportResponse` on success.

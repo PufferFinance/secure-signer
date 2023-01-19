@@ -1,4 +1,3 @@
-// #[macro_use]
 extern crate anyhow;
 
 mod eth_signing;
@@ -9,21 +8,24 @@ mod route_handlers;
 mod routes;
 
 use eth_types::DepositResponse;
-use route_handlers::SecureSignerSig;
+use route_handlers::{SecureSignerSig, KeyGenResponse, KeyImportRequest, KeyImportResponse, RemoteAttestationResponse, ListKeysResponse};
+use keys::{eth_pk_to_hex, bls_pk_to_hex};
 
 use anyhow::{bail, Context, Result};
 use blst::min_pk::{PublicKey, SecretKey};
+use clap::Parser;
 use ecies::{decrypt, encrypt};
 use reqwest;
 use serde::Serialize;
 
-use eth_keystore::{decrypt_key, new};
+use eth_keystore::{decrypt_key};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::route_handlers::{KeyGenResponse, KeyImportRequest, KeyImportResponse, RemoteAttestationResponse};
-use crate::keys::{eth_pk_to_hex};
+
+const KEYSTORE_DIR: &str = "keys";
+
 
 pub async fn post_request<T: Serialize>(url: &String, body: T) -> Result<reqwest::Response> {
     let client = reqwest::Client::new();
@@ -33,6 +35,15 @@ pub async fn post_request<T: Serialize>(url: &String, body: T) -> Result<reqwest
         .send()
         .await
         .with_context(|| "Failed POST reqwest with body")
+}
+
+pub async fn get_request(url: &String) -> Result<reqwest::Response> {
+    let client = reqwest::Client::new();
+    client
+        .get(url)
+        .send()
+        .await
+        .with_context(|| "Failed GET reqwest with body")
 }
 
 /// Makes a Reqwest POST request to the /eth/v1/keystores API endpoint to get a KeyImportResponse
@@ -47,26 +58,8 @@ pub async fn bls_key_import_post_request(
         .json::<KeyImportResponse>()
         .await
         .with_context(|| format!("could not parse json response from  URL: {}", url))?;
-    println!("{:#?}", resp);
+    // println!("{:#?}", resp);
     Ok(resp)
-}
-
-/// Makes a Reqwest POST request to the /eth/v1/kegen/secp256k1 API endpoint to get a KeyGenResponse
-pub async fn eth_keygen_post_request(host: String) -> Result<KeyGenResponse> {
-    let url = format!("{host}/eth/v1/keygen/secp256k1");
-    let resp = post_request(&url, {})
-        .await
-        .with_context(|| format!("failed POST request to URL: {}", url))?
-        .json::<KeyGenResponse>()
-        .await
-        .with_context(|| format!("could not parse json response from  URL: {}", url))?;
-    println!("{:#?}", resp);
-    Ok(resp)
-}
-
-async fn get_new_pk(host: String) -> Result<String> {
-    let resp = eth_keygen_post_request(host).await?;
-    Ok(resp.pk_hex)
 }
 
 async fn import_bls_key(
@@ -95,36 +88,89 @@ async fn import_bls_key(
         encrypting_pk_hex: ss_eth_pk_hex,
     };
 
-    println!("{:#?}", req);
+    // println!("{:#?}", req);
     let resp = bls_key_import_post_request(req, host).await?;
     Ok(resp)
 }
 
+async fn list_keys(
+    host: String,
+    bls: bool,
+    imported: bool,
+) -> Result<()> {
+    let url = match bls {
+        true => {
+            match imported {
+                true => format!("{host}/eth/v1/keystores"),
+                false => format!("{host}/eth/v1/keygen/bls"),
+            }
+        },
+        false => format!("{host}/eth/v1/keygen/secp256k1"),
+    };
+    let resp = get_request(&url)
+        .await
+        .with_context(|| format!("failed POST request to URL: {}", url))?
+        .json::<ListKeysResponse>()
+        .await
+        .with_context(|| format!("could not parse json response from : {}", url))?;
+    println!("{:#?}", resp);
+    Ok(())
+}
+
+/// Makes a Reqwest POST request to the /eth/v1/keygen/secp256k1 or /eth/v1/keygen/secp256k1 API endpoint (depends on bls: bool argument) to get a KeyGenResponse
+pub async fn keygen_post_request(host: String, bls: bool) -> Result<KeyGenResponse> {
+    let url = match bls {
+        true => format!("{host}/eth/v1/keygen/bls"),
+        false => format!("{host}/eth/v1/keygen/secp256k1"),
+    };
+    let resp = post_request(&url, {})
+        .await
+        .with_context(|| format!("failed POST request to URL: {}", url))?
+        .json::<KeyGenResponse>()
+        .await
+        .with_context(|| format!("could not parse json response from  URL: {}", url))?;
+    // println!("{:#?}", resp);
+    Ok(resp)
+}
+
+async fn get_new_eth_pk(host: String) -> Result<String> {
+    let resp = keygen_post_request(host, false).await?;
+    Ok(resp.pk_hex)
+}
+
+async fn get_new_bls_pk(host: String) -> Result<String> {
+    let resp = keygen_post_request(host, true).await?;
+    Ok(resp.pk_hex)
+}
+
 fn new_bls_keystore(dir: &Path, name: Option<&str>, password: &str) -> Result<PublicKey> {
     let mut rng = rand::thread_rng();
-    let (private_key, fname) = new(&dir, &mut rng, password, name)?;
-    println!("New keystore: {fname}");
+    let (private_key, fname) = eth_keystore::new(&dir, &mut rng, password, name)?;
+    
     // get the public key
     let pk = match keys::bls_sk_from_hex(hex::encode(&private_key)) {
         Ok(sk) => sk.sk_to_pk(),
         Err(e) => {
             // sometimes generates bad encoded bls key, keep trying
-            fs::remove_file(dir.join(&fname))?;
+            if name.is_some() {
+                fs::remove_file(dir.join(&name.unwrap()))?;
+            } else {
+                fs::remove_file(dir.join(&fname))?;
+            }
             new_bls_keystore(dir, name, password)?
         }
     };
 
-    // println!("New keystore: {fname}");
-    println!(
-        "DEBUG new keystore: public key: {:?}, private_key: {:?}",
-        hex::encode(pk.compress()),
-        hex::encode(private_key)
-    );
+    // println!(
+    //     "DEBUG new keystore: public key: {:?}, private_key: {:?}",
+    //     hex::encode(pk.compress()),
+    //     hex::encode(private_key)
+    // );
     Ok(pk)
 }
 
 fn new_withdrawal_key(dir: &Path, password: &str) -> Result<(String, String)> {
-    let pk = new_bls_keystore(dir, None, password)?;
+    let pk = new_bls_keystore(dir, Some("withdrawal-keystore.json"), password)?;
     let withdrawal_bls_pk_hex = "0x".to_string() + &hex::encode(pk.compress());
     let withdrawal_credentials = "0x".to_string() + &hex::encode(&keys::keccak(&pk.compress())?);
     Ok((withdrawal_bls_pk_hex, withdrawal_credentials))
@@ -145,7 +191,7 @@ pub async fn deposit_post_request(
         .json::<DepositResponse>()
         .await
         .with_context(|| format!("could not parse json response from : {}", url))?;
-    println!("{:#?}", resp);
+    // println!("{:#?}", resp);
     Ok(resp)
 }
 
@@ -160,7 +206,6 @@ fn build_deposit_msg(
         r#"
     {{
         "type": "DEPOSIT",  
-        "signingRoot": "0x139d59dbb1770fdc582ff75193720352ccc76131e37ac69d0c10e7416f3f3050",
         "deposit": {{
             "pubkey": "{validator_pk_hex}",
             "withdrawal_credentials": "{withdrawal_credentials}",
@@ -192,108 +237,180 @@ pub async fn remote_attestation_post_request(
         .json::<RemoteAttestationResponse>()
         .await
         .with_context(|| format!("could not parse json response from : {}", url))?;
-    println!("{:#?}", resp);
+    // println!("{:#?}", resp);
     Ok(resp)
 }
 
-pub async fn verify_eth_remote_attestation(
+pub async fn verify_remote_attestation(
     pk_hex: String,
     host: String,
     mrenclave: String,
+    bls: bool,
 ) -> Result<()> {
     let resp: RemoteAttestationResponse = remote_attestation_post_request(pk_hex.clone(), host).await?;
+    println!("{:#?}", resp);
     assert_eq!(pk_hex, resp.pub_key);
     let evidence = resp.evidence;
     // verify rpt signed by valid intel cert  
     evidence.verify_intel_signing_certificate()?;
-    let got_pk = evidence.get_eth_pk()?;
-    let got_pk_hex = eth_pk_to_hex(&got_pk);
+
+    // extract pk from report body
+    let got_pk_hex = if bls {
+        let got_pk = evidence.get_bls_pk()?;
+        bls_pk_to_hex(&got_pk)
+    } else {
+        let got_pk = evidence.get_eth_pk()?;
+        eth_pk_to_hex(&got_pk)
+    };
     let pk_hex: String = pk_hex.strip_prefix("0x").unwrap_or(&pk_hex).into();
     assert_eq!(pk_hex, got_pk_hex);
 
+    // extract mrencalve from report body
     let got_mre = evidence.get_mrenclave()?;
     println!("got MRENCLAVE: {got_mre}");
     // assert_eq!(mrenclave, ); // todo
     Ok(())
 }
 
-const KEYSTORE_DIR: &str = "keys";
+
+/// Secure-Signer Client Interface
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+   /// The port that Secure-Signer is exposing
+   #[arg(short, long, default_value_t = 9001)]
+   port: u16,
+
+   /// Requests Secure-Signer to generate BLS key perform remote attestation
+   #[arg(short, long)]
+   bls_keygen: bool,
+
+   /// The path to a BLS keystore
+   #[arg(long)]
+   import: Option<String>,
+
+   /// The password to the keystore
+   #[arg(long)]
+   password: Option<String>,
+
+   /// Request Secure-Signer to generate a DepositData
+   #[arg(short, long)]
+   deposit: bool,
+
+   /// The password to the keystore
+   #[arg(short, long)]
+   validator_pk_hex: Option<String>,
+
+   /// The expected MRENCLAVE value
+   #[arg(long)]
+   mrenclave: Option<String>,
+}
 
 #[tokio::main]
 async fn main() {
-    let port = std::env::args()
-        .nth(1)
-        .unwrap_or("3031".into())
-        .parse::<u16>()
-        .expect("BAD PORT");
+    let args = Args::parse();
 
-    println!("Connecting to Secure-Signer on port {}", port);
+    let port = args.port;
+    println!("- Connecting to Secure-Signer on port {}", port);
     let host = format!("http://localhost:{port}");
-    let keystore_path = std::env::args().nth(2).unwrap();
-    let keystore_password = std::env::args().nth(3).unwrap();
 
-    // ------- for importing -------
-    // Load validator keys
-    let (client_bls_sk_hex, client_bls_pk_hex) =
-        keys::load_keystore(keystore_path, keystore_password.clone()).unwrap();
 
-    // request a new ETH key from Secure-Signer
-    let ss_eth_pk_hex = get_new_pk(host.clone()).await.unwrap();
-    println!("Secure-Signer ETH public key: {ss_eth_pk_hex}");
+    // ------- for generating BLS key in SS -------
+    if args.bls_keygen {
+        // request Secure-Signer generate BLS key
+        let ss_bls_pk_hex = get_new_bls_pk(host.clone()).await.expect("SS failed to gen new BLS key");
+        println!("- Secure-Signer generated BLS public key: {ss_bls_pk_hex}");
 
-    // request Secure-Signer to perform Remote Attestation with their ETH key
-    let mrenclave = "".into();
-    assert!(verify_eth_remote_attestation(ss_eth_pk_hex.clone(), host.clone(), mrenclave).await.is_ok());
+        // request Secure-Signer to perform Remote Attestation with their ETH key
+        let mrenclave = "".into(); // TODO from CLI
+        assert!(verify_remote_attestation(ss_bls_pk_hex.clone(), host.clone(), mrenclave, true).await.is_ok());
+        println!("- Secure-Signer BLS public key passed remote attestation");
 
-    // securely import BLS private key into Secure-Signer
-    let returned_bls_pk = import_bls_key(host.clone(), client_bls_sk_hex, ss_eth_pk_hex)
-        .await
-        .unwrap();
-    println!("Secure-Signer registered BLS pk: {:?}", returned_bls_pk);
-    // ------- for importing -------
+        let url = format!("{host}/eth/v1/keystores");
+        list_keys(host.clone(), true, false).await;
+        return 
+    }
 
-    // ------- for deposit -------
-    // Create withdrawal credentials
-    let dir = Path::new(KEYSTORE_DIR);
-    let (withdrawal_pk_hex, withdrawal_credentials) =
-        new_withdrawal_key(dir, &keystore_password).unwrap();
-    println!(
-        "Created withdrawal key {:?} with credentials {:?}",
-        withdrawal_pk_hex, withdrawal_credentials
-    );
+    // ------- for importing BLS key into SS -------
+    if args.import.is_some() && args.password.is_some() {
+        // Load BLS keystore
+        let (client_bls_sk_hex, client_bls_pk_hex) =
+            keys::load_keystore(args.import.as_ref().unwrap(), args.password.as_ref().unwrap()).expect("failed to read keystore");
 
-    // Send DEPOSIT message
-    let fork_version = "00001020";
-    let deposit_msg =
-        build_deposit_msg(&client_bls_pk_hex, &withdrawal_credentials, fork_version).unwrap();
-    println!("{:?}", deposit_msg);
-    let deposit_resp = get_deposit_signature(client_bls_pk_hex.clone(), deposit_msg, &host)
-        .await
-        .unwrap();
+        // request a new ETH key from Secure-Signer
+        let ss_eth_pk_hex = get_new_eth_pk(host.clone()).await.expect("SS failed to gen new ETH key");
+        println!("- Secure-Signer generated ETH public key: {ss_eth_pk_hex}");
 
-    let pubkey = deposit_resp.pubkey;
-    let withdrawal_credentials = deposit_resp.withdrawal_credentials;
-    let amount = deposit_resp.amount;
-    let signature = deposit_resp.signature;
-    let deposit_message_root = deposit_resp.deposit_message_root;
-    let deposit_data_root = deposit_resp.deposit_data_root;
+        // request Secure-Signer to perform Remote Attestation with their ETH key
+        let mrenclave = "".into(); // TODO from CLI
+        assert!(verify_remote_attestation(ss_eth_pk_hex.clone(), host.clone(), mrenclave, false).await.is_ok());
+        println!("- Secure-Signer ETH public key passed remote attestation");
 
-    // Build deposit JSON that works with https://goerli.launchpad.ethereum.org/en/upload-deposit-data
-    let dd = format!(
-        r#"
-    [{{
-        "pubkey": "{pubkey}",
-        "withdrawal_credentials": "{withdrawal_credentials}",
-        "amount": {amount},
-        "signature": "{signature}",
-        "deposit_message_root": "{deposit_message_root}",
-        "deposit_data_root": "{deposit_data_root}",
-        "fork_version": "{fork_version}",
-        "network_name": "goerli",
-        "deposit_cli_version": "2.3.0"
-    }}]"#
-    );
+        // securely import BLS private key into Secure-Signer
+        let returned_bls_pk = import_bls_key(host.clone(), client_bls_sk_hex, ss_eth_pk_hex)
+            .await
+            .unwrap();
+        println!("- Securely transfered validator key to Secure-Signer: {:?}", returned_bls_pk);
 
-    fs::write(dir.join("deposit_data.json"), dd).unwrap();
-    // ------- for deposit -------
+        let url = format!("{host}/eth/v1/keystores");
+        list_keys(host.clone(), true, true).await;
+        return 
+    }
+
+    // ------- for creating DepositData -------
+    if args.deposit {
+        let pw = args.password.expect("Password required to save withdrawal keystore");
+        let validator_pk_hex = args.validator_pk_hex.expect("Validator public key (hex) required for DepositData");
+
+        // Create withdrawal credentials
+        let dir = Path::new(KEYSTORE_DIR);
+        let (withdrawal_pk_hex, withdrawal_credentials) =
+            new_withdrawal_key(dir, &pw).unwrap();
+
+        println!(
+            "Created withdrawal key {:?} with credentials {:?}",
+            withdrawal_pk_hex, withdrawal_credentials
+        );
+
+        // Send DEPOSIT message
+        let fork_version = "00001020";
+        let deposit_msg =
+            build_deposit_msg(&validator_pk_hex, &withdrawal_credentials, fork_version).unwrap();
+        // println!("{:?}", deposit_msg);
+        let deposit_resp = get_deposit_signature(validator_pk_hex.clone(), deposit_msg, &host)
+            .await
+            .unwrap();
+
+        let pubkey = deposit_resp.pubkey;
+        let withdrawal_credentials = deposit_resp.withdrawal_credentials;
+        let amount = deposit_resp.amount;
+        let signature = deposit_resp.signature;
+        let deposit_message_root = deposit_resp.deposit_message_root;
+        let deposit_data_root = deposit_resp.deposit_data_root;
+
+        // Build deposit JSON that works with https://goerli.launchpad.ethereum.org/en/upload-deposit-data
+        let dd = format!(
+            r#"
+        [{{
+            "pubkey": "{pubkey}",
+            "withdrawal_credentials": "{withdrawal_credentials}",
+            "amount": {amount},
+            "signature": "{signature}",
+            "deposit_message_root": "{deposit_message_root}",
+            "deposit_data_root": "{deposit_data_root}",
+            "fork_version": "{fork_version}",
+            "network_name": "goerli",
+            "deposit_cli_version": "2.3.0"
+        }}]"#
+        );
+        
+        let p = dir.join("deposit_data.json");
+        println!("Writing DepositData to {:?}", p);
+        fs::write(p, dd).unwrap();
+
+        return 
+    }
+
+    println!("No commands were ran, run `--help` flag for usage")
+
 }
