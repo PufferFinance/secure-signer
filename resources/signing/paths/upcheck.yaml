@@ -1,0 +1,17 @@
+get:
+  tags:
+    - 'Server Status'
+  summary: 'Server Status'
+  description: |
+    Checks the Secure-Signer server status. Confirms if Secure-Signer is connected and running. 
+  operationId: 'UPCHECK'
+  responses:
+    '200':
+      description: 'OK'
+      content:
+        text/plain; charset=utf-8:
+          schema:
+            type: string
+          example: 'OK'
+    '500':
+      description: 'Internal Secure-Signer server error'

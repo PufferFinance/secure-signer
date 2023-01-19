@@ -17,8 +17,12 @@ paths:
     $ref: './signing/paths/sign.yaml'
   /upcheck:
     $ref: './signing/paths/upcheck.yaml'
-  /eth/v1/keystores:
-    $ref: './keymanager/paths/keygen.yaml'
+  /eth/v1/remote-attestation/{identifier}:
+    $ref: './signing/paths/remote-attestation.yaml'
+  /eth/v1/keygen/bls:
+    $ref: './keygen/paths/bls_keygen.yaml'
+  /eth/v1/keygen/secp256k1:
+    $ref: './keygen/paths/secp256k1_keygen.yaml'
   /eth/v1/keystores:
     $ref: './keymanager/paths/keystores.yaml'
 
