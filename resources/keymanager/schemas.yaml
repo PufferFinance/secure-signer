@@ -17,7 +17,7 @@ components:
       type: string
       description: |
         JSON serialized representation of a single keystore in EIP-2335: BLS12-381 Keystore format.
-      example: '{"version":4,"uuid":"9f75a3fa-1e5a-49f9-be3d-f5a19779c6fa","path":"m/12381/3600/0/0/0","pubkey":"0x93247f2209abcacf57b75a51dafae777f9dd38bc7053d1af526f220a7489a6d3a2753e5f3e8b1cfe39b56f43611df74a","crypto":{"kdf":{"function":"pbkdf2","params":{"dklen":32,"c":262144,"prf":"hmac-sha256","salt":"8ff8f22ef522a40f99c6ce07fdcfc1db489d54dfbc6ec35613edf5d836fa1407"},"message":""},"checksum":{"function":"sha256","params":{},"message":"9678a69833d2576e3461dd5fa80f6ac73935ae30d69d07659a709b3cd3eddbe3"},"cipher":{"function":"aes-128-ctr","params":{"iv":"31b69f0ac97261e44141b26aa0da693f"},"message":"e8228bafec4fcbaca3b827e586daad381d53339155b034e5eaae676b715ab05e"}}}'
+      example: '{"crypto":{"cipher":"aes-128-ctr","cipherparams":{"iv":"0a68d3bf7100eee506501964a38462a5"},"ciphertext":"fcdf80c4ab4b932715d7aa64de0437d60b0b32c07638e6d817b31716d0468820","kdf":"scrypt","kdfparams":{"dklen":32,"n":8192,"p":1,"r":8,"salt":"72309c01a897cebb754838ddb0d4073706445202ce2e7728771bdefc47484f50"},"mac":"0c920db1858f12479f5a5fd3e6c247ad3b1196ea2a9d7335148cef6d816422c1"},"id":"a88d18e2-4a70-4261-b6c6-96edd76ba5c5","version":3}'
 
     SlashingProtectionData:
       type: string
