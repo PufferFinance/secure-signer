@@ -311,37 +311,37 @@ impl NetworkConfig {
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-   /// The port that Secure-Signer is exposing
-   #[arg(short, long, default_value_t = 9001)]
-   port: u16,
+    /// The port that Secure-Signer is exposing
+    #[arg(short, long, default_value_t = 9001)]
+    port: u16,
 
-   /// The path to the directory to save Secure-Signer outputs
-   #[arg(short, long, default_value = "./ss_out")]
-   outdir: String,
+    /// The path to the directory to save Secure-Signer outputs
+    #[arg(short, long, default_value = "./ss_out")]
+    outdir: String,
 
-   /// Requests Secure-Signer to generate BLS key perform remote attestation
-   #[arg(short, long)]
-   bls_keygen: bool,
+    /// Requests Secure-Signer to generate BLS key perform remote attestation
+    #[arg(short, long)]
+    bls_keygen: bool,
 
-   /// The path to a BLS keystore
-   #[arg(long)]
-   import: Option<String>,
+    /// The path to a BLS keystore
+    #[arg(long)]
+    import: Option<String>,
 
-   /// The password to the keystore
-   #[arg(long)]
-   password: Option<String>,
+    /// The password to the keystore
+    #[arg(long)]
+    password: Option<String>,
 
-   /// Request Secure-Signer to generate a DepositData
-   #[arg(short, long)]
-   deposit: bool,
+    /// Request Secure-Signer to generate a DepositData
+    #[arg(short, long)]
+    deposit: bool,
 
-   /// The validator public key in hex
-   #[arg(short, long)]
-   validator_pk_hex: Option<String>,
+    /// The validator public key in hex
+    #[arg(short, long)]
+    validator_pk_hex: Option<String>,
 
-   /// The expected MRENCLAVE value
-   #[arg(long)]
-   mrenclave: Option<String>,
+    /// The expected MRENCLAVE value
+    #[arg(long, default_value = "0x123456789")]
+    mrenclave: String,
 
     /// The path to the JSON network config file
     #[arg(short, long, default_value = "network_config.json")]
@@ -369,9 +369,9 @@ async fn main() {
         let ss_bls_pk_hex = get_new_bls_pk(host.clone()).await.expect("SS failed to gen new BLS key");
         println!("- Secure-Signer generated BLS public key: {ss_bls_pk_hex}");
 
-        // request Secure-Signer to perform Remote Attestation with their ETH key
-        let mrenclave = "".into(); // TODO from CLI
-        verify_remote_attestation(ss_bls_pk_hex.clone(), host.clone(), mrenclave, true, &format!("{dir_str}/bls-ra-evidence.json")).await.unwrap();
+        // request Secure-Signer to perform Remote Attestation with their BLS key
+        #[cfg(target_os = "linux")]
+        verify_remote_attestation(ss_bls_pk_hex.clone(), host.clone(), args.mrenclave.clone(), true, &format!("{dir_str}/bls-ra-evidence.json")).await.unwrap();
         println!("- Secure-Signer BLS public key passed remote attestation");
 
         let url = format!("{host}/eth/v1/keystores");
@@ -391,8 +391,8 @@ async fn main() {
         println!("- Secure-Signer generated ETH public key: {ss_eth_pk_hex}");
 
         // request Secure-Signer to perform Remote Attestation with their ETH key
-        let mrenclave = "".into(); // TODO from CLI
-        verify_remote_attestation(ss_eth_pk_hex.clone(), host.clone(), mrenclave, false, &format!("{dir_str}/eth-ra-evidence.json")).await.unwrap();
+        #[cfg(target_os = "linux")]
+        verify_remote_attestation(ss_eth_pk_hex.clone(), host.clone(), args.mrenclave.clone(), false, &format!("{dir_str}/eth-ra-evidence.json")).await.unwrap();
         println!("- Secure-Signer ETH public key passed remote attestation");
 
         // securely import BLS private key into Secure-Signer
@@ -406,8 +406,9 @@ async fn main() {
         let url = format!("{host}/eth/v1/keystores");
         list_keys(host.clone(), true, true).await;
 
-        // let mrenclave = "".into(); // TODO from CLI
-        verify_remote_attestation(returned_bls_pk, host.clone(), mrenclave, true, &format!("{dir_str}/bls-ra-evidence.json")).await.unwrap();
+        // request Secure-Signer to perform Remote Attestation with their BLS key
+        #[cfg(target_os = "linux")]
+        verify_remote_attestation(returned_bls_pk, host.clone(), args.mrenclave.clone(), true, &format!("{dir_str}/bls-ra-evidence.json")).await.unwrap();
         println!("- Imported BLS public key passed remote attestation");
         return 
     }

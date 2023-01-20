@@ -857,7 +857,7 @@ pub mod mock_requests {
         let req = format!(r#"
         {{
             "type": "DEPOSIT",
-            "signingRoot": "0x139d59dbb1770fdc582ff75193720352ccc76131e37ac69d0c10e7416f3f3050",
+            "genesis_fork_version":"00001020",
             "deposit": {{
                 "pubkey": "0x8996c1117cb75927eb53db74b25c3668c0f7b08d34cdb8de1062bef578fb1c1e32032e0555e9f5be47cd5e8f0f2705d5",
                 "withdrawal_credentials": "0x75362a41a82133d71eee01e602ad564c73590557bb7c994cf9be5620d2023a58",
