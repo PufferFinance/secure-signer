@@ -80,27 +80,24 @@ pub async fn bls_key_import_post_request(
 
 async fn import_bls_key(
     host: String,
-    client_bls_sk_hex: String,
+    keystore_str: String,
+    password: String,
     ss_eth_pk_hex: String,
 ) -> Result<KeyImportResponse> {
-    // Compute bls pk
-    let client_bls_sk = keys::bls_sk_from_hex(client_bls_sk_hex)?;
-    let client_bls_pk_hex: String =
-        "0x".to_string() + &hex::encode(client_bls_sk.sk_to_pk().compress());
 
-    // ECDH envelope encrypt client BLS key with Secure-Signer's SECP256K1 public key
+    // ECDH envelope encrypt keystore password with Secure-Signer's SECP256K1 public key
     let ss_eth_pk_hex_stripped: String = ss_eth_pk_hex
         .strip_prefix("0x")
         .unwrap_or(&ss_eth_pk_hex)
         .into();
     let ss_eth_pk_bytes = hex::decode(&ss_eth_pk_hex_stripped)?;
-    let client_ct_bls_sk_bytes = encrypt(&ss_eth_pk_bytes, &client_bls_sk.serialize())?;
-    let client_ct_bls_sk_hex = "0x".to_string() + &hex::encode(client_ct_bls_sk_bytes);
+    let ct_password_bytes = encrypt(&ss_eth_pk_bytes, &password.as_bytes())?;
+    let ct_password_hex = "0x".to_string() + &hex::encode(ct_password_bytes);
 
     // Bundle together
     let req = KeyImportRequest {
-        ct_bls_sk_hex: client_ct_bls_sk_hex,
-        bls_pk_hex: client_bls_pk_hex,
+        keystore: keystore_str,
+        ct_password_hex: ct_password_hex,
         encrypting_pk_hex: ss_eth_pk_hex,
     };
 
@@ -385,8 +382,9 @@ async fn main() {
     // ------- for importing BLS key into SS -------
     if args.import.is_some() && args.password.is_some() {
         // Load BLS keystore
-        let (client_bls_sk_hex, client_bls_pk_hex) =
-            keys::load_keystore(args.import.as_ref().unwrap(), args.password.as_ref().unwrap()).expect("failed to read keystore");
+        let keystore_pw = args.password.expect("keystore password expected");
+        let keystore_path = args.import.expect("bad keystore path");
+        let keystore_str: String = fs::read_to_string(keystore_path).expect("couldn't read keystore");
 
         // request a new ETH key from Secure-Signer
         let ss_eth_pk_hex = get_new_eth_pk(host.clone()).await.expect("SS failed to gen new ETH key");
@@ -398,17 +396,17 @@ async fn main() {
         println!("- Secure-Signer ETH public key passed remote attestation");
 
         // securely import BLS private key into Secure-Signer
-        let returned_bls_pk_resp = import_bls_key(host.clone(), client_bls_sk_hex, ss_eth_pk_hex)
+        let returned_bls_pk_resp = import_bls_key(host.clone(), keystore_str, keystore_pw, ss_eth_pk_hex)
             .await
             .unwrap();
         let returned_bls_pk_raw = returned_bls_pk_resp.data[0].message.clone();
-        let returned_bls_pk = returned_bls_pk_raw.strip_prefix("0x").unwrap_or(&returned_bls_pk_raw).into();
+        let returned_bls_pk = returned_bls_pk_raw.strip_prefix("0x").unwrap_or(&returned_bls_pk_raw).to_string();
         println!("- Securely transfered validator key to Secure-Signer: {:?}", returned_bls_pk);
 
         let url = format!("{host}/eth/v1/keystores");
         list_keys(host.clone(), true, true).await;
 
-        let mrenclave = "".into(); // TODO from CLI
+        // let mrenclave = "".into(); // TODO from CLI
         verify_remote_attestation(returned_bls_pk, host.clone(), mrenclave, true, &format!("{dir_str}/bls-ra-evidence.json")).await.unwrap();
         println!("- Imported BLS public key passed remote attestation");
         return 

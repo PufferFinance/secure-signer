@@ -1,11 +1,13 @@
 use crate::eth_signing::*;
 use crate::eth_types::*;
+use crate::keys::load_then_save_keystore;
 use crate::keys::{
     bls_key_gen, eth_key_gen, list_eth_keys, list_generated_bls_keys,
     list_imported_bls_keys, read_eth_key, write_key, new_keystore
 };
 use crate::remote_attestation::{epid_remote_attestation, AttestationEvidence};
 
+use anyhow::Context;
 use anyhow::{bail, Result};
 use blst::min_pk::PublicKey;
 use blst::min_pk::SecretKey;
@@ -204,11 +206,11 @@ pub async fn list_eth_keys_service() -> Result<impl warp::Reply, warp::Rejection
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct KeyImportRequest {
-    /// The encrypted BLS key to import
-    pub ct_bls_sk_hex: String,
-    /// The public key
-    pub bls_pk_hex: String,
-    /// The SECP256K1 public key safeguarded in TEE that encrypted ct_bls_sk_hex
+    /// The BLS keystore to import
+    pub keystore: String,
+    /// The encrypted keystore password
+    pub ct_password_hex: String,
+    /// The SECP256K1 public key safeguarded in TEE that encrypted ct_password
     pub encrypting_pk_hex: String,
 }
 
@@ -239,38 +241,27 @@ impl KeyImportResponse {
     }
 }
 
-/// Decrypts a BLS private key that was encrypted via ECDH with an SECP256K1 key
-/// safeguarded by the TEE, then saves the BLS key. Expects the bls_pk_hex to be compressed (48 bytes),
-/// and the eth encrypting_pk_hex to be compressed (33 bytes)
-pub fn decrypt_and_save_imported_bls_key(req: &KeyImportRequest) -> Result<()> {
+/// Decrypts a BLS keystore where the password was encrypted via ECDH with an SECP256K1 key
+/// safeguarded by the TEE, then saves a new keystore to enclave memory. Expects the 
+/// ETH encrypting_pk_hex to be compressed (33 bytes) and hex-encoded. 
+pub fn decrypt_and_save_imported_bls_key(req: &KeyImportRequest) -> Result<String> {
     println!("DEBUG: servicing req: {:?}", req);
     println!("reading eth key with pk: {}", req.encrypting_pk_hex);
     // fetch safeguarded ETH private key
     let sk = read_eth_key(&req.encrypting_pk_hex)?;
 
-    // get plaintext bls key
-    let ct_bls_sk_hex: String = req.ct_bls_sk_hex.strip_prefix("0x").unwrap_or(&req.ct_bls_sk_hex).into();
-    let ct_bls_sk_bytes = hex::decode(&ct_bls_sk_hex)?;
-    let bls_sk_bytes = decrypt(&sk.serialize(), &ct_bls_sk_bytes)?;
-    println!("decrypted imported sk: {}", hex::encode(&bls_sk_bytes));
-    let bls_sk = match SecretKey::from_bytes(&bls_sk_bytes) {
-        Ok(sk) => sk,
-        Err(e) => bail!(
-            "decrypt_and_save_imported_bls_key() couldn't recover bls sk from import request: {:?}",
-            e
-        ),
-    };
+    // get plaintext password
+    let ct_password_hex: String = req.ct_password_hex.strip_prefix("0x").unwrap_or(&req.ct_password_hex).into();
+    let ct_password_bytes = hex::decode(&ct_password_hex)?;
+    let password_bytes = decrypt(&sk.serialize(), &ct_password_bytes)?;
+    let password = String::from_utf8(password_bytes).with_context(|| "non-utf8 password")?;
+    println!("DEBUG: decrypted password: {}", password);
 
-    // verify supplied pk is dervied from this sk
-    let bls_pk_hex: String = req.bls_pk_hex.strip_prefix("0x").unwrap_or(&req.bls_pk_hex).into();
-    if hex::encode(bls_sk.sk_to_pk().compress()) != bls_pk_hex {
-        bail!("The imported bls sk doesn't match the expected bls pk")
-    }
+    // Decrypt the keystore using decrpyted password then save bls key to new keystore
+    let pk_hex = load_then_save_keystore(&req.keystore, &password)?;
 
-    // save the bls key
-    let name = new_keystore(Path::new("./etc/keys/bls_keys/imported/"), "", &bls_pk_hex, &bls_sk_bytes)?;
-    println!("Imported BLS keystore with pk: {name}");
-    Ok(())
+    println!("Imported BLS keystore with pk: {pk_hex}");
+    Ok(pk_hex)
 }
 
 /// Decrypts and saves an incoming encrypted BLS key. Returns a `KeyImportResponse` on success.
@@ -279,9 +270,9 @@ pub async fn bls_key_import_service(
 ) -> Result<impl warp::Reply, warp::Rejection> {
     println!("log: bls_key_import_service()");
     match decrypt_and_save_imported_bls_key(&req) {
-        Ok(()) => {
+        Ok(bls_pk_hex) => {
             // The key has successfully been saved, formulate http response
-            let resp = KeyImportResponse::new(req.bls_pk_hex);
+            let resp = KeyImportResponse::new(bls_pk_hex);
             Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
         }
         Err(e) => {
