@@ -1,8 +1,7 @@
 [package]
 name = "puffersecuresigner"
-version = "1.0.0"
-authors = ["Jason Vranek <jason@portalcompute.com>"]
-build = "build.rs"
+version = "0.1.0"
+authors = ["Jason Vranek <jason@pufferi.fi>"]
 edition = "2021"
 
 [build]
