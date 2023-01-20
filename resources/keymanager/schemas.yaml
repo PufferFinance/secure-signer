@@ -1,0 +1,65 @@
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Pubkey:
+      type: string
+      pattern: "^0x[a-fA-F0-9]{96}$"
+      description: |
+        The validator's BLS public key, uniquely identifying them. _48-bytes, hex encoded with 0x prefix, case insensitive._
+      example: "0x93247f2209abcacf57b75a51dafae777f9dd38bc7053d1af526f220a7489a6d3a2753e5f3e8b1cfe39b56f43611df74a"
+
+    Keystore:
+      type: string
+      description: |
+        JSON serialized representation of a single keystore in EIP-2335: BLS12-381 Keystore format.
+      example: '{"crypto":{"cipher":"aes-128-ctr","cipherparams":{"iv":"0a68d3bf7100eee506501964a38462a5"},"ciphertext":"fcdf80c4ab4b932715d7aa64de0437d60b0b32c07638e6d817b31716d0468820","kdf":"scrypt","kdfparams":{"dklen":32,"n":8192,"p":1,"r":8,"salt":"72309c01a897cebb754838ddb0d4073706445202ce2e7728771bdefc47484f50"},"mac":"0c920db1858f12479f5a5fd3e6c247ad3b1196ea2a9d7335148cef6d816422c1"},"id":"a88d18e2-4a70-4261-b6c6-96edd76ba5c5","version":3}'
+
+    SlashingProtectionData:
+      type: string
+      description: |
+        JSON serialized representation of the slash protection data in format defined in EIP-3076: Slashing Protection Interchange Format.
+      example: '{"metadata":{"interchange_format_version":"5","genesis_validators_root":"0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2"},"data":[{"pubkey":"0x93247f2209abcacf57b75a51dafae777f9dd38bc7053d1af526f220a7489a6d3a2753e5f3e8b1cfe39b56f43611df74a","signed_blocks":[],"signed_attestations":[]}]}'
+
+    ErrorResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          description: "Detailed error message"
+          type: string
+          example: "description of the error that occurred"
+
+  responses:
+    BadRequest:
+      description: "Bad request. Request was malformed and could not be processed"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Unauthorized:
+      description: "Unauthorized, no token is found"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Forbidden:
+      description: "Forbidden, a token is found but is invalid"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    InternalError:
+      description: "Internal server error. The server encountered an unexpected error indicative of
+                    a serious fault in the system, or a bug."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"

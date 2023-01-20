@@ -158,6 +158,37 @@ pub fn load_keystore(keystore_path: &String, keystore_password: &String) -> Resu
     Ok((sk_hex, pk_hex))
 }
 
+pub fn load_then_save_keystore(keystore_str: &String, keystore_password: &String) -> Result<String> {
+    // temporarily save keystore
+    let temp_path = "./etc/keys/temp";
+    fs::write(temp_path, keystore_str)?;
+    // decrypt keystore
+    let sk_bytes = match decrypt_key(Path::new(temp_path), keystore_password) {
+        Ok(bs) => bs,
+        Err(e) => {
+            fs::remove_file(temp_path)?;
+            bail!("Couldn't decrypt keystore")
+        }
+    };
+    let pk = match bls_sk_from_hex(hex::encode(&sk_bytes)) {
+        Ok(pk) => pk.sk_to_pk(),
+        Err(e) => {
+            fs::remove_file(temp_path)?;
+            bail!("Couldn't convert bls sk")
+        }
+    };
+    let pk_hex = hex::encode(pk.compress());
+
+    // delete temp keystore
+    fs::remove_file(temp_path)?;
+
+    // generate a new keystore
+    let keystore_path = "./etc/keys/bls_keys/imported/";
+    new_keystore(Path::new(keystore_path), "", &pk_hex, &sk_bytes)?;
+    let prefixed_pk_hex: String = "0x".to_owned() + &pk_hex;
+    Ok(prefixed_pk_hex)
+}
+
 /// Generates a new BLS secret key from randomness
 pub fn new_bls_key() -> Result<SecretKey> {
     // rng

@@ -81,7 +81,7 @@ pub fn list_generated_eth_keys_route() -> impl Filter<Extract = impl warp::Reply
         .and_then(list_eth_keys_service)
 }
 
-/// Generates a new BLS private key in Enclave. To remain compatible with web3signer POST /eth/v1/keystores, the JSON body is not parsed. The BLS public key is returned 
+/// Generates a new BLS private key in Enclave. 
 /// Route added by Secure-Signer
 pub fn bls_key_gen_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::post()

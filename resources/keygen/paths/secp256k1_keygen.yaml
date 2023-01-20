@@ -1,0 +1,64 @@
+post:
+  operationId: ETH_KEYGEN
+  summary: Generate ETH Key.
+  description: |
+    Generates a fresh ETH (SECP256K1) keypair within Secure-Signer. Returns the hex-encoded ETH public 
+    key for the private ETH key that was generated in Secure-Signer.
+  security:
+    - bearerAuth: []
+  tags:
+    - ETH Keygen
+  responses:
+    "200":
+      description: Success response
+      content:
+        application/json:
+          schema:
+            title: KeyGenResponse
+            type: object
+            required: [pk_hex]
+            properties:
+              pk_hex:
+                $ref: "../schemas.yaml#/components/schemas/EthPubkey"
+    "400":
+      $ref: "../schemas.yaml#/components/responses/BadRequest"
+    "401":
+      $ref: "../schemas.yaml#/components/responses/Unauthorized"
+    "403":
+      $ref: "../schemas.yaml#/components/responses/Forbidden"
+    "500":
+      $ref: "../schemas.yaml#/components/responses/InternalError"
+
+get:
+  operationId: ETH_KEYGEN_LIST
+  summary: List Generated ETH Keys.
+  description: |
+    Returns a list of hex-encoded ETH (SECP256K1) public keys for the private ETH keys that were generated in Secure-Signer.
+  security:
+    - bearerAuth: []
+  tags:
+    - ETH Keygen
+  responses:
+    "200":
+      description: Success response
+      content:
+        application/json:
+          schema:
+            title: ListKeysResponse
+            type: object
+            required: [data]
+            properties:
+              data:
+                type: array
+                items:
+                  type: object
+                  required: [pubkey]
+                  properties:
+                    pubkey:
+                      $ref: "../schemas.yaml#/components/schemas/EthPubkey"
+    "401":
+      $ref: "../schemas.yaml#/components/responses/Unauthorized"
+    "403":
+      $ref: "../schemas.yaml#/components/responses/Forbidden"
+    "500":
+      $ref: "../schemas.yaml#/components/responses/InternalError"
