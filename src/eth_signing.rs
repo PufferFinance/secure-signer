@@ -389,7 +389,7 @@ pub mod slash_resistance_tests {
         let pk = sk.sk_to_pk();
         let pk_hex = hex::encode(pk.compress());
         // save keystore
-        let name = new_keystore(Path::new("./etc/keys/bls_keys/generated/"), "pufifish", &pk_hex, &sk.serialize()).unwrap();
+        let name = new_keystore(Path::new("./etc/keys/bls_keys/generated/"), "", &pk_hex, &sk.serialize()).unwrap();
         println!("DEBUG: using pk: {pk_hex}");
         pk_hex
     }
@@ -406,7 +406,7 @@ pub mod slash_resistance_tests {
         let pk = sk.sk_to_pk();
         let pk_hex = hex::encode(pk.compress());
         // save keystore
-        let name = new_keystore(Path::new("./etc/keys/bls_keys/generated/"), "pufifish", &pk_hex, &sk.serialize()).unwrap();
+        let name = new_keystore(Path::new("./etc/keys/bls_keys/generated/"), "", &pk_hex, &sk.serialize()).unwrap();
         println!("DEBUG: using pk: {pk_hex}");
         pk_hex
     }
