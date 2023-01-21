@@ -9,15 +9,15 @@ RUN apt update && DEBIAN_FRONTEND="noninteractive" apt install -y --no-install-r
     echo 'deb [arch=amd64] https://occlum.io/occlum-package-repos/debian focal main' | tee /etc/apt/sources.list.d/occlum.list && \
     wget -qO - https://occlum.io/occlum-package-repos/debian/public.key | apt-key add - && \
     apt update && \
-    apt install -y libsgx-uae-service && \
-    apt install -y libsgx-dcap-ql && \
-    apt install -y libsgx-dcap-default-qpl && \
-    apt install -y occlum-runtime && \
     apt install -y libsgx-epid && \
     apt install -y libsgx-quote-ex && \
     apt install -y libsgx-dcap-ql && \
     apt install -y libsgx-urts && \
     apt install -y libsgx-uae-service && \
+    apt install -y libsgx-dcap-ql && \
+    apt install -y libsgx-dcap-default-qpl && \
+    apt install -y occlum-runtime && \
+    service aesmd status && \
     apt clean && \
     rm -rf /var/lib/apt/lists/*
 ENV PATH="/opt/occlum/build/bin:/usr/local/occlum/bin:$PATH"

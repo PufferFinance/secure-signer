@@ -36,6 +36,7 @@ docker container rm ${container_name}
 echo "Start Secure-Signer server in backgound ..."
 docker run -itd --network host \
         -v ~/secure-signer:/root/secure-signer \
+        -v /var/run/aesmd:/var/run/aesmd \
         --device /dev/sgx/enclave --device /dev/sgx/provision \
         --name ${container_name} \
         ${registry}/secure_signer_image:${tag} #\
