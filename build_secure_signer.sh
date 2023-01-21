@@ -1,14 +1,14 @@
 #!/bin/bash
 set -e
 
-script_dir="$(dirname $(readlink -f $0))"
+script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}"  )" >/dev/null 2>&1 && pwd )"
 
 export OPENSSL_DIR="/usr/local/occlum/x86_64-linux-musl/"
-export RA_CONFIG_NAME="ra_config.json"
-export ENCLAVE_NAME="Secure-Signer"
-export INSTANCE_PATH="${script_dir}/${ENCLAVE_NAME}"
-export BINARY_NAME="secure-signer"
-export PORT=9001
+export ra_config_name="ra_config.json"
+export enclave_name="Secure-Signer"
+export image_path="${script_dir}/${enclave_name}"
+export binary_name="secure-signer"
+ss_port=9001
 
 function build_secure_signer()
 {
@@ -16,40 +16,36 @@ function build_secure_signer()
 	./build_epid_ra.sh
 
     # compile secure-signer
-    # occlum-cargo clean
 	occlum-cargo build --release
 }
 
 function new_ss_instance()
 {
-    rm -rf ${ENCLAVE_NAME}
-    mkdir -p ${INSTANCE_PATH}
+    rm -rf ${enclave_name}
+    mkdir -p ${image_path}
 
-    pushd ${ENCLAVE_NAME}
-    occlum init ${ENCLAVE_NAME}
+    pushd ${enclave_name}
+        occlum init ${enclave_name}
 
-    # prepare SS content
-    copy_bom -f ../conf/secure-signer-rust-config.yaml --root image --include-dir /opt/occlum/etc/template
-	cp ../conf/${RA_CONFIG_NAME} ./image/etc/
-    cp /etc/resolv.conf ./image/etc
-	cp /etc/hosts ./image/etc
+        # prepare SS content
+        copy_bom -f ../conf/secure-signer-rust-config.yaml --root image --include-dir /opt/occlum/etc/template
+        cp ../conf/${ra_config_name} ./image/etc/
+        cp /etc/resolv.conf ./image/etc
+        cp /etc/hosts ./image/etc
 
-    new_json="$(jq '.resource_limits.user_space_size = "128MB" |
-                    .resource_limits.kernel_space_heap_size="256MB" |
-                    .process.default_heap_size = "32MB" |
-                    .resource_limits.max_num_of_threads = 32 |
-                    .metadata.debuggable = false' Occlum.json)" && \
-    echo "${new_json}" > Occlum.json
-    
-    # build the image
-    occlum build
-
-    # occlum package ${ENCLAVE_NAME}
+        new_json="$(jq '.resource_limits.user_space_size = "128MB" |
+                        .resource_limits.kernel_space_heap_size="256MB" |
+                        .process.default_heap_size = "32MB" |
+                        .resource_limits.max_num_of_threads = 32 |
+                        .metadata.debuggable = false' Occlum.json)" && \
+        echo "${new_json}" > Occlum.json
+        
+        occlum build
     popd
 }
 
-function get_mr() {
-    pushd ${INSTANCE_PATH}
+function measure() {
+    pushd ${image_path}
         echo "MRENCLAVE:"
         occlum print mrenclave
         echo "MRSIGNER:"
@@ -58,16 +54,61 @@ function get_mr() {
 }
 
 function run() {
-    cd ${INSTANCE_PATH} && occlum run /bin/${BINARY_NAME} ${PORT}
+    cd ${image_path} && occlum run /bin/${binary_name} ${ss_port}
 }
 
 function package() {
-    cd ${INSTANCE_PATH} && occlum package ${ENCLAVE_NAME}
+    cd ${image_path} && occlum package ${enclave_name}
 }
 
+function build() {
+    build_secure_signer
+    new_ss_instance
+    measure
+    package
+}
 
-build_secure_signer
-new_ss_instance
-package
-get_mr
-run
+function clean_build() {
+    occlum-cargo clean
+    build
+}
+
+function dockerize() {
+    pushd ${script_dir}
+        ./container/build_image.sh \
+            -i ./${enclave_name}/${enclave_name}.tar.gz \
+            -n secure_signer_image
+    echo ${script_dir}
+
+    popd 
+}
+
+function usage {
+    cat << EOM
+Run container images secure_signer_image in background.
+usage: $(basename "$0") [OPTION]...
+    -p <Secure-Signer Server port> default 9001.
+    -c clean Cargo then build all
+    -b build cached
+    -r Run Secure-Signer on port set by -p (default 9001).
+    -d Clean Build -> package -> create Docker Image
+    -m Measure MRENCLAVE and MRSIGNER.
+    -h <usage> usage help
+EOM
+    exit 0
+}
+
+function process_args {
+    while getopts ":pcbrdmh" option; do
+        case "${option}" in
+            p) ss_port=${OPTARG};;
+            c) clean_build;;
+            b) build;;
+            r) run;;
+            d) dockerize;;
+            m) measure;;
+            h) usage;;
+        esac
+    done
+}
+process_args "$@"
