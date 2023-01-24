@@ -1,7 +1,7 @@
 FROM ubuntu:20.04
 LABEL maintainer="Jason Vranek <jason@puffer.fi>"
 
-# Install SGX DCAP and Occlum runtime
+# Install SGX, EPID, DCAP, and Occlum runtime
 ENV APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1
 RUN apt update && DEBIAN_FRONTEND="noninteractive" apt install -y --no-install-recommends gnupg wget ca-certificates jq && \
     echo 'deb [arch=amd64] https://download.01.org/intel-sgx/sgx_repo/ubuntu focal main' | tee /etc/apt/sources.list.d/intel-sgx.list && \
@@ -17,7 +17,6 @@ RUN apt update && DEBIAN_FRONTEND="noninteractive" apt install -y --no-install-r
     apt install -y libsgx-dcap-ql && \
     apt install -y libsgx-dcap-default-qpl && \
     apt install -y occlum-runtime && \
-    service aesmd status && \
     apt clean && \
     rm -rf /var/lib/apt/lists/*
 ENV PATH="/opt/occlum/build/bin:/usr/local/occlum/bin:$PATH"

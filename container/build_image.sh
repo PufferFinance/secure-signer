@@ -13,18 +13,20 @@ usage: $(basename "$0") [OPTION]...
     -r <registry prefix> the prefix string for registry
     -n <container image name> 
     -g <tag> container image tag
+    -b <base image name>
     -h <usage> usage help
 EOM
     exit 0
 }
 
 function process_args {
-    while getopts ":i:r:n:g:h" option; do
+    while getopts ":i:r:n:g:b:h" option; do
         case "${option}" in
             i) package=${OPTARG};;
             r) registry=${OPTARG};;
             n) name=${OPTARG};;
             g) tag=${OPTARG};;
+            b) base_image_name=${OPTARG};;
             h) usage;;
         esac
     done
@@ -49,7 +51,7 @@ function build_docker_occlum_image {
         --build-arg http_proxy=$http_proxy \
         --build-arg https_proxy=$https_proxy \
         --build-arg OCCLUM_PACKAGE=${package} \
-        -f container/Dockerfile_SS.ubuntu20.04 . \
+        -f ${base_image_name} . \
         -t ${registry}/${name}:${tag}
 }
 

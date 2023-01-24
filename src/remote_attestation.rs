@@ -14,14 +14,14 @@ use std::os::raw::c_char;
 
 use crate::keys;
 
-#[cfg(target_os = "sgx")]
+#[cfg(not(feature = "dev"))]
 #[link(name = "epid")]
 extern "C" {
    /// The cpp function for epid remote attestation with IAS defined in src/ra_wrapper.cpp
    fn do_epid_ra(data: *const u8, report: *mut c_char, signature: *mut c_char, signing_cert: *mut c_char);
 }
 
-#[cfg(not(target_os = "sgx"))]
+#[cfg(feature = "dev")]
 // Use this func sig for local development
 pub fn do_epid_ra(data: *const u8, report: *mut c_char, signature: *mut c_char, signing_cert: *mut c_char) {}
 
