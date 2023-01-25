@@ -1,8 +1,7 @@
 [package]
 name = "puffersecuresigner"
-version = "1.0.0"
-authors = ["Jason Vranek <jason@portalcompute.com>"]
-build = "build.rs"
+version = "0.1.0"
+authors = ["Jason Vranek <jason@pufferi.fi>"]
 edition = "2021"
 
 [build]
@@ -49,10 +48,14 @@ reqwest = { version = "0.11", features = ["json"] }
 anyhow = "1.0.65"
 clap = { version = "4.1.1", features = ["derive"] }
 
+[features]
+dev = []
+
 [[bin]] # Bin to run the sgx-signer rpc
 name = "secure-signer"
 path = "src/secure_signer.rs"
 
 [[bin]] # Bin to run the client 
+required-features = ["dev"]
 name = "client"
 path = "src/client.rs"

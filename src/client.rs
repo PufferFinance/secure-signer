@@ -344,7 +344,7 @@ struct Args {
     mrenclave: String,
 
     /// The path to the JSON network config file
-    #[arg(short, long, default_value = "network_config.json")]
+    #[arg(short, long, default_value = "./conf/network_config.json")]
     config: String,
 }
 
