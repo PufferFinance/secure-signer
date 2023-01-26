@@ -1,6 +1,5 @@
 use crate::eth_types::{Slot, Epoch, Root, BLSPubkey, from_u64_string, from_bls_pk_hex};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use serde::de;
 use hex;
 use serde_hex::{SerHex, StrictPfx};
 use anyhow::{Result, bail, Context};
@@ -70,7 +69,7 @@ impl SlashingProtectionData {
     }
   }
 
-  fn get_latest_signed_block_slot(&self) -> Slot {
+  pub fn get_latest_signed_block_slot(&self) -> Slot {
     match self.signed_blocks.last() {
       None => 0,
       Some(b) => b.slot
@@ -79,7 +78,7 @@ impl SlashingProtectionData {
 
   /// If the SlashingProtectionDB is growable, append the new block, otherwise
   /// overwrite the 0th element.
-  fn new_block(&mut self, block: SignedBlockSlot, growable: bool) -> Result<()> {
+  pub fn new_block(&mut self, block: SignedBlockSlot, growable: bool) -> Result<()> {
     if block.slot <= self.get_latest_signed_block_slot() {
       bail!("Will not save this slashable evidence!");
     }
@@ -91,7 +90,7 @@ impl SlashingProtectionData {
     Ok(())
   }
 
-  fn get_latest_signed_attestation_epochs(&self) -> (Epoch, Epoch) {
+  pub fn get_latest_signed_attestation_epochs(&self) -> (Epoch, Epoch) {
     match self.signed_attestations.last() {
       None => (0, 0),
       Some(a) => (a.source_epoch, a.target_epoch)
@@ -100,7 +99,7 @@ impl SlashingProtectionData {
 
   /// If the SlashingProtectionDB is growable, append the new attestation epochs, otherwise
   /// overwrite the 0th element.
-  fn new_attestation(&mut self, attest: SignedAttestationEpochs, growable: bool) -> Result<()> {
+  pub fn new_attestation(&mut self, attest: SignedAttestationEpochs, growable: bool) -> Result<()> {
     let (prev_src, prev_tgt) = self.get_latest_signed_attestation_epochs();
     if attest.source_epoch < prev_src {
       bail!("Will not save this slashable evidence!");
@@ -117,8 +116,9 @@ impl SlashingProtectionData {
     Ok(())
   }
 
-  fn write(&self, fname: &str) -> Result<()> {
-    let file_path: PathBuf = [SLASHING_PROTECTION_DIR, fname].iter().collect();
+  pub fn write(&self) -> Result<()> {
+    let fname = hex::encode(self.pubkey.as_ssz_bytes());
+    let file_path: PathBuf = [SLASHING_PROTECTION_DIR, &fname].iter().collect();
     if let Some(p) = file_path.parent() {
         fs::create_dir_all(p).with_context(|| "Failed to create slashing dir")?
     };
@@ -127,8 +127,9 @@ impl SlashingProtectionData {
     fs::write(&file_path, json).with_context(|| "failed to write protection data")
   }
 
-  fn read(fname: &str) -> Result<Self> {
-    let file_path: PathBuf = [SLASHING_PROTECTION_DIR, fname].iter().collect();
+  pub fn read(pk_hex: &str) -> Result<Self> {
+    let pk_hex: String = pk_hex.strip_prefix("0x").unwrap_or(&pk_hex).into();
+    let file_path: PathBuf = [SLASHING_PROTECTION_DIR, &pk_hex].iter().collect();
     let json = fs::read(file_path)?;
     serde_json::from_slice(&json).with_context(|| "failed to read protection data")
   }
@@ -270,7 +271,7 @@ mod test_serde {
     #[test]
     fn test_blocks() -> Result<()> {
       let pk = BLSPubkey::default();
-      let mut data = SlashingProtectionData::new(pk);
+      let mut data = SlashingProtectionData::new(pk.clone());
       assert_eq!(data.signed_blocks.len(), 0);
       assert_eq!(data.signed_attestations.len(), 0);
       assert_eq!(data.get_latest_signed_block_slot(), 0);
@@ -328,10 +329,10 @@ mod test_serde {
       assert_eq!(data.get_latest_signed_block_slot(), 5000);
 
       // Write the protection (serialization)
-      data.write("test.json")?;
+      data.write()?;
 
       // Read the protection (deserialization)
-      let d = SlashingProtectionData::read("test.json")?;
+      let d = SlashingProtectionData::read(&hex::encode(pk.as_ssz_bytes()))?;
       assert_eq!(d.signed_blocks.len(), 3);
       assert_eq!(d.signed_blocks[0].slot, 11);
       assert_eq!(d.signed_blocks[1].slot, 12);
@@ -346,7 +347,7 @@ mod test_serde {
     #[test]
     fn test_attestations() -> Result<()> {
       let pk = BLSPubkey::default();
-      let mut data = SlashingProtectionData::new(pk);
+      let mut data = SlashingProtectionData::new(pk.clone());
       assert_eq!(data.signed_blocks.len(), 0);
       assert_eq!(data.signed_attestations.len(), 0);
       assert_eq!(data.get_latest_signed_attestation_epochs(), (0, 0));
@@ -456,10 +457,10 @@ mod test_serde {
       assert_eq!(data.get_latest_signed_attestation_epochs(), (20, 31));
 
       // Write the protection (serialization)
-      data.write("test.json")?;
+      data.write()?;
 
       // Read the protection (deserialization)
-      let d = SlashingProtectionData::read("test.json")?;
+      let d = SlashingProtectionData::read(&hex::encode(pk.as_ssz_bytes()))?;
       assert_eq!(d.signed_attestations.len(), 2);
       assert_eq!(d.signed_attestations[0].source_epoch, 20);
       assert_eq!(d.signed_attestations[0].target_epoch, 30);
