@@ -1,12 +1,16 @@
 use crate::eth_types::{Slot, Epoch, Root, BLSPubkey, from_u64_string, from_bls_pk_hex};
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::de;
+use hex;
 use serde_hex::{SerHex, StrictPfx};
-use anyhow::{Result, bail};
+use anyhow::{Result, bail, Context};
+use ssz::Encode;
 use std::fs;
 use std::path::PathBuf;
 
-pub fn deserialize_signing_root<'de, D>(deserializer: D) -> Result<Option<Root>, D::Error>
+pub const SLASHING_PROTECTION_DIR: &str = "./etc/slashing/";
+
+pub fn de_signing_root<'de, D>(deserializer: D) -> Result<Option<Root>, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -20,6 +24,28 @@ where
     Ok(Some(array))
 }
 
+/// Assumes that calling struct will skip serializing if the option is none
+pub fn se_signing_root<S>(value: &Option<Root>, serializer: S) -> Result<S::Ok, S::Error>
+    where S: Serializer
+{
+  let hex_string = hex::encode(&value.expect("Should have skipped a None option before entering this serializer"));
+  serializer.serialize_str(&hex_string)
+}
+
+pub fn to_bls_pk_hex<S>(bls_pk: &BLSPubkey, serializer: S) -> Result<S::Ok, S::Error>
+    where S: Serializer
+{
+    let hex_string = hex::encode(&bls_pk.as_ssz_bytes());
+    serializer.serialize_str(&hex_string)
+}
+
+pub fn to_u64_string<S>(value: &u64, serializer: S) -> Result<S::Ok, S::Error>
+    where S: Serializer
+{
+  let string = value.to_string();
+  serializer.serialize_str(&string)
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SlashingProtectionMetaData {
     pub interchange_format_version: String,
@@ -29,7 +55,7 @@ pub struct SlashingProtectionMetaData {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SlashingProtectionData {
-    #[serde(deserialize_with = "from_bls_pk_hex")]
+    #[serde(deserialize_with = "from_bls_pk_hex", serialize_with = "to_bls_pk_hex")]
     pub pubkey: BLSPubkey,
     pub signed_blocks: Vec<SignedBlockSlot>,
     pub signed_attestations: Vec<SignedAttestationEpochs>,
@@ -90,25 +116,43 @@ impl SlashingProtectionData {
     }
     Ok(())
   }
+
+  fn write(&self, fname: &str) -> Result<()> {
+    let file_path: PathBuf = [SLASHING_PROTECTION_DIR, fname].iter().collect();
+    if let Some(p) = file_path.parent() {
+        fs::create_dir_all(p).with_context(|| "Failed to create slashing dir")?
+    };
+    let json = serde_json::to_string(&self)?;
+    println!("serialized:\n{json}");
+    fs::write(&file_path, json).with_context(|| "failed to write protection data")
+  }
+
+  fn read(fname: &str) -> Result<Self> {
+    let file_path: PathBuf = [SLASHING_PROTECTION_DIR, fname].iter().collect();
+    let json = fs::read(file_path)?;
+    serde_json::from_slice(&json).with_context(|| "failed to read protection data")
+  }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SignedAttestationEpochs {
-    #[serde(deserialize_with = "from_u64_string")]
+  #[serde(deserialize_with = "from_u64_string", serialize_with = "to_u64_string")]
     pub source_epoch: Epoch,
-    #[serde(deserialize_with = "from_u64_string")]
+    #[serde(deserialize_with = "from_u64_string", serialize_with = "to_u64_string")]
     pub target_epoch: Epoch,
     #[serde(default)]
-    #[serde(deserialize_with = "deserialize_signing_root")]
+    #[serde(deserialize_with = "de_signing_root", serialize_with = "se_signing_root")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub signing_root: Option<Root>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SignedBlockSlot {
-    #[serde(deserialize_with = "from_u64_string")]
+  #[serde(deserialize_with = "from_u64_string", serialize_with = "to_u64_string")]
     pub slot: Slot,
     #[serde(default)]
-    #[serde(deserialize_with = "deserialize_signing_root")]
+    #[serde(deserialize_with = "de_signing_root", serialize_with = "se_signing_root")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub signing_root: Option<Root>,
 }
 
@@ -136,7 +180,7 @@ impl SlashingProtectionDB {
     Ok(db)
   }
 
-  pub fn save(&self) -> Result<()> {
+  pub fn read(&self) -> Result<()> {
 
 
     Ok(())
@@ -152,7 +196,7 @@ mod test_serde {
     use ssz::Encode;
 
     #[test]
-    fn test_serialize() -> Result<()> {
+    fn test_deserialize() -> Result<()> {
         let raw = r#"
         {
             "metadata": {
@@ -194,6 +238,7 @@ mod test_serde {
         // block 0
         assert_eq!(db.data[0].signed_blocks[0].slot, 81952);
         assert_eq!(hex::encode(&db.data[0].signed_blocks[0].signing_root.unwrap()), "4ff6f743a43f3b4f95350831aeaf0a122a1a392922c45d804280284a69eb850b".to_string());
+        println!("{:?}", db.data[0].signed_blocks[0].signing_root.unwrap());
         
         // block 1
         assert_eq!(db.data[0].signed_blocks[1].slot, 81951);
@@ -239,7 +284,7 @@ mod test_serde {
       assert_eq!(data.get_latest_signed_block_slot(), 10);
 
       // growable=false should overwrite 0th index
-      let b = SignedBlockSlot { slot: 11, signing_root: None};
+      let b = SignedBlockSlot { slot: 11, signing_root: Some([79, 246, 247, 67, 164, 63, 59, 79, 149, 53, 8, 49, 174, 175, 10, 18, 42, 26, 57, 41, 34, 196, 93, 128, 66, 128, 40, 74, 105, 235, 133, 11]),};
       data.new_block(b, grow)?;
       assert_eq!(data.signed_blocks.len(), 1); // same length
       assert_eq!(data.signed_blocks[0].slot, 11);
@@ -281,6 +326,18 @@ mod test_serde {
       data.new_block(b, grow)?;
       assert_eq!(data.signed_blocks.len(), 3);
       assert_eq!(data.get_latest_signed_block_slot(), 5000);
+
+      // Write the protection (serialization)
+      data.write("test.json")?;
+
+      // Read the protection (deserialization)
+      let d = SlashingProtectionData::read("test.json")?;
+      assert_eq!(d.signed_blocks.len(), 3);
+      assert_eq!(d.signed_blocks[0].slot, 11);
+      assert_eq!(d.signed_blocks[1].slot, 12);
+      assert_eq!(d.signed_blocks[2].slot, 5000);
+      assert_eq!(d.signed_blocks[0].signing_root.unwrap(), [79, 246, 247, 67, 164, 63, 59, 79, 149, 53, 8, 49, 174, 175, 10, 18, 42, 26, 57, 41, 34, 196, 93, 128, 66, 128, 40, 74, 105, 235, 133, 11]);
+      assert_eq!(d.get_latest_signed_block_slot(), 5000);
       
       Ok(())
 
@@ -318,7 +375,7 @@ mod test_serde {
       let a = SignedAttestationEpochs { 
         source_epoch: 20,
         target_epoch: 30,
-        signing_root: None,
+        signing_root: Some([79, 246, 247, 67, 164, 63, 59, 79, 149, 53, 8, 49, 174, 175, 10, 18, 42, 26, 57, 41, 34, 196, 93, 128, 66, 128, 40, 74, 105, 235, 133, 11]),
       };
       
       data.new_attestation(a, grow);
@@ -397,6 +454,19 @@ mod test_serde {
       data.new_attestation(a, grow);
       assert_eq!(data.signed_attestations.len(), 2);
       assert_eq!(data.get_latest_signed_attestation_epochs(), (20, 31));
+
+      // Write the protection (serialization)
+      data.write("test.json")?;
+
+      // Read the protection (deserialization)
+      let d = SlashingProtectionData::read("test.json")?;
+      assert_eq!(d.signed_attestations.len(), 2);
+      assert_eq!(d.signed_attestations[0].source_epoch, 20);
+      assert_eq!(d.signed_attestations[0].target_epoch, 30);
+      assert_eq!(d.signed_attestations[0].signing_root.unwrap(), [79, 246, 247, 67, 164, 63, 59, 79, 149, 53, 8, 49, 174, 175, 10, 18, 42, 26, 57, 41, 34, 196, 93, 128, 66, 128, 40, 74, 105, 235, 133, 11]);
+      assert_eq!(d.signed_attestations[1].source_epoch, 20);
+      assert_eq!(d.signed_attestations[1].target_epoch, 31);
+      assert_eq!(d.get_latest_signed_attestation_epochs(), (20, 31));
       
       Ok(())
 
