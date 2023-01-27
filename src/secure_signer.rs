@@ -5,6 +5,7 @@ extern crate libc;
 
 mod eth_signing;
 mod eth_types;
+mod slash_protection;
 mod keys;
 mod remote_attestation;
 mod routes;

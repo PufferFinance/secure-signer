@@ -6,6 +6,7 @@ mod keys;
 mod remote_attestation;
 mod route_handlers;
 mod routes;
+mod slash_protection;
 
 use eth_types::DepositResponse;
 use route_handlers::{SecureSignerSig, KeyGenResponse, KeyImportRequest, KeyImportResponse, RemoteAttestationResponse, ListKeysResponse};
@@ -83,6 +84,7 @@ async fn import_bls_key(
     keystore_str: String,
     password: String,
     ss_eth_pk_hex: String,
+    slash_protection_path: Option<String>,
 ) -> Result<KeyImportResponse> {
 
     // ECDH envelope encrypt keystore password with Secure-Signer's SECP256K1 public key
@@ -94,11 +96,20 @@ async fn import_bls_key(
     let ct_password_bytes = encrypt(&ss_eth_pk_bytes, &password.as_bytes())?;
     let ct_password_hex = "0x".to_string() + &hex::encode(ct_password_bytes);
 
+    let slash_protection = match slash_protection_path {
+        None => None,
+        Some(dir) => {
+            let s: String = fs::read_to_string(dir).expect("couldn't read slash protection file");
+            Some(s)
+        }
+    };
+
     // Bundle together
     let req = KeyImportRequest {
         keystore: keystore_str,
         ct_password_hex: ct_password_hex,
         encrypting_pk_hex: ss_eth_pk_hex,
+        slashing_protection: slash_protection,
     };
 
     // println!("{:#?}", req);
@@ -331,6 +342,10 @@ struct Args {
     #[arg(long)]
     password: Option<String>,
 
+    /// The path to EIP-3076 .JSON
+    #[arg(long)]
+    slash_protection_path: Option<String>,
+
     /// Request Secure-Signer to generate a DepositData
     #[arg(short, long)]
     deposit: bool,
@@ -396,7 +411,7 @@ async fn main() {
         println!("- Secure-Signer ETH public key passed remote attestation");
 
         // securely import BLS private key into Secure-Signer
-        let returned_bls_pk_resp = import_bls_key(host.clone(), keystore_str, keystore_pw, ss_eth_pk_hex)
+        let returned_bls_pk_resp = import_bls_key(host.clone(), keystore_str, keystore_pw, ss_eth_pk_hex, args.slash_protection_path)
             .await
             .unwrap();
         let returned_bls_pk_raw = returned_bls_pk_resp.data[0].message.clone();
