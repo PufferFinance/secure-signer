@@ -1,5 +1,6 @@
 use crate::eth_types::{Slot, Epoch, Root, BLSPubkey, from_u64_string, from_bls_pk_hex};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use ssz_types::FixedVector;
 use hex;
 use serde_hex::{SerHex, StrictPfx};
 use anyhow::{Result, bail, Context};
@@ -69,10 +70,17 @@ impl SlashingProtectionData {
     }
   }
 
+  pub fn from_pk_hex(pk_hex: String) -> Result<Self> {
+    let pk_hex: String = pk_hex.strip_prefix("0x").unwrap_or(&pk_hex).into();
+    let pk_bytes = hex::decode(pk_hex)?;
+    let pk_bytes: BLSPubkey = FixedVector::from(pk_bytes.to_vec());
+    Ok(SlashingProtectionData::new(pk_bytes))
+  }
+
   pub fn get_latest_signed_block_slot(&self) -> Slot {
-    match self.signed_blocks.last() {
+    match self.signed_blocks.iter().max_by_key(|s| s.slot) {
       None => 0,
-      Some(b) => b.slot
+      Some(s) => s.slot
     }
   }
 
@@ -91,10 +99,15 @@ impl SlashingProtectionData {
   }
 
   pub fn get_latest_signed_attestation_epochs(&self) -> (Epoch, Epoch) {
-    match self.signed_attestations.last() {
-      None => (0, 0),
-      Some(a) => (a.source_epoch, a.target_epoch)
-    }
+    let latest_src = match self.signed_attestations.iter().max_by_key(|s| s.source_epoch) {
+      None => 0,
+      Some(s) => s.source_epoch
+    };
+    let latest_tgt = match self.signed_attestations.iter().max_by_key(|s| s.target_epoch) {
+      None => 0,
+      Some(s) => s.target_epoch
+    };
+    (latest_src, latest_tgt)
   }
 
   /// If the SlashingProtectionDB is growable, append the new attestation epochs, otherwise
@@ -181,24 +194,24 @@ impl SlashingProtectionDB {
     Ok(db)
   }
 
+  
   pub fn read(&self) -> Result<()> {
-
-
+    // TODO combine all saved SlashingProtectionData into
+    // a SlashingProtectionDB to return via GET endpoint.
     Ok(())
   }
 }
 
 
 #[cfg(test)]
-mod test_serde {
+pub mod test_slash_protection {
     use super::*;
     use serde_json;
     use hex;
     use ssz::Encode;
 
-    #[test]
-    fn test_deserialize() -> Result<()> {
-        let raw = r#"
+    pub fn dummy_slash_protection_data() -> String {
+      let raw = r#"
         {
             "metadata": {
               "interchange_format_version": "5",
@@ -206,7 +219,7 @@ mod test_serde {
             },
             "data": [
               {
-                "pubkey": "0xb845089a1457f811bfc000588fbb4e713669be8ce060ea6be3c6ece09afc3794106c91ca73acda5e5457122d58723bed",
+                "pubkey": "0x8349434ad0700e79be65c0c7043945df426bd6d7e288c16671df69d822344f1b0ce8de80360a50550ad782b68035cb18",
                 "signed_blocks": [
                   {
                     "slot": "81952",
@@ -230,31 +243,37 @@ mod test_serde {
               }
             ]
           }"#;
+      raw.to_string()
 
-        let db = SlashingProtectionDB::from_str(raw)?;
-        assert_eq!(db.metadata.interchange_format_version, "5");
-        assert_eq!(hex::encode(db.metadata.genesis_validators_root), "04700007fabc8282644aed6d1c7c9e21d38a03a0c4ba193f3afe428824b3a673".to_string());
-        assert_eq!(hex::encode(&db.data[0].pubkey.as_ssz_bytes()), "b845089a1457f811bfc000588fbb4e713669be8ce060ea6be3c6ece09afc3794106c91ca73acda5e5457122d58723bed".to_string());
+    }
 
-        // block 0
-        assert_eq!(db.data[0].signed_blocks[0].slot, 81952);
-        assert_eq!(hex::encode(&db.data[0].signed_blocks[0].signing_root.unwrap()), "4ff6f743a43f3b4f95350831aeaf0a122a1a392922c45d804280284a69eb850b".to_string());
-        println!("{:?}", db.data[0].signed_blocks[0].signing_root.unwrap());
-        
-        // block 1
-        assert_eq!(db.data[0].signed_blocks[1].slot, 81951);
-        assert!(db.data[0].signed_blocks[1].signing_root.is_none());
+    #[test]
+    fn test_deserialize() -> Result<()> {
+      let raw = dummy_slash_protection_data();
+      let db = SlashingProtectionDB::from_str(&raw)?;
+      assert_eq!(db.metadata.interchange_format_version, "5");
+      assert_eq!(hex::encode(db.metadata.genesis_validators_root), "04700007fabc8282644aed6d1c7c9e21d38a03a0c4ba193f3afe428824b3a673".to_string());
+      assert_eq!(hex::encode(&db.data[0].pubkey.as_ssz_bytes()), "8349434ad0700e79be65c0c7043945df426bd6d7e288c16671df69d822344f1b0ce8de80360a50550ad782b68035cb18".to_string());
 
-        // attestation 0
-        assert_eq!(db.data[0].signed_attestations[0].source_epoch, 2290);
-        assert_eq!(db.data[0].signed_attestations[0].target_epoch, 3007);
-        assert_eq!(hex::encode(&db.data[0].signed_attestations[0].signing_root.unwrap()), "587d6a4f59a58fe24f406e0502413e77fe1babddee641fda30034ed37ecc884d".to_string());
+      // block 0
+      assert_eq!(db.data[0].signed_blocks[0].slot, 81952);
+      assert_eq!(hex::encode(&db.data[0].signed_blocks[0].signing_root.unwrap()), "4ff6f743a43f3b4f95350831aeaf0a122a1a392922c45d804280284a69eb850b".to_string());
+      println!("{:?}", db.data[0].signed_blocks[0].signing_root.unwrap());
+      
+      // block 1
+      assert_eq!(db.data[0].signed_blocks[1].slot, 81951);
+      assert!(db.data[0].signed_blocks[1].signing_root.is_none());
 
-        // attestation 1
-        assert_eq!(db.data[0].signed_attestations[1].source_epoch, 2290);
-        assert_eq!(db.data[0].signed_attestations[1].target_epoch, 3008);
-        assert!(db.data[0].signed_attestations[1].signing_root.is_none());
-        Ok(())
+      // attestation 0
+      assert_eq!(db.data[0].signed_attestations[0].source_epoch, 2290);
+      assert_eq!(db.data[0].signed_attestations[0].target_epoch, 3007);
+      assert_eq!(hex::encode(&db.data[0].signed_attestations[0].signing_root.unwrap()), "587d6a4f59a58fe24f406e0502413e77fe1babddee641fda30034ed37ecc884d".to_string());
+
+      // attestation 1
+      assert_eq!(db.data[0].signed_attestations[1].source_epoch, 2290);
+      assert_eq!(db.data[0].signed_attestations[1].target_epoch, 3008);
+      assert!(db.data[0].signed_attestations[1].signing_root.is_none());
+      Ok(())
     }
 
     #[test]

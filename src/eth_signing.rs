@@ -422,8 +422,7 @@ pub mod slash_resistance_tests {
         println!("DEBUG: using pk: {pk_hex}");
 
         // init slashing protection db
-        let pk_bytes: BLSPubkey = FixedVector::from(pk.compress().to_vec());
-        let db = SlashingProtectionData::new(pk_bytes);
+        let db = SlashingProtectionData::from_pk_hex(pk_hex.clone()).unwrap();
         db.write().unwrap();
 
         pk_hex
@@ -444,8 +443,7 @@ pub mod slash_resistance_tests {
         let name = new_keystore(Path::new("./etc/keys/bls_keys/generated/"), "", &pk_hex, &sk.serialize()).unwrap();
         println!("DEBUG: using pk: {pk_hex}");
         // init slashing protection db
-        let pk_bytes: BLSPubkey = FixedVector::from(pk.compress().to_vec());
-        let db = SlashingProtectionData::new(pk_bytes);
+        let db = SlashingProtectionData::from_pk_hex(pk_hex.clone()).unwrap();
         db.write().unwrap();
         pk_hex
     }

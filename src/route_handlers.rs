@@ -1,9 +1,12 @@
 use crate::eth_signing::*;
 use crate::eth_types::*;
-use crate::keys::load_then_save_keystore;
+use crate::keys::bls_sk_from_hex;
+use crate::slash_protection::SlashingProtectionDB;
+use crate::slash_protection::SlashingProtectionData;
 use crate::keys::{
     bls_key_gen, eth_key_gen, list_eth_keys, list_generated_bls_keys,
-    list_imported_bls_keys, read_eth_key, write_key, new_keystore
+    list_imported_bls_keys, read_eth_key, write_key, new_keystore,
+    load_then_save_keystore, decrypt_keystore, envelope_decrypt_password
 };
 use crate::remote_attestation::{epid_remote_attestation, AttestationEvidence};
 
@@ -13,9 +16,11 @@ use blst::min_pk::PublicKey;
 use blst::min_pk::SecretKey;
 use ecies::{decrypt, PublicKey as EthPublicKey};
 use serde::{Deserialize, Serialize};
+use ssz::Encode;
 use std::collections::HashMap;
 use warp::{http::StatusCode, reply};
 use std::path::Path;
+use std::convert::TryFrom;
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct RemoteAttestationRequest {
@@ -88,6 +93,27 @@ pub async fn bls_key_gen_service() -> Result<impl warp::Reply, warp::Rejection> 
     let save_key = true;
     match bls_key_gen(save_key) {
         Ok(pk) => {
+            let db = SlashingProtectionData::from_pk_hex(hex::encode(pk.compress()));
+            match db {
+                Ok(db) => {
+                    if db.write().is_err() {
+                        let mut resp = HashMap::new();
+                        resp.insert("error", "Failed to save SlashingProtectionData");
+                        return Ok(reply::with_status(
+                            reply::json(&resp),
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                        ))
+                    }
+                },
+                Err(e) => {
+                    let mut resp = HashMap::new();
+                    resp.insert("error", "Failed to create SlashingProtectionData");
+                    return Ok(reply::with_status(
+                        reply::json(&resp),
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                    ))
+                }
+            }
             let resp = KeyGenResponse::from_bls_key(pk);
             Ok(reply::with_status(reply::json(&resp), StatusCode::OK))
         }
@@ -212,6 +238,8 @@ pub struct KeyImportRequest {
     pub ct_password_hex: String,
     /// The SECP256K1 public key safeguarded in TEE that encrypted ct_password
     pub encrypting_pk_hex: String,
+    /// JSON serialized representation of the slash protection data in format defined in EIP-3076
+    pub slashing_protection: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -247,20 +275,58 @@ impl KeyImportResponse {
 pub fn decrypt_and_save_imported_bls_key(req: &KeyImportRequest) -> Result<String> {
     println!("DEBUG: servicing req: {:?}", req);
     println!("reading eth key with pk: {}", req.encrypting_pk_hex);
-    // fetch safeguarded ETH private key
-    let sk = read_eth_key(&req.encrypting_pk_hex)?;
 
-    // get plaintext password
-    let ct_password_hex: String = req.ct_password_hex.strip_prefix("0x").unwrap_or(&req.ct_password_hex).into();
-    let ct_password_bytes = hex::decode(&ct_password_hex)?;
-    let password_bytes = decrypt(&sk.serialize(), &ct_password_bytes)?;
-    let password = String::from_utf8(password_bytes).with_context(|| "non-utf8 password")?;
+    // Decrypt the password
+    let password = envelope_decrypt_password(req.ct_password_hex.clone(), req.encrypting_pk_hex.clone())?;
     println!("DEBUG: decrypted password: {}", password);
 
-    // Decrypt the keystore using decrpyted password then save bls key to new keystore
-    let pk_hex = load_then_save_keystore(&req.keystore, &password)?;
+    // Decrypt the keystore using decrpyted password 
+    let sk_bytes = decrypt_keystore(&req.keystore, &password)?;
+    println!("DEBUG: decrypted keystore: {:?}", sk_bytes);
+
+    // Get the public key: 
+    let pk = match bls_sk_from_hex(hex::encode(&sk_bytes)) {
+        Ok(pk) => pk.sk_to_pk(),
+        Err(e) => {
+            bail!("Couldn't convert bls sk")
+        }
+    };
+    let pk_hex = hex::encode(pk.compress());
+
+    // Add a slash protection entry for this pub key
+    match &req.slashing_protection {
+        None => {
+            // Generate fresh slashing protection
+            let db = SlashingProtectionData::from_pk_hex(pk_hex.clone())?;
+            db.write()?;
+        },
+        Some(sp) => {
+            // Verify the supplied slash protection matches the pk
+            let db: SlashingProtectionDB = serde_json::from_str(sp)?;
+            // KNOWN LIMITATION: Only support one keystore
+            match db.data.first() {
+                None => {
+                    // Generate fresh slashing protection
+                    let db = SlashingProtectionData::from_pk_hex(pk_hex.clone())?;
+                    db.write()?;
+                }, 
+                Some(data) => {
+                    if hex::encode(data.pubkey.as_ssz_bytes()) == pk_hex {
+                        data.write()?
+                    } else {
+                        bail!("The slashing protection pubkey does not match keystore")
+                    }
+                }
+            }
+        }
+    }
+    
+    // Save the BLS key to a new keystore
+    let keystore_path = "./etc/keys/bls_keys/imported/";
+    new_keystore(Path::new(keystore_path), "", &pk_hex, &sk_bytes)?;
 
     println!("Imported BLS keystore with pk: {pk_hex}");
+
     Ok(pk_hex)
 }
 

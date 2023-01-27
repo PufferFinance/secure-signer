@@ -132,6 +132,17 @@ fn save_eth_key(sk: EthSecretKey, pk: EthPublicKey) -> Result<EthPublicKey> {
     Ok(pk)
 }
 
+pub fn envelope_decrypt_password(ct_pw: String, pubkey: String) -> Result<String> {
+    // fetch safeguarded ETH private key
+    let sk = read_eth_key(&pubkey)?;
+    let ct_password_hex: String = ct_pw.strip_prefix("0x").unwrap_or(&ct_pw).into();
+    let ct_password_bytes = hex::decode(&ct_password_hex)?;
+    // get plaintext password
+    let password_bytes = decrypt(&sk.serialize(), &ct_password_bytes)?;
+    let password = String::from_utf8(password_bytes).with_context(|| "non-utf8 password")?;
+    Ok(password)
+}
+
 pub fn new_keystore(p: &Path, password: &str, name: &str, sk_bytes: &[u8]) -> Result<String> {
     fs::create_dir_all(p).with_context(|| "Failed to create dir for keystore")?;
     let mut rng = rand::thread_rng();
@@ -156,6 +167,26 @@ pub fn load_keystore(keystore_path: &String, keystore_password: &String) -> Resu
     //     pk_hex, sk_hex
     // );
     Ok((sk_hex, pk_hex))
+}
+
+pub fn decrypt_keystore(keystore_str: &String, keystore_password: &String) -> Result<Vec<u8>> {
+    // temporarily save keystore
+    let temp_path = "./etc/keys/temp";
+    fs::write(temp_path, keystore_str)?;
+
+    // decrypt keystore
+    let sk_bytes = match decrypt_key(Path::new(temp_path), keystore_password) {
+        Ok(bs) => bs,
+        Err(e) => {
+            fs::remove_file(temp_path)?;
+            bail!("Couldn't decrypt keystore")
+        }
+    };
+
+    // delete temp keystore
+    fs::remove_file(temp_path)?;
+
+    Ok(sk_bytes)
 }
 
 pub fn load_then_save_keystore(keystore_str: &String, keystore_password: &String) -> Result<String> {
