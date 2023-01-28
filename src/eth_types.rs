@@ -77,7 +77,6 @@ where
         "0x" => hex::decode(&hex_str[2..]).expect("failed to deserialize"),
         _ => hex::decode(hex_str).expect("failed to deserialize"),
     };
-    println!("bytes: {:?}", bytes);
     let pk: BLSPubkey = FixedVector::from(bytes);
     Ok(pk)
 }

@@ -1,11 +1,14 @@
 use crate::eth_types::*;
 use crate::keys;
+use crate::slash_protection;
 
 use anyhow::{bail, Context, Result};
 use ssz::Encode;
 use std::fs;
 use std::path::PathBuf;
 use tree_hash::TreeHash;
+
+pub const ALLOW_GROWABLE_SLASH_PROTECTION_DB: bool = true;
 
 /// Writes the slot of a block to memory (indexed by the bls pub key) for slash protection
 fn write_block_slot(pk_hex: &String, slot: Slot) -> Result<()> {
@@ -164,7 +167,8 @@ pub fn get_block_signature(
     block: BeaconBlock,
 ) -> Result<BLSSignature> {
     // read previous slot from mem
-    let previous_block_slot = read_block_slot(&pk_hex)?;
+    let mut sp = slash_protection::SlashingProtectionData::read(&pk_hex)?;
+    let previous_block_slot = sp.get_latest_signed_block_slot();
 
     // The block slot number must be strictly increasing to prevent slashing
     if block.slot <= previous_block_slot {
@@ -177,8 +181,14 @@ pub fn get_block_signature(
         Some(compute_epoch_at_slot(block.slot)),
     );
 
+    let root: Root = compute_signing_root(block.clone(), domain.clone());
+    let b = slash_protection::SignedBlockSlot {
+        slot: block.slot,
+        signing_root: Some(root)
+    };
     // Save the new block slot to persistent memory
-    write_block_slot(&pk_hex, block.slot)?;
+    sp.new_block(b, ALLOW_GROWABLE_SLASH_PROTECTION_DB)?;
+    sp.write()?;
 
     secure_sign(pk_hex, block, domain)
 }
@@ -191,7 +201,8 @@ pub fn get_block_v2_signature(
     block_header: BeaconBlockHeader,
 ) -> Result<BLSSignature> {
     // read previous slot from mem
-    let previous_block_slot = read_block_slot(&pk_hex)?;
+    let mut sp = slash_protection::SlashingProtectionData::read(&pk_hex)?;
+    let previous_block_slot = sp.get_latest_signed_block_slot();
 
     // The block slot number must be strictly increasing to prevent slashing
     if block_header.slot <= previous_block_slot {
@@ -204,8 +215,14 @@ pub fn get_block_v2_signature(
         Some(compute_epoch_at_slot(block_header.slot)),
     );
 
+    let root: Root = compute_signing_root(block_header.clone(), domain.clone());
+    let b = slash_protection::SignedBlockSlot {
+        slot: block_header.slot,
+        signing_root: Some(root)
+    };
     // Save the new block slot to persistent memory
-    write_block_slot(&pk_hex, block_header.slot)?;
+    sp.new_block(b, ALLOW_GROWABLE_SLASH_PROTECTION_DB)?;
+    sp.write()?;
 
     secure_sign(pk_hex, block_header, domain)
 }
@@ -217,7 +234,8 @@ pub fn get_attestation_signature(
     fork_info: ForkInfo,
     attestation_data: AttestationData,
 ) -> Result<BLSSignature> {
-    let (prev_src_epoch, prev_tgt_epoch) = read_attestation_data(&pk_hex)?;
+    let mut sp = slash_protection::SlashingProtectionData::read(&pk_hex)?;
+    let (prev_src_epoch, prev_tgt_epoch) = sp.get_latest_signed_attestation_epochs();
 
     // The attestation source epoch must be non-decreasing to prevent slashing
     if attestation_data.source.epoch < prev_src_epoch {
@@ -229,15 +247,23 @@ pub fn get_attestation_signature(
         bail!("attestation_data.target.epoch <= prev_tgt_epoch")
     }
 
-    // Save the new attestation data to persistent memory
-    write_attestation_data(&pk_hex, &attestation_data)?;
-
     // Sign the Attestation
     let domain = get_domain(
         fork_info,
         DOMAIN_BEACON_ATTESTER,
         Some(attestation_data.target.epoch),
     );
+
+    let root: Root = compute_signing_root(attestation_data.clone(), domain.clone());
+    let a = slash_protection::SignedAttestationEpochs {
+        source_epoch: attestation_data.source.epoch,
+        target_epoch: attestation_data.target.epoch,
+        signing_root: Some(root)
+    };
+    // Save the new attestation data to persistent memory
+    sp.new_attestation(a, ALLOW_GROWABLE_SLASH_PROTECTION_DB)?;
+    sp.write()?;
+
     secure_sign(pk_hex, attestation_data, domain)
 }
 
@@ -373,8 +399,11 @@ mod spec_tests {}
 #[cfg(test)]
 pub mod slash_resistance_tests {
 
+    use ssz_types::FixedVector;
+
     use crate::keys::new_keystore;
 
+    use crate::slash_protection::SlashingProtectionData;
     use super::*;
     use std::fs;
     use std::path::Path;
@@ -391,6 +420,11 @@ pub mod slash_resistance_tests {
         // save keystore
         let name = new_keystore(Path::new("./etc/keys/bls_keys/generated/"), "", &pk_hex, &sk.serialize()).unwrap();
         println!("DEBUG: using pk: {pk_hex}");
+
+        // init slashing protection db
+        let db = SlashingProtectionData::from_pk_hex(pk_hex.clone()).unwrap();
+        db.write().unwrap();
+
         pk_hex
     }
 
@@ -408,6 +442,9 @@ pub mod slash_resistance_tests {
         // save keystore
         let name = new_keystore(Path::new("./etc/keys/bls_keys/generated/"), "", &pk_hex, &sk.serialize()).unwrap();
         println!("DEBUG: using pk: {pk_hex}");
+        // init slashing protection db
+        let db = SlashingProtectionData::from_pk_hex(pk_hex.clone()).unwrap();
+        db.write().unwrap();
         pk_hex
     }
 

@@ -4,6 +4,7 @@ use crate::route_handlers::{
     bls_key_import_service, list_imported_bls_keys_service, secure_sign_bls, 
 };
 use warp::Filter;
+use warp::{http::StatusCode, reply};
 
 
 /// Signs off on validator duty.
@@ -18,7 +19,7 @@ pub fn bls_sign_route() -> impl Filter<Extract = impl warp::Reply, Error = warp:
         .and(warp::body::bytes())
         .and_then(secure_sign_bls)
 }
-use warp::{http::StatusCode, reply};
+
 /// Returns a 200 status code if server is alive
 pub fn upcheck_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::get()
@@ -104,7 +105,7 @@ pub fn list_generated_bls_keys_route() -> impl Filter<Extract = impl warp::Reply
 }
 
 #[cfg(test)]
-mod api_signing_tests {
+pub mod api_signing_tests {
     use super::*;
     use std::fs;
     use serde_json;
@@ -112,7 +113,7 @@ mod api_signing_tests {
     use crate::route_handlers::{mock_requests::*, SecureSignerSig};
     use crate::eth_types::{RandaoRevealRequest, BlockV2Request};
 
-    async fn mock_secure_sign_bls_route(bls_pk: &String, json_req: &String) -> warp::http::Response<bytes::Bytes> {
+    pub async fn mock_secure_sign_bls_route(bls_pk: &String, json_req: &String) -> warp::http::Response<bytes::Bytes> {
         let filter = bls_sign_route();
         let uri = format!("/api/v1/eth2/sign/{}", bls_pk);
 
@@ -374,8 +375,11 @@ mod key_management_tests {
     use super::*;
     use crate::keys::{new_bls_key, new_eth_key, CIPHER_SUITE, eth_pk_from_hex, new_keystore};
     use crate::remote_attestation::{AttestationEvidence};
+    use crate::slash_protection::test_slash_protection::dummy_slash_protection_data;
     use crate::routes::*;
     use crate::route_handlers::*;
+    use crate::route_handlers::{mock_requests::*, SecureSignerSig};
+    use crate::routes::api_signing_tests::*;
     use ecies::{decrypt, encrypt};
     use blst::min_pk::{SecretKey, PublicKey, Signature};
     use ecies::PublicKey as EthPublicKey;
@@ -384,6 +388,10 @@ mod key_management_tests {
     use std::fs;
     use std::path::Path;  
     use serde_json;
+
+    fn dummy_keystore_string() -> String {
+        r#"{"crypto":{"cipher":"aes-128-ctr","cipherparams":{"iv":"dc4104fe6715cbf0c6cccc2f8aefa68b"},"ciphertext":"b24066c307ff23754aa12c0d5ef33527514de717157aaf67494a36290e25ce47","kdf":"scrypt","kdfparams":{"dklen":32,"n":8192,"p":1,"r":8,"salt":"1f313d2b1ed0f85bec298478e28772f132412696b97049da55be982da6da8cbc"},"mac":"b8586806b1271a4bf63977113bd44a131bafa07aa431e849de4eb79fecc289e9"},"id":"33959655-ff04-41ea-b60b-51bef65eb1ec","version":3}"#.to_string()
+    }
 
     async fn call_eth_key_gen_route() -> KeyGenResponse {
         let filter = eth_key_gen_route();
@@ -427,28 +435,22 @@ mod key_management_tests {
         assert_eq!(list_keys_resp.data[0].pubkey, resp.pk_hex);
     }
 
-    async fn mock_request_bls_key_import_route() -> KeyImportResponse {
+    async fn mock_request_bls_key_import_route(slash_protection: Option<String>) -> KeyImportResponse {
         // 1) generate ETH secret key in enclave
         let resp = call_eth_key_gen_route().await;
         let enclave_eth_pk_hex = resp.pk_hex;
         let eth_pk = eth_pk_from_hex(enclave_eth_pk_hex.clone()).unwrap();
         let enclave_eth_pk_bytes = eth_pk.serialize_compressed();
 
+        // expected to be done by client
         // 2) request enclave to do remote attestation
-        // let resp = enclave_remote_attestation();
-
         // 3) verify evidence
-        // ...
-
         // 4) extract ETH pub key
-        // ...
 
-        // 5) locally generate BLS key to import
-        let bls_sk = new_bls_key().unwrap();
-        let password = "test";
-        let pk = new_keystore(Path::new("./etc/"), password, "test-keystore.json", &bls_sk.serialize()).unwrap();
-        let keystore_str: String = fs::read_to_string(Path::new("./etc/test-keystore.json")).expect("couldn't read keystore");
-        let bls_pk_hex = "0x".to_string() + &hex::encode(bls_sk.sk_to_pk().compress()); // 48 bytes
+        // 5) BLS key to import
+        let password = "";
+        let bls_pk_hex = "0x8349434ad0700e79be65c0c7043945df426bd6d7e288c16671df69d822344f1b0ce8de80360a50550ad782b68035cb18".to_string();
+        let keystore_str = dummy_keystore_string();
 
         // 6) encrypt BLS key with ETH pub key
         let ct_password = encrypt(&enclave_eth_pk_bytes, password.as_bytes()).unwrap();
@@ -459,6 +461,7 @@ mod key_management_tests {
             keystore: keystore_str,
             ct_password_hex: ct_password_hex,
             encrypting_pk_hex: enclave_eth_pk_hex,
+            slashing_protection: slash_protection,
         };
         println!("making bls key import req: {:?}", req);
 
@@ -487,8 +490,63 @@ mod key_management_tests {
     #[tokio::test]
     async fn test_request_bls_key_import_route() {
         fs::remove_dir_all("./etc");
-        let resp = mock_request_bls_key_import_route().await;
+        let sp = None;
+        let resp = mock_request_bls_key_import_route(sp).await;
         println!("{:?}", resp);
+    }
+
+    #[tokio::test]
+    async fn test_request_bls_key_import_route_with_slash_protection() {
+        fs::remove_dir_all("./etc");
+        let sp = dummy_slash_protection_data();
+        let resp = mock_request_bls_key_import_route(Some(sp)).await;
+        println!("{:?}", resp);
+
+
+    }
+
+    #[tokio::test]
+    async fn test_request_bls_key_import_route_with_slash_protection_and_try_slashing() {
+        fs::remove_dir_all("./etc");
+        let sp = dummy_slash_protection_data();
+        let resp = mock_request_bls_key_import_route(Some(sp)).await;
+        let bls_pk_hex = &resp.data.first().unwrap().message;
+
+        // from dummy slash protection:
+        let last_slot = 81952;
+        let last_source_epoch = 2290;
+        let last_target_epoch = 3008;
+
+        // mock data for ATTESTATION request (attempt a slashable offense - decreasing source)
+        let json_req = mock_attestation_request(&(last_source_epoch - 1).to_string(), &(last_target_epoch + 100).to_string());
+        let resp = mock_secure_sign_bls_route(&bls_pk_hex, &json_req).await;
+        assert_eq!(resp.status(), 412);
+
+        // mock data for ATTESTATION request (attempt a slashable offense - non-increasing target)
+        let json_req = mock_attestation_request(&last_source_epoch.to_string(), &last_target_epoch.to_string());
+        let resp = mock_secure_sign_bls_route(&bls_pk_hex, &json_req).await;
+        assert_eq!(resp.status(), 412);
+
+        // mock data for ATTESTATION request - should be 200
+        let json_req = mock_attestation_request(&last_source_epoch.to_string(), &(last_target_epoch + 1).to_string());
+        let resp = mock_secure_sign_bls_route(&bls_pk_hex, &json_req).await;
+        assert_eq!(resp.status(), 200);
+
+        // mock data for a BLOCK request (attempt a slashable offense - non-increasing slot)
+        let json_req = mock_propose_block_request(&last_slot.to_string());
+        let resp = mock_secure_sign_bls_route(&bls_pk_hex, &json_req).await;
+        assert_eq!(resp.status(), 412);
+
+        // mock data for a BLOCK request (attempt a slashable offense - decreasing slot)
+        let json_req = mock_propose_block_request(&(last_slot - 1).to_string());
+        let resp = mock_secure_sign_bls_route(&bls_pk_hex, &json_req).await;
+        assert_eq!(resp.status(), 412);
+
+        // mock data for a BLOCK request - should be 200
+        let json_req = mock_propose_block_request(&(last_slot + 1).to_string());
+        let resp = mock_secure_sign_bls_route(&bls_pk_hex, &json_req).await;
+        assert_eq!(resp.status(), 200);
+
     }
 
     async fn mock_request_bls_key_list_route() -> ListKeysResponse {
@@ -508,7 +566,7 @@ mod key_management_tests {
     async fn test_list_imported_bls_keys_route() {
         // clear any existing local keys
         fs::remove_dir_all("./etc");
-        let key_gen_resp = mock_request_bls_key_import_route().await;
+        let key_gen_resp = mock_request_bls_key_import_route(None).await;
         println!("key_gen_resp {:?}", key_gen_resp);
         let bls_pk_hex = key_gen_resp.data[0].message.clone();
         assert_eq!(key_gen_resp.data.len(), 1);
@@ -548,12 +606,19 @@ mod key_management_tests {
         resp
     }
 
+    use crate::slash_protection::SlashingProtectionData;
+
     #[tokio::test]
     async fn test_bls_key_gen_route() {
         // clear any existing local keys
         fs::remove_dir_all("./etc");
         let key_gen_resp = mock_request_bls_key_gen_route().await;
         let bls_pk_hex = key_gen_resp.pk_hex.clone();
+
+        // verify route generated a SlashingProtectionData .json
+        let db = SlashingProtectionData::read(&bls_pk_hex).unwrap();
+        assert_eq!(db.signed_blocks.len(), 0);
+        assert_eq!(db.signed_attestations.len(), 0);
 
         let list_keys_resp = mock_request_generated_bls_key_list_route().await;
         assert_eq!(list_keys_resp.data.len(), 1);
