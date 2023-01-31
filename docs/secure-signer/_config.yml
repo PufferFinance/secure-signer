@@ -18,81 +18,23 @@
 # You can create any custom variable you would like, and they will be accessible
 # in the templates via {{ site.myvariable }}.
 
-title: Secure-Signer
-email: contact@puffer.fi
-description:  Secure-Signer Documnetation
-name: Secure-Signer 
+title: Your awesome title
+email: your-email@example.com
+description: >- # this means to ignore newlines until "baseurl:"
+  Write an awesome description for your new site here. You can edit this
+  line in _config.yml. It will appear in your document head meta (for
+  Google search results) and in your feed.xml site description.
 baseurl: "" # the subpath of your site, e.g. /blog
 url: "" # the base hostname & protocol for your site, e.g. http://example.com
 twitter_username: jekyllrb
 github_username:  jekyll
 
 # Build settings
-theme: jekyll-docs-theme
-remote_theme: jekyll-docs-theme
+theme: just-the-docs
+remote_theme: just-the-docs
 plugins:
   - jekyll-feed
 
-
-project:
-  version: 1.0.0
-  download_url: https://github.com/PufferFinance/secure-signer
-  download_text: download
-
-license:
-  software: Apache 2.0 License
-  software_url: https://www.apache.org/licenses/LICENSE-2.0
-
-links:
-  header:
-    - title: GitHub
-      icon: github
-      brand: true
-      url: https://github.com/PufferFinance/secure-signer
-  homepage:
-    - title: View on GitHub
-      icon: github
-      brand: true
-      url: https://github.com/PufferFinance/secure-signer
-  footer:
-    - title: GitHub
-      icon: github
-      brand: true
-      url: https://github.com/PufferFinance/secure-signer
-    - title: Issues
-      icon: bug
-      url: https://github.com/PufferFinance/secure-signer/issues
-
-ui:
-  mode: 'auto' # 'auto', 'dark', 'light'
-  brand:
-    dark: "#00ceff"
-    light: "#a20000"
-  border_color:
-    dark: "#5f5f5f"
-    light: "#dee2e6"
-  header:
-    trianglify: true
-    dark:
-      color1: "#062a48"
-      color2: "#304e67"
-    light:
-      color1: "#080331"
-      color2: "#673051"
-  masthead:
-    color:
-      dark: "#fff"
-      light: "#fff"
-    align:
-      homepage: 'center'
-      page: 'left'
-
-social:
-  twitter: 
-      enabled: true
-      via:
-      hash:
-      account: https://twitter.com/Puffer_Finance
 # Exclude from processing.
 # The following items will not be processed, by default.
 # Any item listed under the `exclude:` key here will be automatically added to
