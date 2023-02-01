@@ -45,12 +45,12 @@ function new_ss_instance()
 }
 
 function measure() {
-    pushd ${image_path}
+    pushd ${image_path} > /dev/null
         echo "MRENCLAVE:"
         occlum print mrenclave
         echo "MRSIGNER:"
         occlum print mrsigner
-    popd
+    popd > /dev/null
 }
 
 function run() {
