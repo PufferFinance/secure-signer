@@ -22,17 +22,12 @@ function run_ss() {
 # Function to build the Secure Signer container image either in development or release mode
 function attach_image() {
     echo "Launching ${container_name}..."
-    try () {
-        docker run -itd --network host \
-            -v ~/secure-signer:/root/secure-signer \
-            -v /var/run/aesmd:/var/run/aesmd \
-            --device /dev/sgx/enclave --device /dev/sgx/provision \
-            --name ${container_name} \
-            ${registry}/${image_name}:${tag}
-    }
-    catch () {
-        echo "Container already running"
-    }
+    docker run -itd --network host \
+        -v ~/secure-signer:/root/secure-signer \
+        -v /var/run/aesmd:/var/run/aesmd \
+        --device /dev/sgx/enclave --device /dev/sgx/provision \
+        --name ${container_name} \
+        ${registry}/${image_name}:${tag}
     echo "Attaching to ${container_name}..."
     docker exec -it ${container_name} bash
 }
