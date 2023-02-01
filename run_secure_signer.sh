@@ -5,8 +5,6 @@ script_dir="$(dirname $(readlink -f $0))"
 
 export binary_name="secure-signer"
 ss_port=9001
-registry="puffer"
-tag="latest"
 
 
 # Function to build the Secure Signer container image either in development or release mode
@@ -79,10 +77,11 @@ process_args "$@"
 
 if [ $release ]; then
     container_name="secure_signer_container"
-    image_name="secure_signer_image"
+    image_name="secure_signer"
+    registry="pufferfinance"
+    tag="latest"
 elif [ $development ]; then
     container_name="secure_signer_container_dev"
-    # image_name="secure_signer_dev_image"
     image_name="occlum"
     registry="occlum"
     tag="latest-ubuntu20.04"
