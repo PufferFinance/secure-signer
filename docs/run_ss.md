@@ -2,7 +2,7 @@
 layout: default
 title: Running Secure-Signer
 permalink: /running/
-nav_order: 3
+nav_order: 4
 has_children: true
 ---
 ## Running the Secure-Signer Container
