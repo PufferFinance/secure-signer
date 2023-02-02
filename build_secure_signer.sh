@@ -8,6 +8,14 @@ export ra_config_name="ra_config.json"
 export enclave_name="Secure-Signer"
 export image_path="${script_dir}/${enclave_name}"
 export binary_name="secure-signer"
+
+base_image_name="container/Dockerfile_SS.ubuntu20.04"
+image_name="secure_signer"
+registry="pufferfinance"
+tag="latest"
+executable="./target/release/client"
+config="./conf/network_config.json"
+measurement="./Secure-Signer/MRENCLAVE"
 ss_port=9001
 
 function build_secure_signer()
@@ -47,9 +55,11 @@ function new_ss_instance()
 function measure() {
     pushd ${image_path} > /dev/null
         echo "MRENCLAVE:"
-        occlum print mrenclave
+        occlum print mrenclave > MRENCLAVE
+        cat MRENCLAVE
         echo "MRSIGNER:"
-        occlum print mrsigner
+        occlum print mrsigner > MRSIGNER
+        cat MRSIGNER
     popd > /dev/null
 }
 
@@ -80,24 +90,18 @@ function clean_build() {
 # Function to build the Secure Signer container image either in development or release mode
 function dockerize() {
     # Change the directory to script_dir
-    pushd ${script_dir}
-        if [ $release ]; then
-            base_image_name="container/Dockerfile_SS.ubuntu20.04"
-            image_name="secure_signer_image"
-        elif [ $development ]; then
-            base_image_name="container/Dockerfile_SS_dev.ubuntu20.04"
-            image_name="secure_signer_dev_image"
-        else
-            echo "Error: Must specify either --release or --development flag"
-            exit 1
-        fi
-
+    pushd ${script_dir} > /dev/null
         # Build the container image 
         ./container/build_image.sh \
             -i ./${enclave_name}/${enclave_name}.tar.gz \
             -n ${image_name} \
-            -b ${base_image_name}
-    popd
+            -b ${base_image_name} \
+            -r ${registry} \
+            -g ${tag} \
+            -c ${config} \
+            -e ${executable} \
+            -m ${measurement}
+    popd > /dev/null
 }
 
 function usage {
@@ -108,8 +112,7 @@ usage: $(basename "$0") [OPTION]...
     -c clean Cargo then build all
     -b build from cached dependencies
     -x Run Secure-Signer on port set by -p (default 9001) (assumes this script is executed in Docker container).
-    -d Build and package the DEVELOPMENT Docker Image
-    -r Build and package the RELEASE Docker Image
+    -d Build and package the Docker Container Image
     -m Measure Secure-Signer's MRENCLAVE and MRSIGNER.
     -h <usage> usage help
 EOM
@@ -119,15 +122,14 @@ EOM
 
 function process_args {
     # Use getopts to process the arguments
-    while getopts ":pcbxrdmp:h" option; do
+    while getopts ":pcbxdmp:h" option; do
         case "${option}" in
             p) ss_port=${OPTARG};;
             c) clean_build;;
             b) build;;
             x) run;;
             m) measure;;
-            d) development=true; dockerize;;
-            r) release=true; dockerize;;
+            d) dockerize;;
             h) usage;;
         esac
     done
