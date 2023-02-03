@@ -3,7 +3,6 @@ set -e
 
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}"  )" >/dev/null 2>&1 && pwd )"
 
-export OPENSSL_DIR="/usr/local/occlum/x86_64-linux-musl/"
 export ra_config_name="ra_config.json"
 export enclave_name="Secure-Signer"
 export image_path="${script_dir}/${enclave_name}"
@@ -17,14 +16,25 @@ export config="./conf/network_config.json"
 export measurement="./Secure-Signer/MRENCLAVE"
 export ss_port=9001
 
+# If LOCAL_DEV is not set assume compiling for Occlum
+if [ -z "$LOCAL_DEV" ]; then
+    cargo_bin="occlum-cargo"
+    OPENSSL_DIR="/usr/local/occlum/x86_64-linux-musl/"
+else
+    cargo_bin="cargo"
+    build_flags="--features=dev"
+fi
+
 function build_secure_signer()
 {
 
-  	# compiles EPID remote attestation cpp code
-	./build_epid_ra.sh
+    if [ -z "$LOCAL_DEV" ]; then
+        # compiles EPID remote attestation cpp code
+        ./build_epid_ra.sh
+    fi
 
     # compile secure-signer
-	occlum-cargo build --release
+	${cargo_bin} build --release ${build_flags}
 }
 
 function new_ss_instance()
@@ -65,7 +75,11 @@ function measure() {
 
 function run() {
     pushd ${image_path}
+    if [ -z "$LOCAL_DEV" ]; then
         occlum run /bin/${binary_name} ${ss_port}
+    else
+        cargo run ${build_flags} --bin ${binary_name} ${ss_port}
+    fi
     popd
 }
 
@@ -77,18 +91,20 @@ function package() {
 
 function build() {
     build_secure_signer
-    new_ss_instance
-    measure
-    package
+    if [ -z "$LOCAL_DEV" ]; then
+        new_ss_instance
+        measure
+        package
+    fi
 }
 
 function clean_build() {
-    occlum-cargo clean
+    ${cargo_bin} clean
     build
 }
 
 function unit_tests() {
-    occlum-cargo test --features=dev -- --test-threads 1  
+    ${cargo_bin} test --features=dev -- --test-threads 1  
 }
 
 # Function to build the Secure Signer container image either in development or release mode
@@ -111,6 +127,7 @@ function dockerize() {
 function usage {
     cat << EOM
 Build and containerize Secure-Signer.
+Run "LOCAL_DEV=true ./build_secure_signer.sh <args>" for local dev compilation without SGX dependencies.
 usage: $(basename "$0") [OPTION]...
     -p <Secure-Signer Server port> default 9001.
     -c clean Cargo then build all
