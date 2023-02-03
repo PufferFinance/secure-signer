@@ -115,6 +115,21 @@ where
     Ok(u64::from_str_radix(hex_str, 10).expect("not a decimal"))
 }
 
+
+pub fn de_signing_root<'de, D>(deserializer: D) -> Result<Option<Root>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let hex_string: &str = Deserialize::deserialize(deserializer)?;
+    if hex_string.is_empty() {
+      return Ok(None);
+    }
+    let bytes: Root = SerHex::<StrictPfx>::from_hex(&hex_string).expect("bad hex");
+    let mut array = [0u8; 32];
+    array.copy_from_slice(&bytes[..32]);
+    Ok(Some(array))
+}
+
 // Datatypes from ETH2 specs
 
 #[derive(Debug, Deserialize, Serialize, Encode, Decode, TreeHash, Clone)]
@@ -431,16 +446,20 @@ pub struct AggregationSlot {
 #[derive(Deserialize, Serialize, Debug)]
 pub struct BlockRequest {
     pub fork_info: ForkInfo,
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub signingRoot: Root,
+    #[serde(default)]
+    #[serde(deserialize_with = "de_signing_root")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signingRoot: Option<Root>,
     pub block: BeaconBlock,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct BlockV2Request {
     pub fork_info: ForkInfo,
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub signingRoot: Root,
+    #[serde(default)]
+    #[serde(deserialize_with = "de_signing_root")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signingRoot: Option<Root>,
     pub beacon_block: BlockV2RequestWrapper,
 }
 
@@ -453,37 +472,47 @@ pub struct BlockV2RequestWrapper {
 #[derive(Deserialize, Serialize, Debug)]
 pub struct AttestationRequest {
     pub fork_info: ForkInfo,
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub signingRoot: Root,
+    #[serde(default)]
+    #[serde(deserialize_with = "de_signing_root")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signingRoot: Option<Root>,
     pub attestation: AttestationData,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct RandaoRevealRequest {
     pub fork_info: ForkInfo,
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub signingRoot: Root,
+    #[serde(default)]
+    #[serde(deserialize_with = "de_signing_root")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signingRoot: Option<Root>,
     pub randao_reveal: RandaoReveal,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct AggregateAndProofRequest {
     pub fork_info: ForkInfo,
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub signingRoot: Root,
+    #[serde(default)]
+    #[serde(deserialize_with = "de_signing_root")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signingRoot: Option<Root>,
     pub aggregate_and_proof: AggregateAndProof,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct AggregationSlotRequest {
     pub fork_info: ForkInfo,
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub signingRoot: Root,
+    #[serde(default)]
+    #[serde(deserialize_with = "de_signing_root")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signingRoot: Option<Root>,
     pub aggregation_slot: AggregationSlot,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct DepositRequest {
+    #[serde(default)]
+    #[serde(deserialize_with = "de_signing_root")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signingRoot: Option<Root>,
     pub deposit: DepositMessage,
@@ -505,39 +534,49 @@ pub struct DepositResponse {
 #[derive(Deserialize, Serialize, Debug)]
 pub struct VoluntaryExitRequest {
     pub fork_info: ForkInfo,
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub signingRoot: Root,
+    #[serde(default)]
+    #[serde(deserialize_with = "de_signing_root")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signingRoot: Option<Root>,
     pub voluntary_exit: VoluntaryExit,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct SyncCommitteeMessageRequest {
     pub fork_info: ForkInfo,
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub signingRoot: Root,
+    #[serde(default)]
+    #[serde(deserialize_with = "de_signing_root")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signingRoot: Option<Root>,
     pub sync_committee_message: SyncCommitteeMessage,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct SyncCommitteeSelectionProofRequest {
     pub fork_info: ForkInfo,
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub signingRoot: Root,
+    #[serde(default)]
+    #[serde(deserialize_with = "de_signing_root")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signingRoot: Option<Root>,
     pub sync_aggregator_selection_data: SyncAggregatorSelectionData,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct SyncCommitteeContributionAndProofRequest {
     pub fork_info: ForkInfo,
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub signingRoot: Root,
+    #[serde(default)]
+    #[serde(deserialize_with = "de_signing_root")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signingRoot: Option<Root>,
     pub contribution_and_proof: ContributionAndProof,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct ValidatorRegistrationRequest {
-    #[serde(with = "SerHex::<StrictPfx>")]
-    pub signingRoot: Root,
+    #[serde(default)]
+    #[serde(deserialize_with = "de_signing_root")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signingRoot: Option<Root>,
     pub validator_registration: ValidatorRegistration,
 }
 
@@ -644,7 +683,7 @@ mod serialization_tests {
             }}
         }}"#);
         let v: ValidatorRegistrationRequest = serde_json::from_str(&req).unwrap();
-        assert_eq!(v.signingRoot, [19, 157, 89, 219, 177, 119, 15, 220, 88, 47, 247, 81, 147, 114, 3, 82, 204, 199, 97, 49, 227, 122, 198, 157, 12, 16, 231, 65, 111, 63, 48, 80]);
+        assert_eq!(v.signingRoot, Some([19, 157, 89, 219, 177, 119, 15, 220, 88, 47, 247, 81, 147, 114, 3, 82, 204, 199, 97, 49, 227, 122, 198, 157, 12, 16, 231, 65, 111, 63, 48, 80]));
         assert_eq!(v.validator_registration.gas_limit, 30000000);
         assert_eq!(v.validator_registration.timestamp, 100);
         assert_eq!(v.validator_registration.fee_recipient[..], [42_u8; 20]);

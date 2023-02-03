@@ -935,7 +935,23 @@ pub mod mock_requests {
 
 
     pub fn mock_aggregation_slot_request() -> String {
-        unimplemented!()
+        let req = format!(r#"
+        {{
+            "type": "AGGREGATION_SLOT",
+            "fork_info":{{
+                "fork":{{
+                   "previous_version":"0x80000070",
+                   "current_version":"0x80000071",
+                   "epoch":"750"
+                }},
+                "genesis_validators_root":"0x2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"
+            }},
+            "signingRoot": "0x2ebfc2d70944cc2fbff6d67c6d9cbb043d7fbe0a660d248b6e666ce110af418a",
+            "aggregation_slot": {{
+                "slot": "123123"
+            }}
+        }}"#);
+        req
     }
 
     pub fn mock_sync_committee_message_request() -> String {
