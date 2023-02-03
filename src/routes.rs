@@ -234,7 +234,7 @@ pub mod api_signing_tests {
         assert_eq!(parsed_req.fork_info.fork.current_version, [0,0,0,0]);
         assert_eq!(parsed_req.fork_info.fork.epoch, 0);
         assert_eq!(parsed_req.fork_info.genesis_validators_root, [42_u8; 32]);
-        assert_eq!(parsed_req.signingRoot, [191, 112, 219, 187, 200, 50, 153, 251, 135, 115, 52, 234, 234, 239, 179, 45, 244, 66, 66, 193, 191, 7, 140, 220, 24, 54, 220, 195, 40, 45, 79, 189]);
+        assert_eq!(parsed_req.signingRoot, Some([191, 112, 219, 187, 200, 50, 153, 251, 135, 115, 52, 234, 234, 239, 179, 45, 244, 66, 66, 193, 191, 7, 140, 220, 24, 54, 220, 195, 40, 45, 79, 189]));
         assert_eq!(parsed_req.randao_reveal.epoch, 0);
 
         let resp = mock_secure_sign_bls_route(&bls_pk_hex, &json_req).await;
@@ -272,7 +272,7 @@ pub mod api_signing_tests {
         assert_eq!(parsed_req.fork_info.fork.current_version, [128,0,0,113]);
         assert_eq!(parsed_req.fork_info.fork.epoch, 750);
         assert_eq!(parsed_req.fork_info.genesis_validators_root, [42_u8; 32]);
-        assert_eq!(parsed_req.signingRoot, [46, 191, 194, 215, 9, 68, 204, 47, 191, 246, 214, 124, 109, 156, 187, 4, 61, 127, 190, 10, 102, 13, 36, 139, 110, 102, 108, 225, 16, 175, 65, 138]);
+        assert_eq!(parsed_req.signingRoot, Some([46, 191, 194, 215, 9, 68, 204, 47, 191, 246, 214, 124, 109, 156, 187, 4, 61, 127, 190, 10, 102, 13, 36, 139, 110, 102, 108, 225, 16, 175, 65, 138]));
         assert_eq!(parsed_req.beacon_block.block_header.slot, 24000);
         assert_eq!(parsed_req.beacon_block.block_header.proposer_index, 0);
         assert_eq!(parsed_req.beacon_block.block_header.parent_root, [0_u8; 32]);
@@ -360,12 +360,74 @@ pub mod api_signing_tests {
 
     }
 
+    #[tokio::test]
+    async fn test_bls_sign_route_aggregation_slot_type() {
+        // clear state
+        fs::remove_dir_all("./etc");
+
+        let json_req = mock_aggregation_slot_request();
+
+        // new keypair
+        let bls_pk_hex = setup_keypair2();
+
+        // mock data for AGGREGATION_SLOT request
+        let resp = mock_secure_sign_bls_route(&bls_pk_hex, &json_req).await;
+        println!("{:?}", resp);
+        assert_eq!(resp.status(), 200);
+        let sig: SecureSignerSig = serde_json::from_slice(resp.body()).unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_bls_sign_route_sync_committee_message_type() {
+        // clear state
+        fs::remove_dir_all("./etc");
+
+        let json_req = mock_sync_committee_message_request();
+
+        // new keypair
+        let bls_pk_hex = setup_keypair2();
+
+        // mock data for SYNC_COMMITTEE_MESSAGE request
+        let resp = mock_secure_sign_bls_route(&bls_pk_hex, &json_req).await;
+        println!("{:?}", resp);
+        assert_eq!(resp.status(), 200);
+        let sig: SecureSignerSig = serde_json::from_slice(resp.body()).unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_bls_sign_route_sync_committee_selection_proof_type() {
+        // clear state
+        fs::remove_dir_all("./etc");
+
+        let json_req = mock_sync_committee_selection_proof_request();
+
+        // new keypair
+        let bls_pk_hex = setup_keypair2();
+
+        // mock data for SYNC_COMMITTEE_SELECTION_PROOF request
+        let resp = mock_secure_sign_bls_route(&bls_pk_hex, &json_req).await;
+        println!("{:?}", resp);
+        assert_eq!(resp.status(), 200);
+        let sig: SecureSignerSig = serde_json::from_slice(resp.body()).unwrap();
+    }
+
     
-    // todo
-    // async fn test_bls_sign_route_aggregation_slot_type() {}
-    // async fn test_bls_sign_route_sync_committee_message_type() {}
-    // async fn test_bls_sign_route_sync_committee_selection_proof_type() {}
-    // async fn test_bls_sign_route_sync_committee_contribution_and_proof_type() {}
+    #[tokio::test]
+    async fn test_bls_sign_route_sync_committee_contribution_and_proof_type() {
+        // clear state
+        fs::remove_dir_all("./etc");
+
+        let json_req = mock_sync_committee_contribution_and_proof_request();
+
+        // new keypair
+        let bls_pk_hex = setup_keypair2();
+
+        // mock data for SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF request
+        let resp = mock_secure_sign_bls_route(&bls_pk_hex, &json_req).await;
+        println!("{:?}", resp);
+        assert_eq!(resp.status(), 200);
+        let sig: SecureSignerSig = serde_json::from_slice(resp.body()).unwrap();
+    }
 
 }
 
