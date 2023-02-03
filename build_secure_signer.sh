@@ -8,18 +8,18 @@ export ra_config_name="ra_config.json"
 export enclave_name="Secure-Signer"
 export image_path="${script_dir}/${enclave_name}"
 export binary_name="secure-signer"
-
-base_image_name="container/Dockerfile_SS.ubuntu20.04"
-image_name="secure_signer"
-registry="pufferfinance"
-tag="latest"
-executable="./target/release/client"
-config="./conf/network_config.json"
-measurement="./Secure-Signer/MRENCLAVE"
-ss_port=9001
+export base_image_name="container/Dockerfile_SS.ubuntu20.04"
+export image_name="secure_signer"
+export registry="pufferfinance"
+export tag="latest"
+export executable="./target/release/client"
+export config="./conf/network_config.json"
+export measurement="./Secure-Signer/MRENCLAVE"
+export ss_port=9001
 
 function build_secure_signer()
 {
+
   	# compiles EPID remote attestation cpp code
 	./build_epid_ra.sh
 
@@ -87,6 +87,10 @@ function clean_build() {
     build
 }
 
+function unit_tests() {
+    occlum-cargo test --features=dev -- --test-threads 1  
+}
+
 # Function to build the Secure Signer container image either in development or release mode
 function dockerize() {
     # Change the directory to script_dir
@@ -114,6 +118,7 @@ usage: $(basename "$0") [OPTION]...
     -x Run Secure-Signer on port set by -p (default 9001) (assumes this script is executed in Docker container).
     -d Build and package the Docker Container Image
     -m Measure Secure-Signer's MRENCLAVE and MRSIGNER.
+    -t Run all unit tests
     -h <usage> usage help
 EOM
     exit 0
@@ -122,7 +127,7 @@ EOM
 
 function process_args {
     # Use getopts to process the arguments
-    while getopts ":pcbxdmp:h" option; do
+    while getopts ":pcbxdmtp:h" option; do
         case "${option}" in
             p) ss_port=${OPTARG};;
             c) clean_build;;
@@ -130,6 +135,7 @@ function process_args {
             x) run;;
             m) measure;;
             d) dockerize;;
+            t) unit_tests;;
             h) usage;;
         esac
     done
