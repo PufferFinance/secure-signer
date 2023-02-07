@@ -19,7 +19,7 @@ export ss_port=9001
 # If LOCAL_DEV is not set assume compiling for Occlum
 if [ -z "$LOCAL_DEV" ]; then
     cargo_bin="occlum-cargo"
-    OPENSSL_DIR="/usr/local/occlum/x86_64-linux-musl/"
+    export OPENSSL_DIR="/usr/local/occlum/x86_64-linux-musl/"
 else
     cargo_bin="cargo"
     build_flags="--features=dev"
@@ -55,6 +55,7 @@ function new_ss_instance()
                         .resource_limits.kernel_space_heap_size="256MB" |
                         .process.default_heap_size = "32MB" |
                         .resource_limits.max_num_of_threads = 32 |
+                        .env.default = ["OCCLUM=yes", "RUST_LOG=info"] |
                         .metadata.debuggable = false' Occlum.json)" && \
         echo "${new_json}" > Occlum.json
         
