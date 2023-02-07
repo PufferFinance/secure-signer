@@ -1,5 +1,6 @@
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_hex::{SerHex, StrictPfx};
+use ssz::{Decode, Encode};
 use ssz_derive::{Decode, Encode};
 use ssz_types::{typenum, BitList, BitVector, FixedVector};
 use tree_hash_derive::TreeHash;
@@ -81,6 +82,13 @@ where
     Ok(pk)
 }
 
+pub fn to_bls_pk_hex<S>(bls_pk: &BLSPubkey, serializer: S) -> Result<S::Ok, S::Error>
+    where S: Serializer
+{
+    let hex_string = hex::encode(&bls_pk.as_ssz_bytes());
+    serializer.serialize_str(&hex_string)
+}
+
 pub fn from_bls_sig_hex<'de, D>(deserializer: D) -> Result<BLSSignature, D::Error>
 where
     D: Deserializer<'de>,
@@ -115,6 +123,12 @@ where
     Ok(u64::from_str_radix(hex_str, 10).expect("not a decimal"))
 }
 
+pub fn to_u64_string<S>(value: &u64, serializer: S) -> Result<S::Ok, S::Error>
+    where S: Serializer
+{
+  let string = value.to_string();
+  serializer.serialize_str(&string)
+}
 
 pub fn de_signing_root<'de, D>(deserializer: D) -> Result<Option<Root>, D::Error>
 where
@@ -128,6 +142,17 @@ where
     let mut array = [0u8; 32];
     array.copy_from_slice(&bytes[..32]);
     Ok(Some(array))
+}
+
+/// Assumes that calling struct will skip serializing if the option is none
+pub fn se_signing_root<S>(value: &Option<Root>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let hex_string = hex::encode(
+        &value.expect("Should have skipped a None option before entering this serializer"),
+    );
+    serializer.serialize_str(&hex_string)
 }
 
 // Datatypes from ETH2 specs
