@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 use ssz::Encode;
 use std::collections::HashMap;
 use warp::{http::StatusCode, reply};
+use log::{info, debug, error};
 use std::path::Path;
 use std::convert::TryFrom;
 
@@ -38,6 +39,7 @@ pub struct RemoteAttestationResponse {
 pub async fn epid_remote_attestation_service(
     pk_hex: String,
 ) -> Result<impl warp::Reply, warp::Rejection> {
+    info!("epid_remote_attestation_service()");
     match epid_remote_attestation(&pk_hex) {
         Ok(evidence) => {
             let resp = RemoteAttestationResponse {
@@ -89,7 +91,7 @@ impl ListKeysResponse {
 
 /// Runs all the logic to generate and save a new BLS key. Returns a `KeyGenResponse` on success.
 pub async fn bls_key_gen_service() -> Result<impl warp::Reply, warp::Rejection> {
-    println!("log: bls_key_gen_service()");
+    info!("bls_key_gen_service()");
     let save_key = true;
     match bls_key_gen(save_key) {
         Ok(pk) => {
@@ -150,7 +152,7 @@ impl KeyGenResponse {
 
 /// Runs all the logic to generate and save a new ETH key. Returns a `KeyGenResponse` on success.
 pub async fn eth_key_gen_service() -> Result<impl warp::Reply, warp::Rejection> {
-    println!("log: eth_key_gen_service()");
+    info!("eth_key_gen_service()");
     match eth_key_gen() {
         Ok(pk) => {
             let resp = KeyGenResponse::from_eth_key(pk);
@@ -168,7 +170,8 @@ pub async fn eth_key_gen_service() -> Result<impl warp::Reply, warp::Rejection> 
 }
 
 /// Lists the public keys of the imported BLS secret keys
-pub async fn list_imported_bls_keys_service() -> Result<impl warp::Reply, warp::Rejection> {
+pub async fn list_imported_bls_keys_service() -> Result<impl warp::Reply, warp::Rejection> { 
+    info!("list_imported_bls_keys_service()");
     match list_imported_bls_keys() {
         Ok(pks) => {
             let resp = ListKeysResponse::new(pks);
@@ -190,6 +193,7 @@ pub async fn list_imported_bls_keys_service() -> Result<impl warp::Reply, warp::
 
 /// Lists the public keys of the generated BLS secret keys
 pub async fn list_generated_bls_keys_service() -> Result<impl warp::Reply, warp::Rejection> {
+    info!("list_generated_bls_keys_service()");
     match list_generated_bls_keys() {
         Ok(pks) => {
             let resp = ListKeysResponse::new(pks);
@@ -211,6 +215,7 @@ pub async fn list_generated_bls_keys_service() -> Result<impl warp::Reply, warp:
 
 /// Lists the public keys of the generated ETH secret keys
 pub async fn list_eth_keys_service() -> Result<impl warp::Reply, warp::Rejection> {
+    info!("list_eth_keys_service()");
     match list_eth_keys() {
         Ok(pks) => {
             let resp = ListKeysResponse::new(pks);
@@ -273,21 +278,19 @@ impl KeyImportResponse {
 /// safeguarded by the TEE, then saves a new keystore to enclave memory. Expects the 
 /// ETH encrypting_pk_hex to be compressed (33 bytes) and hex-encoded. 
 pub fn decrypt_and_save_imported_bls_key(req: &KeyImportRequest) -> Result<String> {
-    println!("DEBUG: servicing req: {:?}", req);
-    println!("reading eth key with pk: {}", req.encrypting_pk_hex);
+    debug!("KeyImportRequest: {:?}", req);
 
     // Decrypt the password
     let password = envelope_decrypt_password(req.ct_password_hex.clone(), req.encrypting_pk_hex.clone())?;
-    println!("DEBUG: decrypted password: {}", password);
 
     // Decrypt the keystore using decrpyted password 
     let sk_bytes = decrypt_keystore(&req.keystore, &password)?;
-    println!("DEBUG: decrypted keystore: {:?}", sk_bytes);
 
     // Get the public key: 
     let pk = match bls_sk_from_hex(hex::encode(&sk_bytes)) {
         Ok(pk) => pk.sk_to_pk(),
         Err(e) => {
+            error!("Failed to import key");
             bail!("Couldn't convert bls sk")
         }
     };
@@ -314,6 +317,7 @@ pub fn decrypt_and_save_imported_bls_key(req: &KeyImportRequest) -> Result<Strin
                     if hex::encode(data.pubkey.as_ssz_bytes()) == pk_hex {
                         data.write()?
                     } else {
+                        error!("The slashing protection pubkey does not match keystore");
                         bail!("The slashing protection pubkey does not match keystore")
                     }
                 }
@@ -325,7 +329,7 @@ pub fn decrypt_and_save_imported_bls_key(req: &KeyImportRequest) -> Result<Strin
     let keystore_path = "./etc/keys/bls_keys/imported/";
     new_keystore(Path::new(keystore_path), "", &pk_hex, &sk_bytes)?;
 
-    println!("Imported BLS keystore with pk: {pk_hex}");
+    info!("Imported BLS keystore with pk: {pk_hex}");
 
     Ok(pk_hex)
 }
@@ -334,7 +338,7 @@ pub fn decrypt_and_save_imported_bls_key(req: &KeyImportRequest) -> Result<Strin
 pub async fn bls_key_import_service(
     req: KeyImportRequest,
 ) -> Result<impl warp::Reply, warp::Rejection> {
-    println!("log: bls_key_import_service()");
+    info!("bls_key_import_service()");
     match decrypt_and_save_imported_bls_key(&req) {
         Ok(bls_pk_hex) => {
             // The key has successfully been saved, formulate http response
@@ -356,12 +360,14 @@ pub async fn bls_key_import_service(
 /// Handler for BLOCK type
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#signature
 pub fn handle_block_type(req: BlockRequest, bls_pk_hex: String) -> Result<BLSSignature> {
+    info!("Handling BLOCK type");
     get_block_signature(bls_pk_hex, req.fork_info, req.block)
 }
 
 /// Handler for BLOCK_V2 type
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#signature
 pub fn handle_block_v2_type(req: BlockV2Request, bls_pk_hex: String) -> Result<BLSSignature> {
+    info!("Handling BLOCK_V2 type");
     get_block_v2_signature(bls_pk_hex, req.fork_info, req.beacon_block.block_header)
 }
 
@@ -371,6 +377,7 @@ pub fn handle_attestation_type(
     req: AttestationRequest,
     bls_pk_hex: String,
 ) -> Result<BLSSignature> {
+    info!("Handling ATTESTATION type");
     get_attestation_signature(bls_pk_hex, req.fork_info, req.attestation)
 }
 
@@ -380,6 +387,7 @@ pub fn handle_randao_reveal_type(
     req: RandaoRevealRequest,
     bls_pk_hex: String,
 ) -> Result<BLSSignature> {
+    info!("Handling RANDAO_REVEAL type");
     get_epoch_signature(bls_pk_hex, req.fork_info, req.randao_reveal.epoch)
 }
 
@@ -398,6 +406,7 @@ pub fn handle_aggregation_slot_type(
     req: AggregationSlotRequest,
     bls_pk_hex: String,
 ) -> Result<BLSSignature> {
+    info!("Handling AGGREGATION_SLOT type");
     get_slot_signature(bls_pk_hex, req.fork_info, req.aggregation_slot.slot)
 }
 
@@ -405,7 +414,7 @@ pub fn handle_aggregation_slot_type(
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#submit-deposit
 // pub fn handle_deposit_type(req: DepositRequest, bls_pk_hex: String) -> Result<BLSSignature> {
 pub fn handle_deposit_type(req: DepositRequest, bls_pk_hex: String) -> Result<DepositResponse> {
-    println!("got deposit type");
+    info!("Handling DEPOSIT type");
     get_deposit_signature(bls_pk_hex, req.deposit, req.genesis_fork_version)
 }
 
@@ -415,6 +424,7 @@ pub fn handle_voluntary_exit_type(
     req: VoluntaryExitRequest,
     bls_pk_hex: String,
 ) -> Result<BLSSignature> {
+    info!("Handling VOLUNTARY_EXIT type");
     get_voluntary_exit_signature(bls_pk_hex, req.fork_info, req.voluntary_exit)
 }
 
@@ -424,6 +434,7 @@ pub fn handle_sync_committee_msg_type(
     req: SyncCommitteeMessageRequest,
     bls_pk_hex: String,
 ) -> Result<BLSSignature> {
+    info!("Handling SYNC_COMMITTEE_MESSAGE type");
     get_sync_committee_message(bls_pk_hex, req.fork_info, req.sync_committee_message)
 }
 
@@ -433,6 +444,7 @@ pub fn handle_sync_committee_selection_proof_type(
     req: SyncCommitteeSelectionProofRequest,
     bls_pk_hex: String,
 ) -> Result<BLSSignature> {
+    info!("Handling SYNC_COMMITTEE_SELECTION_PROOF type");
     get_sync_committee_selection_proof(
         bls_pk_hex,
         req.fork_info,
@@ -446,6 +458,7 @@ pub fn handle_sync_committee_contribution_and_proof_type(
     req: SyncCommitteeContributionAndProofRequest,
     bls_pk_hex: String,
 ) -> Result<BLSSignature> {
+    info!("Handling SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF type");
     get_contribution_and_proof_signature(bls_pk_hex, req.fork_info, req.contribution_and_proof)
 }
 
@@ -455,6 +468,7 @@ pub fn handle_validator_registration_type(
     req: ValidatorRegistrationRequest,
     bls_pk_hex: String,
 ) -> Result<BLSSignature> {
+    info!("Handling VALIDATOR_REGISTRATION type");
     get_validator_registration_signature(bls_pk_hex, req.validator_registration)
 }
 
@@ -484,8 +498,8 @@ pub async fn secure_sign_bls(
 ) -> Result<impl warp::Reply, warp::Rejection> {
     // strip 0x prefix if exists
     let bls_pk_hex = bls_pk_hex.strip_prefix("0x").unwrap_or(&bls_pk_hex).into();
-    println!("Signing pk {:#?}", bls_pk_hex);
-    println!("{:#?}", req);
+    info!("Validator pubkey {bls_pk_hex}");
+    info!("Request:\n{:#?}", req);
 
     // Match over each possible datatype
     match serde_json::from_slice(&req) {
@@ -581,8 +595,6 @@ pub async fn secure_sign_bls(
         }
         Ok(BLSSignMsg::AGGREGATE_AND_PROOF(req)) | Ok(BLSSignMsg::aggregate_and_proof(req)) => {
             let ab = &req.aggregate_and_proof.aggregate.aggregation_bits;
-
-            println!("agg bits: {:?}, {:?}", ab, hex::encode(ab.as_slice()));
             // handle "AGGREGATE_AND_PROOF" type request
             match handle_aggregate_and_proof_type(req, bls_pk_hex) {
                 Ok(sig) => Ok(reply::with_status(
@@ -622,7 +634,6 @@ pub async fn secure_sign_bls(
             // handle "DEPOSIT" type request
             match handle_deposit_type(req, bls_pk_hex) {
                 Ok(resp) => {
-                    println!("dr: {:?}", resp);
                     Ok(reply::with_status(
                     reply::json(&resp),
                     StatusCode::OK))
@@ -729,10 +740,10 @@ pub async fn secure_sign_bls(
             }
         }
         Err(e) => {
-            println!("LOG - catchall error");
+            error!("Request failed: {:?}", e);
             // catchall error if the request is not valid
             let mut resp = HashMap::new();
-            resp.insert("error", format!("Type not in ['BLOCK', 'ATTESTATION', RANDAO_REVEAL', 'AGGREGATION_SLOT', 'AGGREGATE_AND_PROOF', 'DEPOSIT','VOLUNTARY_EXIT', 'SYNC_COMMITEE_MESSAGE', 'SYNC_COMMITEE_SELECTION_PROOF', 'SYNC_COMMITEE_CONTRIBUTION_AND_PROOF' 'VALIDATOR_REGISTRATION'], {:?}", e));
+            resp.insert("error", format!("Type not in ['BLOCK', 'BLOCK_V2', 'ATTESTATION', RANDAO_REVEAL', 'AGGREGATION_SLOT', 'AGGREGATE_AND_PROOF', 'DEPOSIT','VOLUNTARY_EXIT', 'SYNC_COMMITEE_MESSAGE', 'SYNC_COMMITEE_SELECTION_PROOF', 'SYNC_COMMITEE_CONTRIBUTION_AND_PROOF' 'VALIDATOR_REGISTRATION'], {:?}", e));
             Ok(reply::with_status(
                 reply::json(&resp),
                 StatusCode::BAD_REQUEST,
@@ -772,7 +783,6 @@ pub mod mock_requests {
                 }}
             }}
         }}"#);
-        // println!("{req}");
         req
     }
 
@@ -830,7 +840,6 @@ pub mod mock_requests {
                     "epoch": "0"
                }}
             }}"#);
-        // println!("{req}");
         req
     }
 

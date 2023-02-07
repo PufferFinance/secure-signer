@@ -1,7 +1,7 @@
 // #[macro_use]
 extern crate anyhow;
-
 extern crate libc;
+extern crate env_logger;
 
 mod eth_signing;
 mod eth_types;
@@ -14,11 +14,12 @@ mod route_handlers;
 use warp::Filter;
 use std::fs;
 
-
 #[tokio::main]
 async fn main() {
     let port = std::env::args().nth(1).unwrap_or("3031".into()).parse::<u16>().expect("BAD PORT");
     println!("Starting SGX Secure-Signer: localhost:{}", port);
+
+    env_logger::init();
 
     let routes = 
 
