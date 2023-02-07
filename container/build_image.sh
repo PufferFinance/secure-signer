@@ -3,9 +3,6 @@
 script_dir="$(dirname $(readlink -f $0))"
 top_dir=$(dirname "${scripts_dir}")
 
-registry="$(whoami)"
-tag="latest"
-
 function usage {
     cat << EOM
 usage: $(basename "$0") [OPTION]...
@@ -14,19 +11,25 @@ usage: $(basename "$0") [OPTION]...
     -n <container image name> 
     -g <tag> container image tag
     -b <base image name>
+    -c <network config> path network config dir
+    -e <client executable> path to the ss client binary
+    -m <MRENCLAVE> file containing MRENCLAVE measurement
     -h <usage> usage help
 EOM
     exit 0
 }
 
 function process_args {
-    while getopts ":i:r:n:g:b:h" option; do
+    while getopts ":i:r:n:g:b:e:c:m:h" option; do
         case "${option}" in
             i) package=${OPTARG};;
             r) registry=${OPTARG};;
             n) name=${OPTARG};;
             g) tag=${OPTARG};;
             b) base_image_name=${OPTARG};;
+            e) client=${OPTARG};;
+            c) network_config=${OPTARG};;
+            m) measurement=${OPTARG};;
             h) usage;;
         esac
     done
@@ -51,6 +54,9 @@ function build_docker_occlum_image {
         --build-arg http_proxy=$http_proxy \
         --build-arg https_proxy=$https_proxy \
         --build-arg OCCLUM_PACKAGE=${package} \
+        --build-arg SS_CLIENT=${client} \
+        --build-arg NETWORK_CONFIG=${network_config} \
+        --build-arg MRENCLAVE=${measurement} \
         -f ${base_image_name} . \
         -t ${registry}/${name}:${tag}
 }

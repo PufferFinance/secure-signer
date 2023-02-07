@@ -3,20 +3,38 @@ set -e
 
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}"  )" >/dev/null 2>&1 && pwd )"
 
-export OPENSSL_DIR="/usr/local/occlum/x86_64-linux-musl/"
 export ra_config_name="ra_config.json"
 export enclave_name="Secure-Signer"
 export image_path="${script_dir}/${enclave_name}"
 export binary_name="secure-signer"
-ss_port=9001
+export base_image_name="container/Dockerfile_SS.ubuntu20.04"
+export image_name="secure_signer"
+export registry="pufferfinance"
+export tag="latest"
+export executable="./target/release/client"
+export config="./conf/network_config.json"
+export measurement="./Secure-Signer/MRENCLAVE"
+export ss_port=9001
+
+# If LOCAL_DEV is not set assume compiling for Occlum
+if [ -z "$LOCAL_DEV" ]; then
+    cargo_bin="occlum-cargo"
+    OPENSSL_DIR="/usr/local/occlum/x86_64-linux-musl/"
+else
+    cargo_bin="cargo"
+    build_flags="--features=dev"
+fi
 
 function build_secure_signer()
 {
-  	# compiles EPID remote attestation cpp code
-	./build_epid_ra.sh
+
+    if [ -z "$LOCAL_DEV" ]; then
+        # compiles EPID remote attestation cpp code
+        ./build_epid_ra.sh
+    fi
 
     # compile secure-signer
-	occlum-cargo build --release
+	${cargo_bin} build --release ${build_flags}
 }
 
 function new_ss_instance()
@@ -47,15 +65,21 @@ function new_ss_instance()
 function measure() {
     pushd ${image_path} > /dev/null
         echo "MRENCLAVE:"
-        occlum print mrenclave
+        occlum print mrenclave > MRENCLAVE
+        cat MRENCLAVE
         echo "MRSIGNER:"
-        occlum print mrsigner
+        occlum print mrsigner > MRSIGNER
+        cat MRSIGNER
     popd > /dev/null
 }
 
 function run() {
     pushd ${image_path}
+    if [ -z "$LOCAL_DEV" ]; then
         occlum run /bin/${binary_name} ${ss_port}
+    else
+        cargo run ${build_flags} --bin ${binary_name} ${ss_port}
+    fi
     popd
 }
 
@@ -67,50 +91,51 @@ function package() {
 
 function build() {
     build_secure_signer
-    new_ss_instance
-    measure
-    package
+    if [ -z "$LOCAL_DEV" ]; then
+        new_ss_instance
+        measure
+        package
+    fi
 }
 
 function clean_build() {
-    occlum-cargo clean
+    ${cargo_bin} clean
     build
+}
+
+function unit_tests() {
+    ${cargo_bin} test --features=dev -- --test-threads 1  
 }
 
 # Function to build the Secure Signer container image either in development or release mode
 function dockerize() {
     # Change the directory to script_dir
-    pushd ${script_dir}
-        if [ $release ]; then
-            base_image_name="container/Dockerfile_SS.ubuntu20.04"
-            image_name="secure_signer_image"
-        elif [ $development ]; then
-            base_image_name="container/Dockerfile_SS_dev.ubuntu20.04"
-            image_name="secure_signer_dev_image"
-        else
-            echo "Error: Must specify either --release or --development flag"
-            exit 1
-        fi
-
+    pushd ${script_dir} > /dev/null
         # Build the container image 
         ./container/build_image.sh \
             -i ./${enclave_name}/${enclave_name}.tar.gz \
             -n ${image_name} \
-            -b ${base_image_name}
-    popd
+            -b ${base_image_name} \
+            -r ${registry} \
+            -g ${tag} \
+            -c ${config} \
+            -e ${executable} \
+            -m ${measurement}
+    popd > /dev/null
 }
 
 function usage {
     cat << EOM
 Build and containerize Secure-Signer.
+Run "LOCAL_DEV=true ./build_secure_signer.sh <args>" for local dev compilation without SGX dependencies.
 usage: $(basename "$0") [OPTION]...
     -p <Secure-Signer Server port> default 9001.
     -c clean Cargo then build all
     -b build from cached dependencies
     -x Run Secure-Signer on port set by -p (default 9001) (assumes this script is executed in Docker container).
-    -d Build and package the DEVELOPMENT Docker Image
-    -r Build and package the RELEASE Docker Image
+    -d Build and package the Docker Container Image
     -m Measure Secure-Signer's MRENCLAVE and MRSIGNER.
+    -t Run all unit tests
     -h <usage> usage help
 EOM
     exit 0
@@ -119,15 +144,15 @@ EOM
 
 function process_args {
     # Use getopts to process the arguments
-    while getopts ":pcbxrdmp:h" option; do
+    while getopts ":pcbxdmtp:h" option; do
         case "${option}" in
             p) ss_port=${OPTARG};;
             c) clean_build;;
             b) build;;
             x) run;;
             m) measure;;
-            d) development=true; dockerize;;
-            r) release=true; dockerize;;
+            d) dockerize;;
+            t) unit_tests;;
             h) usage;;
         esac
     done

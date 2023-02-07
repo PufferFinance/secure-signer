@@ -1,4 +1,4 @@
-use crate::eth_types::{Slot, Epoch, Root, BLSPubkey, from_u64_string, from_bls_pk_hex};
+use crate::eth_types::{de_signing_root, Slot, Epoch, Root, BLSPubkey, from_u64_string, from_bls_pk_hex};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use ssz_types::FixedVector;
 use hex;
@@ -10,19 +10,6 @@ use std::path::PathBuf;
 
 pub const SLASHING_PROTECTION_DIR: &str = "./etc/slashing/";
 
-pub fn de_signing_root<'de, D>(deserializer: D) -> Result<Option<Root>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let hex_string: &str = Deserialize::deserialize(deserializer)?;
-    if hex_string.is_empty() {
-      return Ok(None);
-    }
-    let bytes: Root = SerHex::<StrictPfx>::from_hex(&hex_string).expect("bad hex");
-    let mut array = [0u8; 32];
-    array.copy_from_slice(&bytes[..32]);
-    Ok(Some(array))
-}
 
 /// Assumes that calling struct will skip serializing if the option is none
 pub fn se_signing_root<S>(value: &Option<Root>, serializer: S) -> Result<S::Ok, S::Error>

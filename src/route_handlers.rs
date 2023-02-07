@@ -935,19 +935,94 @@ pub mod mock_requests {
 
 
     pub fn mock_aggregation_slot_request() -> String {
-        unimplemented!()
+        let req = format!(r#"
+        {{
+            "type": "AGGREGATION_SLOT",
+            "fork_info":{{
+                "fork":{{
+                   "previous_version":"0x80000070",
+                   "current_version":"0x80000071",
+                   "epoch":"750"
+                }},
+                "genesis_validators_root":"0x2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"
+            }},
+            "signingRoot": "0x2ebfc2d70944cc2fbff6d67c6d9cbb043d7fbe0a660d248b6e666ce110af418a",
+            "aggregation_slot": {{
+                "slot": "123123"
+            }}
+        }}"#);
+        req
     }
 
     pub fn mock_sync_committee_message_request() -> String {
-        unimplemented!()
+        let req = format!(r#"
+        {{
+            "type": "SYNC_COMMITTEE_MESSAGE",
+            "fork_info":{{
+                "fork":{{
+                   "previous_version":"0x80000070",
+                   "current_version":"0x80000071",
+                   "epoch":"750"
+                }},
+                "genesis_validators_root":"0x2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"
+            }},
+            "signingRoot": "0x2ebfc2d70944cc2fbff6d67c6d9cbb043d7fbe0a660d248b6e666ce110af418a",
+            "sync_committee_message": {{
+                "slot": "123123",
+                "beacon_block_root": "0x2ebfc2d70944cc2fbff6d67c6d9cbb043d7fbe0a660d248b6e666ce110af418a"
+            }}
+        }}"#);
+        req
     }
 
     pub fn mock_sync_committee_selection_proof_request() -> String {
-        unimplemented!()
+        let req = format!(r#"
+        {{
+            "type": "SYNC_COMMITTEE_SELECTION_PROOF",
+            "fork_info":{{
+                "fork":{{
+                   "previous_version":"0x80000070",
+                   "current_version":"0x80000071",
+                   "epoch":"750"
+                }},
+                "genesis_validators_root":"0x2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"
+            }},
+            "signingRoot": "0x2ebfc2d70944cc2fbff6d67c6d9cbb043d7fbe0a660d248b6e666ce110af418a",
+            "sync_aggregator_selection_data": {{
+                "slot": "123123",
+                "subcommittee_index": "12345"
+            }}
+        }}"#);
+        req
     }
 
+    /// aggregation bits must be 128b
     pub fn mock_sync_committee_contribution_and_proof_request() -> String {
-        unimplemented!()
+        let req = format!(r#"
+        {{
+            "type": "SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF",
+            "fork_info":{{
+                "fork":{{
+                   "previous_version":"0x80000070",
+                   "current_version":"0x80000071",
+                   "epoch":"750"
+                }},
+                "genesis_validators_root":"0x2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"
+            }},
+            "signingRoot": "0x2ebfc2d70944cc2fbff6d67c6d9cbb043d7fbe0a660d248b6e666ce110af418a",
+            "contribution_and_proof": {{
+                "aggregator_index": "123123",
+                "selection_proof": "0x8209b5391cd69f392b1f02dbc03bab61f574bb6bb54bf87b59e2a85bdc0756f7db6a71ce1b41b727a1f46ccc77b213bf0df1426177b5b29926b39956114421eaa36ec4602969f6f6370a44de44a6bce6dae2136e5fb594cce2a476354264d1ea",
+                "contribution" : {{
+                    "slot": "123123",
+                    "beacon_block_root": "0x2ebfc2d70944cc2fbff6d67c6d9cbb043d7fbe0a660d248b6e666ce110af418a",
+                    "subcommittee_index": "12345",
+                    "aggregation_bits": "0x00000000000000000000000000000000",
+                    "signature": "0x8209b5391cd69f392b1f02dbc03bab61f574bb6bb54bf87b59e2a85bdc0756f7db6a71ce1b41b727a1f46ccc77b213bf0df1426177b5b29926b39956114421eaa36ec4602969f6f6370a44de44a6bce6dae2136e5fb594cce2a476354264d1ea"
+                }}
+            }}
+        }}"#);
+        req
     }
 
 
