@@ -99,6 +99,11 @@ function build() {
     fi
 }
 
+function build_client() {
+	${cargo_bin} build --release --bin client --features=dev
+}
+
+
 function clean_build() {
     ${cargo_bin} clean
     build
@@ -137,6 +142,7 @@ usage: $(basename "$0") [OPTION]...
     -d Build and package the Docker Container Image (assumes "occlum package" has been run)
     -m Measure Secure-Signer's MRENCLAVE and MRSIGNER (assumes this is run in SGX env)
     -t Run all unit tests
+    -a Compile client app
     -h <usage> usage help
 EOM
     exit 0
@@ -145,7 +151,7 @@ EOM
 
 function process_args {
     # Use getopts to process the arguments
-    while getopts ":pcbxdmtp:h" option; do
+    while getopts ":pcbxdamtp:h" option; do
         case "${option}" in
             p) ss_port=${OPTARG};;
             c) clean_build;;
@@ -154,6 +160,7 @@ function process_args {
             m) measure;;
             d) dockerize;;
             t) unit_tests;;
+            a) build_client;;
             h) usage;;
         esac
     done
