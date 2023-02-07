@@ -11,7 +11,7 @@ has_children: true
 By default, any data created within a Docker container is lost if the container is removed. Secure-Signer maintains our keys and slashing protection databases, so we want this data to persist should anything happen to the container. To do so, we will create a Docker volume called `Secure-Signer-Backup`.
 <div class="code-example" markdown="1">
 ```bash
-    docker volume create —-name Secure-Signer-Backup
+docker volume create Secure-Signer-Backup
 ```
 </div>
 
