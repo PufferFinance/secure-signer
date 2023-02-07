@@ -1,3 +1,5 @@
+use crate::keys;
+
 use anyhow::{Result, Context, bail};
 use blst::min_pk::PublicKey;
 use openssl::stack::{Stack, StackRef};
@@ -6,13 +8,11 @@ use openssl::x509::store::X509StoreBuilder;
 use serde::Deserialize;
 use serde_derive::{Serialize};
 use ecies::PublicKey as EthPublicKey;
+use log::{info, debug, error};
 
 use std::ffi::CString;
 use std::{fmt, fs};
 use std::os::raw::c_char;
-
-
-use crate::keys;
 
 #[cfg(not(feature = "dev"))]
 #[link(name = "epid")]
@@ -88,7 +88,7 @@ impl AttestationEvidence {
     /// IAS returns their signing certificate and root CA as concatenated PEMs.
     /// This function verifies that the signing certificate is rooted in Intel's root CA.
     pub fn verify_intel_signing_certificate(&self) -> Result<()> {
-        // println!("{}", self.signing_cert);
+        debug!("Verifying certificate {}", self.signing_cert);
         let x509s = X509::stack_from_pem(&self.signing_cert.as_bytes())?;
 
         // Extract intel's signing certificate
@@ -148,7 +148,6 @@ impl AttestationEvidence {
     pub fn get_bls_pk(&self) -> Result<PublicKey> {
         let report: AttestationReport = serde_json::from_slice(self.raw_report.as_bytes()).with_context(|| "Couldn't get AttestationReport from AttestationEvidence.raw_report")?;
         let body = report.deserialize_quote_body()?;
-        // println!("{:?}", body);
         let pk_bytes = &body.REPORTDATA[0..48];
         match PublicKey::deserialize(pk_bytes) {
             Ok(pk) => Ok(pk),
@@ -159,7 +158,6 @@ impl AttestationEvidence {
     pub fn get_eth_pk(&self) -> Result<EthPublicKey> {
         let report: AttestationReport = serde_json::from_slice(self.raw_report.as_bytes()).with_context(|| "Couldn't get AttestationReport from AttestationEvidence.raw_report")?;
         let body = report.deserialize_quote_body()?;
-        // println!("{:?}", body);
         let pk_bytes = &body.REPORTDATA[0..33];
         let pk = EthPublicKey::parse_slice(pk_bytes, None)?;
         Ok(pk)
@@ -168,7 +166,6 @@ impl AttestationEvidence {
     pub fn get_mrenclave(&self) -> Result<String> {
         let report: AttestationReport = serde_json::from_slice(self.raw_report.as_bytes()).with_context(|| "Couldn't get AttestationReport from AttestationEvidence.raw_report")?;
         let body = report.deserialize_quote_body()?;
-        // println!("{:?}", body);
         Ok(body.MRENCLAVE)
     }
 
@@ -181,12 +178,12 @@ pub fn epid_remote_attestation(pk_hex: &String) -> Result<AttestationEvidence> {
     let pk_bytes = match len {
         66 => { // Compressed SECP256K1 Key = 33B * 2 for hex = 66
             // Check the key exists
-            println!("DEBUG: RA for ETH key {pk_hex}");
+            info!("EPID Remote Attestation for for ETH key {pk_hex}");
             let sk = keys::read_eth_key(&pk_hex)?;
             EthPublicKey::from_secret_key(&sk).serialize_compressed().to_vec()
         },
         96 => { // BLS public key = 48B * 2 for hex = 96
-            println!("DEBUG: RA for BLS key {pk_hex}");
+            info!("EPID Remote Attestation for for BLS key {pk_hex}");
             // Check the key exists
             let sk = match keys::read_bls_key(&format!("generated/{pk_hex}")) {
                 Ok(sk) => sk,
@@ -201,7 +198,7 @@ pub fn epid_remote_attestation(pk_hex: &String) -> Result<AttestationEvidence> {
 
     };
     let proof = AttestationEvidence::new(&pk_bytes)?;
-    println!("Got RA evidence {:?}", proof);
+    info!("Produced Remote Attestation evidence {:?}", proof);
     Ok(proof)
 }
 

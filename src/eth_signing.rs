@@ -11,8 +11,6 @@ use tree_hash::TreeHash;
 use log::{info, debug, error};
 
 pub const ALLOW_GROWABLE_SLASH_PROTECTION_DB: bool = true;
-pub const BLOCK_PROTECTION_DIR: &str = "./etc/slashing/blocks/";
-pub const ATTESTATION_PROTECTION_DIR: &str = "./etc/slashing/attestations/";
 
 /// Return the signing root for the corresponding signing data.
 fn compute_signing_root<T: Encode + TreeHash>(ssz_object: T, domain: Domain) -> Root {
