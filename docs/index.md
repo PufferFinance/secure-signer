@@ -17,7 +17,8 @@ Secure-Signer is a remote-signing tool that interfaces with Ethereum consensus c
 {: .fs-6 .fw-300 }
 
 [Get started now](getting-started){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
-[View it on GitHub](https://github.com/PufferFinance/secure-signer){: .btn .fs-5 .mb-4 .mb-md-0 }
+[View it on GitHub](https://github.com/PufferFinance/secure-signer){: .btn .btn-blue .fs-5 .mb-4 .mb-md-0 }
+[API Documentation](https://pufferfinance.github.io/secure-signer-api-docs/redoc-static.html){: .btn .btn-green .fs-5 .mb-4 .mb-md-0 }
 
 ---
 

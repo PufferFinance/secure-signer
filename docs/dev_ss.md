@@ -93,26 +93,27 @@ rustup target add x86_64-unknown-linux-musl
 </div>
 
 ### Using `build_secure_signer.sh`
-The `build_secure_signer.sh` is a convenience script for building and running Secure-Signer. Usage:
+The `build_secure_signer.sh` is a convenience script for building and running Secure-Signer. If you set the `LOCAL_DEV` environment variable, the script will build/run Rust locally without the Occlum runtime, which may be convenient for developing without an SGX-enabled CPU. Usage:
 <div class="code-example" markdown="1">
 ```bash
 root@Puffer-Dev:~# cd secure-signer/ 
 root@Puffer-Dev:~/secure-signer# ./build_secure_signer.sh -h
 Build and containerize Secure-Signer.
+Run "LOCAL_DEV=true ./build_secure_signer.sh <args>" for local dev compilation without SGX dependencies.
 usage: build_secure_signer.sh [OPTION]...
     -p <Secure-Signer Server port> default 9001.
     -c clean Cargo then build all
     -b build from cached dependencies
-    -x Run Secure-Signer on port set by -p (default 9001) (assumes this script is executed in Docker container).
-    -d Build and package the DEVELOPMENT Docker Image
-    -r Build and package the RELEASE Docker Image
-    -m Measure Secure-Signer's MRENCLAVE and MRSIGNER.
+    -x Run Secure-Signer on port set by -p (default 9001)
+    -d Build and package the Docker Container Image (assumes "occlum package" has been run)
+    -m Measure Secure-Signer's MRENCLAVE and MRSIGNER (assumes this is run in SGX env)
+    -t Run all unit tests
     -h <usage> usage help
 ```
 </div>
 
 ## Build the Secure-Signer codebase
-The following command will compile the codebase, create an Occlum image, and start running the enclave with the default port `9001`.
+The following command will compile the codebase, create an Occlum image, and execute Secure-Signer with the default port `9001`.
 <div class="code-example" markdown="1">
 ```bash
 ./build_secure_signer.sh -b -x
@@ -120,10 +121,10 @@ The following command will compile the codebase, create an Occlum image, and sta
 </div>
 
 ## Running Tests
-Use the following command to run unit tests (from inside the Docker container). Note that the tests access a shared filesystem and should be run sequentially.
+Use the following command to run unit tests (from inside the Docker container). Note that the tests access a shared filesystem and will be run sequentially.
 <div class="code-example" markdown="1">
 ```bash
-cargo test --features=dev -- --test-threads 1
+./build_secure_signer.sh -t
 ```
 </div>
 

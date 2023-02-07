@@ -6,60 +6,24 @@ parent: Running Secure-Signer
 permalink: /running/client
 has_children: false
 ---
-In this section we will guide you through the process of setting up a validator on the Goerli Testnet using the Secure-Signer client App. 
-
-## Clone Secure-Signer
-For the remainder of this guide, we assume the repo is cloned into the home (`~`) directory.
-<div class="code-example" markdown="1">
-```bash
-git clone https://github.com/PufferFinance/secure-signer.git
-```
-</div>
-
-## Using `build_secure_signer.sh`
-The `build_secure_signer.sh` is a convenience script for building and running Secure-Signer. The rest of this guide assumes we are running from inside the [developer Docker container](../developers). Usage:
-<div class="code-example" markdown="1">
-```bash
-root@Puffer-Dev:~# cd secure-signer/ 
-root@Puffer-Dev:~/secure-signer# ./build_secure_signer.sh -h
-Build and containerize Secure-Signer.
-usage: build_secure_signer.sh [OPTION]...
-    -p <Secure-Signer Server port> default 9001.
-    -c clean Cargo then build all
-    -b build from cached dependencies
-    -x Run Secure-Signer on port set by -p (default 9001) (assumes this script is executed in Docker container).
-    -d Build and package the DEVELOPMENT Docker Image
-    -r Build and package the RELEASE Docker Image
-    -m Measure Secure-Signer's MRENCLAVE and MRSIGNER.
-    -h <usage> usage help
-```
-</div>
+In this section we will guide you through the process of setting up a validator on the Goerli Testnet using the Secure-Signer client App that is bundled in the `pufferfinance/secure_signer:latest` container image. It is assumed that you have completed installation and can run Secure-Signer as documented [here](../running).
 
 ## Getting Secure-Signer enclave measurements
-Use the `-m` flag to get the `MRENCLAVE` and `MRSIGNER` values from the Secure-Signer enclave. The `MRENCLAVE` value is important for securely importing keys! Note that this value may have changed since the time of writing this guide.
+The Secure-Signer enclave's `MRENCLAVE` value is necessary so that you know you are interfacing only with the correct version of Secure-Signer. This is extremely important to verify before importing any of your keys! Note that the `MRENCLAVE` value used in this guide may have changed since the time of writing. To fetch this value run:
 
 <div class="code-example" markdown="1">
 ```bash
-root@Puffer-Dev:~/secure-signer# ./build_secure_signer.sh -m
-MRENCLAVE:
+puffer@Puffer-Dev:~$ docker exec secure_signer_container /bin/bash -c  "cat MRENCLAVE"
 9756111746cf7549c9f8c3ca180a29674196fe1300865b47936c5b71fc0a3b94
-MRSIGNER:
-83d719e77deaca1470f6baf62a4d774303c899db69020f9c70ee1dfc08c7ce9e
 ```
 </div>
+Thus the `MRENCLAVE` value for this version of Secure-Signer is `0x9756111746cf7549c9f8c3ca180a29674196fe1300865b47936c5b71fc0a3b94`.
 
-## Build the client App
-The client App is a CLI app written in Rust to help interface with Secure-Signer during the setup phase. Run the following to compile the client App: 
+## Client App usage
+The client App is a CLI app written in Rust to help interface with Secure-Signer during the setup phase. Run the following to get its usage:
 <div class="code-example" markdown="1">
 ```bash
-cargo build --release --features=dev --bin client
-```
-</div>
-
-## client App usage
-<div class="code-example" markdown="1">
-```bash
-root@Puffer-Dev:~/secure-signer# ./target/release/client -h   
+puffer@Puffer-Dev:~$ docker exec -w /home secure_signer_container /bin/bash -c "./client -h"
 Secure-Signer Client Interface
 
 Usage: client [OPTIONS]
@@ -83,7 +47,7 @@ Options:
           Request Secure-Signer to generate a DepositData [requires validator-pk-hex, --withdrawal-addr]
   -v, --validator-pk-hex <VALIDATOR_PK_HEX>
           The validator public key in hex
-  -w, --withdrawal-addr <WITHDRAWAL_ADDR>
+  -e, --execution-addr <EXECUTION_ADDR>
           The ETH address for withdrawals
       --mrenclave <MRENCLAVE>
           The expected MRENCLAVE value
@@ -100,24 +64,24 @@ Options:
 
 
 # Importing a validator key
-Secure-Signer allows users to import their existing validator keystores (see the [API docs](https://pufferfinance.github.io/secure-signer-api-docs/redoc-static.html#tag/Keymanager/operation/KEYMANAGER_IMPORT) for more information). Currently only keystores conforming to V3 of the [EIP-2355](https://eips.ethlibrary.io/eip-2335.html) specs are compatible. In this section, we will explain how to generate a new keystore, import it into Secure-Signer, then generate a DepositData that can be used in the [Goerli launchpad](https://goerli.launchpad.ethereum.org/en/upload-deposit-data). We strongly recommend generating BLS keys within Secure-Signer, described [in this section](#generating-a-validator-key-in-secure-signer).
+Secure-Signer allows users to import their existing validator keystores (see the [API docs](https://pufferfinance.github.io/secure-signer-api-docs/redoc-static.html#tag/Keymanager/operation/KEYMANAGER_IMPORT) for more information). Currently only keystores conforming to V3 of the [EIP2355](https://eips.ethlibrary.io/eip-2335.html) specs are compatible. In this section, we will explain how to generate a new keystore, import it into Secure-Signer, then generate a DepositData that can be used in the [Goerli launchpad](https://goerli.launchpad.ethereum.org/en/upload-deposit-data). We strongly recommend generating BLS keys within Secure-Signer, described [in this section](#generating-a-validator-key-in-secure-signer).
 
 ## Generate a local keystore
-The following command will generate a new keystore file named `bls-v3-keystore.json` in the default directory `./ss_out`. For the purposes of this demo, we will use the password `password`, but be sure to update accordingly. We assume that Secure-Signer is running on port `9001`.
+The following command will generate a new keystore file named `bls-v3-keystore.json` in the default directory `./ss_out`. For the purposes of this demo, we will use the password `password`, but be sure to update accordingly. We assume that Secure-Signer is running on port `9001`, which is the default port used by the client.
 
 <div class="code-example" markdown="1">
 ```bash
-root@Puffer-Dev:~/secure-signer# ./target/release/client --new-local-bls bls-v3-keystore.json --password password
+puffer@Puffer-Dev:~$ docker exec -w /home secure_signer_container /bin/bash -c "./client --new-local-bls bls-v3-keystore.json --password password"
 - Connecting to Secure-Signer on port 9001
-Saved keystore with pk: 0xa706d9bf5d6cb6f818e527d4480e71f88efa2e3ff96a26fc4a0c863bc904a53130ce64eb75db81622e62717282ef6a63
+Saved keystore with pk: 0xaf4d253411e7a2ddc28fc514e551070abc291bc5a5e5fbc4b6bc5f5282f03ce150b363d325437fcfde0df8d22558dcf3
 ```
 </div>
 
 We can verify that the keystore downloaded:
 <div class="code-example" markdown="1">
 ```bash
-root@Puffer-Dev:~/secure-signer# cat ss_out/bls-v3-keystore.json 
-{"crypto":{"cipher":"aes-128-ctr","cipherparams":{"iv":"b8a4f94bdf18512b404ebd18146d0e57"},"ciphertext":"4ee0a2e9afe952bfc8254a3cf2dab5d511305de03d900176f5bbb067faf93b4c","kdf":"scrypt","kdfparams":{"dklen":32,"n":8192,"p":1,"r":8,"salt":"12ba84ee43bb2c3ca62fd2f47d750ef3d6fa93a7970386c292ecabebb98539c6"},"mac":"eae32d3cd0934f3aa980715ab06e03c17849ed40d72c3bf815a92ca63c1a47c1"},"id":"c7a167ce-4775-44a2-b65e-fbe86f94e1a0","version":3}
+puffer@Puffer-Dev:~$ docker exec -w /home secure_signer_container /bin/bash -c "cat ss_out/bls-v3-keystore.json"
+{"crypto":{"cipher":"aes-128-ctr","cipherparams":{"iv":"4316071448aa82f2f8ba87b1e77ba74b"},"ciphertext":"903092827a3fd52a44ba795a557a94e483ae8025b207a6e67a908b699ddb8c3a","kdf":"scrypt","kdfparams":{"dklen":32,"n":8192,"p":1,"r":8,"salt":"7ac3a9575d1da1d44fd0e3e1e78775610be775494debb95935414975c7c40f94"},"mac":"5690add8588e415dbd9c518b9caf2f2fa5b72b12369fa3030a7b7bfb694b26cf"},"id":"459f5b73-8a93-4529-babc-daf1b9e62aad","version":3}
 ```
 </div>
 
@@ -128,14 +92,38 @@ The following command will generate a dummy database named `bls-v3-keystore-slas
 
 <div class="code-example" markdown="1">
 ```bash
-echo '{
+docker exec -w /home secure_signer_container /bin/bash -c "echo  '{
+    \"metadata\": {
+        \"interchange_format_version\": \"5\",
+        \"genesis_validators_root\": \"0x04700007fabc8282644aed6d1c7c9e21d38a03a0c4ba193f3afe428824b3a673\"
+    },
+    \"data\": [
+        {
+            \"pubkey\": \"0xaf4d253411e7a2ddc28fc514e551070abc291bc5a5e5fbc4b6bc5f5282f03ce150b363d325437fcfde0df8d22558dcf3\",
+            \"signed_blocks\": [
+                {
+                    \"slot\": \"1559\"
+                }
+            ],
+            \"signed_attestations\": []
+        }
+    ]
+}' > ss_out/bls-v3-keystore-slash-protection-db.json"
+```
+</div>
+
+Verify our dummy slash protection was written:
+<div class="code-example" markdown="1">
+```bash
+puffer@Puffer-Dev:~$ docker exec -w /home secure_signer_container /bin/bash -c "cat ss_out/bls-v3-keystore-slash-protection-db.json"
+{
     "metadata": {
         "interchange_format_version": "5",
         "genesis_validators_root": "0x04700007fabc8282644aed6d1c7c9e21d38a03a0c4ba193f3afe428824b3a673"
     },
     "data": [
         {
-            "pubkey": "0xa706d9bf5d6cb6f818e527d4480e71f88efa2e3ff96a26fc4a0c863bc904a53130ce64eb75db81622e62717282ef6a63",
+            "pubkey": "0xaf4d253411e7a2ddc28fc514e551070abc291bc5a5e5fbc4b6bc5f5282f03ce150b363d325437fcfde0df8d22558dcf3",
             "signed_blocks": [
                 {
                     "slot": "1559"
@@ -144,26 +132,27 @@ echo '{
             "signed_attestations": []
         }
     ]
-}' > ss_out/bls-v3-keystore-slash-protection-db.json
+}
 ```
 </div>
 
 ## Import the keystore and slash protection
 <div class="code-example" markdown="1">
 ```bash
-root@Puffer-Dev:~/secure-signer# ./target/release/client --import ss_out/bls-v3-keystore.json --password password --slash-protection-path ss_out/bls-v3-keystore-slash-protection-db.json --mrenclave 0x9756111746cf7549c9f8c3ca180a29674196fe1300865b47936c5b71fc0a3b94
+puffer@Puffer-Dev:~$ docker exec -w /home secure_signer_container /bin/bash -c "./client --import ss_out/bls-v3-keystore.json --password password --slash-protection-path ss_out/bls-v3-keystore-slash-protection-db.json --mrenclave 0x9756111746cf7549c9f8c3ca180a29674196fe1300865b47936c5b71fc0a3b94"
 - Connecting to Secure-Signer on port 9001
-- Secure-Signer generated ETH public key: 0x0388eb64f66cb8df3590f3b49096c4deda99df952638664a1d8433ba181611f4e8
+- Secure-Signer generated ETH public key: 0x03c7c44c5091fd60773003d40fa489a5ded9e83d99c2e169d70c084ed8cfef19e7
 - Secure-Signer ETH public key passed remote attestation
-- Securely transfered validator key to Secure-Signer: "a706d9bf5d6cb6f818e527d4480e71f88efa2e3ff96a26fc4a0c863bc904a53130ce64eb75db81622e62717282ef6a63"
+- Securely transfered validator key to Secure-Signer: "af4d253411e7a2ddc28fc514e551070abc291bc5a5e5fbc4b6bc5f5282f03ce150b363d325437fcfde0df8d22558dcf3"
 - Imported BLS public key passed remote attestation
 ListKeysResponse {
     data: [
         ListKeysResponseInner {
-            pubkey: "0xa706d9bf5d6cb6f818e527d4480e71f88efa2e3ff96a26fc4a0c863bc904a53130ce64eb75db81622e62717282ef6a63",
+            pubkey: "0xaf4d253411e7a2ddc28fc514e551070abc291bc5a5e5fbc4b6bc5f5282f03ce150b363d325437fcfde0df8d22558dcf3",
         },
     ],
 }
+
 ```
 </div>
 
@@ -185,7 +174,7 @@ At this point, Secure-Signer is loaded with our validator key and slash protecti
 Note, the following should not be attempted on real keys and is solely for demonstration purposes. In practice, all signing material (minus deposits) passed to Secure-Signer should originate from your consensus client.
 <div class="code-example" markdown="1">
 ```bash
-curl -X POST localhost:9001/api/v1/eth2/sign/0xa706d9bf5d6cb6f818e527d4480e71f88efa2e3ff96a26fc4a0c863bc904a53130ce64eb75db81622e62717282ef6a63 -H "Content-Type: application/json" -d '{
+curl -X POST localhost:9001/api/v1/eth2/sign/0xaf4d253411e7a2ddc28fc514e551070abc291bc5a5e5fbc4b6bc5f5282f03ce150b363d325437fcfde0df8d22558dcf3 -H "Content-Type: application/json" -d '{
     "type": "BLOCK_V2",
     "fork_info":{
         "fork":{
@@ -217,14 +206,14 @@ This concludes the guide on how to import keys into Secure-Signer. The next sect
 Generating a new validator key in Secure-Signer is easy. Run the following:
 <div class="code-example" markdown="1">
 ```bash
-root@Puffer-Dev:~/secure-signer# ./target/release/client --bls-keygen --mrenclave 0x9756111746cf7549c9f8c3ca180a29674196fe1300865b47936c5b71fc0a3b94
+puffer@Puffer-Dev:~$ docker exec -w /home secure_signer_container /bin/bash -c "./client --bls-keygen --mrenclave 0x9756111746cf7549c9f8c3ca180a29674196fe1300865b47936c5b71fc0a3b94"
 - Connecting to Secure-Signer on port 9001
-- Secure-Signer generated BLS public key: 0xaf6f9c1249a4e0e30c73b5df4fdce4b76f0624c5508ab6484c4fb670fe2c9c143287efc289e146b763e87fd3b3dd5857
+- Secure-Signer generated BLS public key: 0x8289a5b32c66cd1f7de338855bc7b70897402a42f24070f9ad62423c76c05f001d560975d40106200b5cb9176488a2c7
 - Secure-Signer BLS public key passed remote attestation
 ListKeysResponse {
     data: [
         ListKeysResponseInner {
-            pubkey: "0xaf6f9c1249a4e0e30c73b5df4fdce4b76f0624c5508ab6484c4fb670fe2c9c143287efc289e146b763e87fd3b3dd5857",
+            pubkey: "0x8289a5b32c66cd1f7de338855bc7b70897402a42f24070f9ad62423c76c05f001d560975d40106200b5cb9176488a2c7",
         },
     ],
 }
@@ -237,35 +226,36 @@ ListKeysResponse {
 - The client App verified the validity of the attestation evidence gaining trust in this Secure-Signer instance. The verification process required that the report's `MRENCLAVE` value matched the expected, the evidence was signed by Intel, and the validator public key was committed to in the report.
 - The client App requested Secure-Signer to list all of the validator keys that have been generated.
 
-Secure-Signer now safeguards the private key corresponding to the public key `0xaf6f9c1249a4e0e30c73b5df4fdce4b76f0624c5508ab6484c4fb670fe2c9c143287efc289e146b763e87fd3b3dd5857` with a slash protection DB initialized to `slot=0`, `source_epoch=0`, and `target_epoch=0`.
+Secure-Signer now safeguards the private key corresponding to the public key `0x8289a5b32c66cd1f7de338855bc7b70897402a42f24070f9ad62423c76c05f001d560975d40106200b5cb9176488a2c7` with a slash protection DB initialized to `slot=0`, `source_epoch=0`, and `target_epoch=0`.
 
 ### Network Config
 Before we generate our DepositData to register our validator keys, there are some parameters that change depending on the target Testnet. By default the client App uses the `conf/network_config.json` file which is configured to work with the [Goerli launchpad](https://goerli.launchpad.ethereum.org/en/upload-deposit-data). To work with a different Testnet, either modify this file or supply a new file using the flag `--config <path_to_your_network_config>`.
 
 # Register validator keys
-To register your validator, you must use your validator key to sign off on a DepositData. The following command will make the client App request Secure-Signer to generate a `deposit_data.json` file to the default directory `ss_out` using the public key `0xaf6f9c1249a4e0e30c73b5df4fdce4b76f0624c5508ab6484c4fb670fe2c9c143287efc289e146b763e87fd3b3dd5857`. The client App generates withdrawal credentials using the `ETH1_ADDRESS_WITHDRAWAL_PREFIX` (0x01) described in the [Capella specs](https://github.com/ethereum/consensus-specs/blob/dev/specs/capella/beacon-chain.md#new-process_bls_to_execution_change), which requires a 20B hex-encoded ETH address. In this example, we're setting partial withdrawals to send ETH to `0x4D68568B8D4E6244233c685B48fEa619621B78D2`.
+To register your validator, you must use your validator key to sign off on a DepositData. The following command will make the client App request Secure-Signer to generate a `deposit_data.json` file to the default directory `ss_out` using the public key `0x8289a5b32c66cd1f7de338855bc7b70897402a42f24070f9ad62423c76c05f001d560975d40106200b5cb9176488a2c7`. The client App generates withdrawal credentials using the `ETH1_ADDRESS_WITHDRAWAL_PREFIX` (0x01) described in the [Capella specs](https://github.com/ethereum/consensus-specs/blob/dev/specs/capella/beacon-chain.md#new-process_bls_to_execution_change), which requires a 20B hex-encoded ETH address. In this example, we're setting partial withdrawals to send ETH to `0x4D68568B8D4E6244233c685B48fEa619621B78D2`.
 
 <div class="code-example" markdown="1">
 ```bash
-root@Puffer-Dev:~/secure-signer# ./target/release/client --deposit --validator-pk-hex 0xaf6f9c1249a4e0e30c73b5df4fdce4b76f0624c5508ab6484c4fb670fe2c9c143287efc289e146b763e87fd3b3dd5857 --execution-addr 0x4D68568B8D4E6244233c685B48fEa619621B78D2
+puffer@Puffer-Dev:~$ docker exec -w /home secure_signer_container /bin/bash -c "./client --deposit --validator-pk-hex 0x8289a5b32c66cd1f7de338855bc7b70897402a42f24070f9ad62423c76c05f001d560975d40106200b5cb9176488a2c7 --execution-addr 0x4D68568B8D4E6244233c685B48fEa619621B78D2"
 - Connecting to Secure-Signer on port 9001
 Using withdrawal_credentials: 0x0100000000000000000000004D68568B8D4E6244233c685B48fEa619621B78D2
 Writing DepositData to "./ss_out/deposit_data.json"
 ```
 </div>
 
-Verify the DepositData was generated:
+You can grab this `deposit_data.json` file by running the following:
 <div class="code-example" markdown="1">
 ```bash
-root@Puffer-Dev:~/secure-signer# cat ss_out/deposit_data.json 
+puffer@Puffer-Dev:~$ docker exec -w /home secure_signer_container /bin/bash -c "cat ss_out/deposit_data.json" > ~/deposit_data.json                                                                       
+puffer@Puffer-Dev:~$ cat ~/deposit_data.json 
 
         [{
-            "pubkey": "af6f9c1249a4e0e30c73b5df4fdce4b76f0624c5508ab6484c4fb670fe2c9c143287efc289e146b763e87fd3b3dd5857",
+            "pubkey": "8289a5b32c66cd1f7de338855bc7b70897402a42f24070f9ad62423c76c05f001d560975d40106200b5cb9176488a2c7",
             "withdrawal_credentials": "0100000000000000000000004d68568b8d4e6244233c685b48fea619621b78d2",
             "amount": 32000000000,
-            "signature": "a2b37e87ee93762dff1784845d28a73a711a244edce9311686b05e6079f95b25a6bd1fa4360b00871cc784b7521aef43181910b9c2b4527a18c5a72f9e7a1a4014e33ea1dd5d8a479ba05ea9f200ee017c167034c09397dbbb52a4931b8947c2",
-            "deposit_message_root": "b15d279068b7fd017b604fdbcceb2d913e20367578c00d05df68c8fe5f1fc67c",
-            "deposit_data_root": "f7aaec6ce6f04e2b86d5341140c99befe432413ac0081a3c2283056633bfeda9",
+            "signature": "b465d3cf1e108aed4a627bca2cffa482218b1e99bdd057b4625a0dee8138f33820af9a42404b732ab4583ae62ef74a350ac5569f23e8d7ecca86d7c8e36daea605157be6b3fe4bb4eb172adb2b9eced5143e34388f68ff95ea73381df234306d",
+            "deposit_message_root": "eadccf9293ad7bb7d739b287a5d6dd2ed4f076a9f72d696b1a41c8220d096389",
+            "deposit_data_root": "8039153a6874062149b6a426a12f5344e89e266dcc454569c79487a8bdcd48e4",
             "fork_version": "00001020",
             "network_name": "goerli",
             "deposit_cli_version": "2.3.0"
@@ -273,10 +263,10 @@ root@Puffer-Dev:~/secure-signer# cat ss_out/deposit_data.json
 ```
 </div>
 
-If on a remote server, you can grab this file by running the following with your username and IP:
+If Secure-Signer is running on a remote server, you can fetch the file on your local machine by running the following with your username and IP:
 <div class="code-example" markdown="1">
 ```bash
-scp user@12.345.678.910:~/secure-signer/ss_out/deposit_data.json .
+scp user@12.345.678.910:~/deposit_data.json .
 ```
 </div>
 

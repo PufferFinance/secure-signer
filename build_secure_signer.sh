@@ -132,9 +132,9 @@ usage: $(basename "$0") [OPTION]...
     -p <Secure-Signer Server port> default 9001.
     -c clean Cargo then build all
     -b build from cached dependencies
-    -x Run Secure-Signer on port set by -p (default 9001) (assumes this script is executed in Docker container).
-    -d Build and package the Docker Container Image
-    -m Measure Secure-Signer's MRENCLAVE and MRSIGNER.
+    -x Run Secure-Signer on port set by -p (default 9001)
+    -d Build and package the Docker Container Image (assumes "occlum package" has been run)
+    -m Measure Secure-Signer's MRENCLAVE and MRSIGNER (assumes this is run in SGX env)
     -t Run all unit tests
     -h <usage> usage help
 EOM
