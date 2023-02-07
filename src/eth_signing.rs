@@ -8,71 +8,11 @@ use std::fs;
 use std::path::PathBuf;
 use tree_hash::TreeHash;
 
+use log::{info, debug, error};
+
 pub const ALLOW_GROWABLE_SLASH_PROTECTION_DB: bool = true;
-
-/// Writes the slot of a block to memory (indexed by the bls pub key) for slash protection
-fn write_block_slot(pk_hex: &String, slot: Slot) -> Result<()> {
-    let file_path: PathBuf = ["./etc/slashing/blocks/", pk_hex.as_str()].iter().collect();
-    if let Some(p) = file_path.parent() {
-        fs::create_dir_all(p).with_context(|| "Failed to create slashing dir")?
-    };
-    fs::write(&file_path, slot.to_le_bytes()).with_context(|| "failed to write slot")
-}
-
-/// Reads the last signed block slot from memory.
-/// If there is no block saved with fname `pk_hex` then return the default slot of 0
-fn read_block_slot(pk_hex: &String) -> Result<Slot> {
-    match fs::read(&format!("./etc/slashing/blocks/{}", pk_hex)) {
-        Ok(slot) => {
-            // Convert slot form little endian bytes
-            let mut s: [u8; 8] = [0_u8; 8];
-            s.iter_mut()
-                .zip(slot[0..8].iter())
-                .for_each(|(to, from)| *to = *from);
-            Ok(u64::from_le_bytes(s))
-        }
-        // No existing slot. return default 0
-        Err(e) => Ok(0),
-    }
-}
-
-/// Writes attestation source and target epochs to memory (indexed by the bls pub key) for slash protection
-fn write_attestation_data(pk_hex: &String, d: &AttestationData) -> Result<()> {
-    let file_path: PathBuf = ["./etc/slashing/attestations/", pk_hex.as_str()]
-        .iter()
-        .collect();
-    if let Some(p) = file_path.parent() {
-        fs::create_dir_all(p).with_context(|| "Failed to create attestations dir")?
-    };
-    let s = d.source.epoch.to_le_bytes();
-    let t = d.target.epoch.to_le_bytes();
-    let data = [&s[..], &t[..]].concat();
-    // println!("Writing attestation data: {:?}", data);
-    fs::write(&file_path, data).with_context(|| "failed to write attestation epochs")
-}
-
-/// Reads the last signed attestation source and target epochs from memory (defaults to 0,0)
-fn read_attestation_data(pk_hex: &String) -> Result<(Epoch, Epoch)> {
-    match fs::read(&format!("./etc/slashing/attestations/{}", pk_hex)) {
-        Ok(data) => {
-            // println!("Reading attestation data: {:?}", data);
-            // Convert slot form little endian bytes
-            let mut source: [u8; 8] = [0_u8; 8];
-            let mut target: [u8; 8] = [0_u8; 8];
-            source
-                .iter_mut()
-                .zip(data[0..8].iter())
-                .for_each(|(to, from)| *to = *from);
-            target
-                .iter_mut()
-                .zip(data[8..16].iter())
-                .for_each(|(to, from)| *to = *from);
-            Ok((u64::from_le_bytes(source), u64::from_le_bytes(target)))
-        }
-        // No existing attsetation data. return default (0,0)
-        Err(e) => Ok((0, 0)),
-    }
-}
+pub const BLOCK_PROTECTION_DIR: &str = "./etc/slashing/blocks/";
+pub const ATTESTATION_PROTECTION_DIR: &str = "./etc/slashing/attestations/";
 
 /// Return the signing root for the corresponding signing data.
 fn compute_signing_root<T: Encode + TreeHash>(ssz_object: T, domain: Domain) -> Root {
@@ -153,9 +93,9 @@ pub fn secure_sign<T: Encode + TreeHash>(
     domain: Domain,
 ) -> Result<BLSSignature> {
     let root: Root = compute_signing_root(msg, domain);
-    println!("signing root: {:?}", hex::encode(root));
+    info!("Computed signingRoot: {:?}", hex::encode(root));
     let sig = keys::bls_sign(&pk_hex, &root)?;
-    println!("sig: {:?}", hex::encode(sig.to_bytes()));
+    info!("Computed signature: {:?}", hex::encode(sig.to_bytes()));
     Ok(<_>::from(sig.to_bytes().to_vec()))
 }
 
@@ -172,6 +112,7 @@ pub fn get_block_signature(
 
     // The block slot number must be strictly increasing to prevent slashing
     if block.slot <= previous_block_slot {
+        error!("Prevented slashable offense");
         bail!("block.slot <= previous_block_slot")
     }
 
@@ -206,6 +147,7 @@ pub fn get_block_v2_signature(
 
     // The block slot number must be strictly increasing to prevent slashing
     if block_header.slot <= previous_block_slot {
+        error!("Prevented slashable offense");
         bail!("block_header.slot <= previous_block_slot")
     }
 
@@ -239,11 +181,13 @@ pub fn get_attestation_signature(
 
     // The attestation source epoch must be non-decreasing to prevent slashing
     if attestation_data.source.epoch < prev_src_epoch {
+        error!("Prevented slashable offense");
         bail!("attestation_data.source.epoch < prev_src_epoch")
     }
 
     // The attestation target epoch must be strictly increasing to prevent slashing
     if attestation_data.target.epoch <= prev_tgt_epoch {
+        error!("Prevented slashable offense");
         bail!("attestation_data.target.epoch <= prev_tgt_epoch")
     }
 
