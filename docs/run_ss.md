@@ -42,7 +42,6 @@ We can verify the volume exists and inspect it with the following:
 The `pufferfinance/secure_signer:latest` container image can be found [here](https://hub.docker.com/r/pufferfinance/secure_signer). The following command will start running a secure_signer container with the name `secure_signer_container`. Notice we are mounting the volume `Secure-Signer-Backup` to the `/Secure-Signer` enclave directory so any changes to Secure-Signer persist if the container is removed: 
 <div class="code-example" markdown="1">
 ```bash
-mkdir secure-signer-backup
 docker run -itd --network host --mount type=volume,source=Secure-Signer-Backup,destination=/Secure-Signer -v /var/run/aesmd:/var/run/aesmd --device /dev/sgx/enclave --device /dev/sgx/provision --name secure_signer_container pufferfinance/secure_signer:latest 
 ```
 </div>
