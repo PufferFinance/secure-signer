@@ -202,6 +202,24 @@ This returns the error: ```{"error":"block_header.slot <= previous_block_slot, S
 
 This concludes the guide on how to import keys into Secure-Signer. The next section will document the simpler and more secure method of generating validator keys inside Secure-Signer. 
 
+## When importing a non-locally generated key
+The prior steps used the client App to generate a new validator key within the Docker container. This meant that the key was accessible by the client App. If you wished to import an existing keystore called `keystore.json`, you would run the following make the keystore file accessible by the client App.
+<div class="code-example" markdown="1">
+```bash
+docker cp keystore.json secure_signer_container:/home/
+```
+</div>
+
+Then the key could be imported with the following. (Note update the password and import your slash protection if it exists):
+
+<div class="code-example" markdown="1">
+```bash
+docker exec -w /home secure_signer_container /bin/bash -c "./client --import keystore.json --password password --mrenclave 0x9756111746cf7549c9f8c3ca180a29674196fe1300865b47936c5b71fc0a3b94"
+```
+</div>
+
+
+
 # Generating a validator key in Secure-Signer
 Generating a new validator key in Secure-Signer is easy. Run the following:
 <div class="code-example" markdown="1">
