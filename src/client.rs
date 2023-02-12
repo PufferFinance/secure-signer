@@ -307,7 +307,7 @@ pub async fn verify_remote_attestation(
     write_evidence_to_file(&evidence, filename);
 
     // Verify rpt signed by valid intel cert  
-    evidence.verify_intel_signing_certificate()?;
+    evidence.verify_remote_attestation_evidence()?;
 
     // Extract pk from report body
     let got_pk_hex = if bls {
