@@ -19,7 +19,7 @@ export ss_port=9001
 # If LOCAL_DEV is not set assume compiling for Occlum
 if [ -z "$LOCAL_DEV" ]; then
     cargo_bin="occlum-cargo"
-    OPENSSL_DIR="/usr/local/occlum/x86_64-linux-musl/"
+    export OPENSSL_DIR="/usr/local/occlum/x86_64-linux-musl/"
 else
     cargo_bin="cargo"
     build_flags="--features=dev"
@@ -55,6 +55,7 @@ function new_ss_instance()
                         .resource_limits.kernel_space_heap_size="256MB" |
                         .process.default_heap_size = "32MB" |
                         .resource_limits.max_num_of_threads = 32 |
+                        .env.default = ["OCCLUM=yes", "RUST_LOG=info"] |
                         .metadata.debuggable = false' Occlum.json)" && \
         echo "${new_json}" > Occlum.json
         
@@ -98,6 +99,11 @@ function build() {
     fi
 }
 
+function build_client() {
+	${cargo_bin} build --release --bin client --features=dev
+}
+
+
 function clean_build() {
     ${cargo_bin} clean
     build
@@ -136,6 +142,7 @@ usage: $(basename "$0") [OPTION]...
     -d Build and package the Docker Container Image (assumes "occlum package" has been run)
     -m Measure Secure-Signer's MRENCLAVE and MRSIGNER (assumes this is run in SGX env)
     -t Run all unit tests
+    -a Compile client app
     -h <usage> usage help
 EOM
     exit 0
@@ -144,7 +151,7 @@ EOM
 
 function process_args {
     # Use getopts to process the arguments
-    while getopts ":pcbxdmtp:h" option; do
+    while getopts ":pcbxdamtp:h" option; do
         case "${option}" in
             p) ss_port=${OPTARG};;
             c) clean_build;;
@@ -153,6 +160,7 @@ function process_args {
             m) measure;;
             d) dockerize;;
             t) unit_tests;;
+            a) build_client;;
             h) usage;;
         esac
     done
