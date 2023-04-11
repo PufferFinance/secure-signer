@@ -34,6 +34,7 @@ pub struct AttestationEvidence {
 
 impl AttestationEvidence {
     pub fn new(data: &[u8]) -> Result<Self> {
+        info!("Attempting Remote Attestation");
         if data.len() > 64 {
             bail!("remote attestation report data exceed 64B limit!")
         }

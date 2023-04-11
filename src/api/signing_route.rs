@@ -7,7 +7,6 @@ use crate::eth2::slash_protection::{
     SignedAttestationEpochs, SignedBlockSlot, SlashingProtectionData,
 };
 use crate::strip_0x_prefix;
-
 use anyhow::{bail, Result};
 use log::{debug, error, info};
 use warp::{http::StatusCode, Filter, Rejection, Reply};
@@ -49,6 +48,7 @@ fn is_slashable(bls_pk_hex: &String, signing_data: &BLSSignMsg) -> Result<bool> 
 }
 
 fn update_slash_protection_db(bls_pk_hex: &String, signing_data: &BLSSignMsg) -> Result<()> {
+    info!("update_slash_protection_db");
     let mut db: SlashingProtectionData = SlashingProtectionData::read(bls_pk_hex.as_str())?;
     let signing_root = signing_data.to_signing_root();
     match signing_data {
@@ -79,6 +79,7 @@ fn update_slash_protection_db(bls_pk_hex: &String, signing_data: &BLSSignMsg) ->
         }
         _ => {
             // Only block proposals and attestations are slashable
+            error!("Attempted to update slash protection db with non-slashable msg type");
             bail!("Should not update slash protection db for non blocks/attestations")
         }
     }
