@@ -16,7 +16,7 @@ use std::ffi::CString;
 use std::os::raw::c_char;
 use std::{fmt, fs};
 
-#[cfg(not(feature = "dev"))]
+#[cfg(feature = "sgx")]
 #[link(name = "epid")]
 extern "C" {
     /// The cpp function for epid remote attestation with IAS defined in src/ra_wrapper.cpp
@@ -28,7 +28,7 @@ extern "C" {
     );
 }
 
-#[cfg(feature = "dev")]
+#[cfg(not(feature = "sgx"))]
 // Use this func sig for local development
 pub fn do_epid_ra(
     data: *const u8,

@@ -50,13 +50,12 @@ anyhow = "1.0.65"
 clap = { version = "4.1.1", features = ["derive"] }
 
 [features]
-dev = []
+sgx = []
 
 [[bin]] # Bin to run the sgx-signer rpc
 name = "secure-signer"
-path = "src/secure_signer.rs"
+path = "src/main.rs"
 
 [[bin]] # Bin to run the client 
-required-features = ["dev"]
 name = "client"
 path = "src/client.rs"

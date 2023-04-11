@@ -20,9 +20,9 @@ export ss_port=9001
 if [ -z "$LOCAL_DEV" ]; then
     cargo_bin="occlum-cargo"
     export OPENSSL_DIR="/usr/local/occlum/x86_64-linux-musl/"
+    build_flags="--release --features=sgx"
 else
     cargo_bin="cargo"
-    build_flags="--features=dev"
 fi
 
 function build_secure_signer()
@@ -34,7 +34,7 @@ function build_secure_signer()
     fi
 
     # compile secure-signer
-	${cargo_bin} build --release ${build_flags}
+	${cargo_bin} build ${build_flags}
 }
 
 function new_ss_instance()
@@ -100,7 +100,7 @@ function build() {
 }
 
 function build_client() {
-	${cargo_bin} build --release --bin client --features=dev
+	${cargo_bin} build --release --bin client 
 }
 
 
@@ -110,7 +110,7 @@ function clean_build() {
 }
 
 function unit_tests() {
-    ${cargo_bin} test --features=dev -- --test-threads 1  
+    ${cargo_bin} test -- --test-threads 1  
 }
 
 # Function to build the Secure Signer container image either in development or release mode
