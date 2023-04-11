@@ -20,8 +20,11 @@ serde_derive = "1.0"
 serde-hex = "0.1.0"
 env_logger = "0.10.0"
 log = "0.4.17"
+ethereum_serde_utils = "0.5.1"
 
 # crypto deps
+blsttc = { version = "8.0.2", git = "https://github.com/PufferFinance/blsttc" }
+libsecp256k1 = "0.7.1"
 blst = "0.3.10"
 rand = "0.8.4"
 rand_chacha = "0.2"
@@ -29,6 +32,7 @@ hex = "0.4.3"
 ecies = {version = "0.2.2", default-features = false, features = ["pure"]}
 openssl = "0.10.42"
 bytes = "1"
+sha3 = "0.10.6"
 
 # eth deps
 eth-keystore = "0.5.0"
@@ -37,6 +41,7 @@ eth2_ssz_derive = "0.3.0"
 eth2_ssz_types = { git = "https://github.com/PufferFinance/ssz_types" }
 tree_hash = { git = "https://github.com/PufferFinance/tree_hash" }
 tree_hash_derive = { git = "https://github.com/PufferFinance/tree_hash" }
+num-bigint = "0.4"
 
 # server deps
 tokio = { version = "1", features = ["full"] }

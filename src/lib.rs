@@ -3,6 +3,10 @@ extern crate anyhow;
 extern crate libc;
 extern crate env_logger;
 
+mod constants;
+mod eth2;
+mod crypto;
+mod io;
 mod eth_signing;
 mod eth_types;
 mod slash_protection;
@@ -12,6 +16,13 @@ mod routes;
 mod route_handlers;
 
 use warp::Filter;
+
+#[macro_export]
+macro_rules! strip_0x_prefix {
+    ($hex:expr) => {
+        $hex.strip_prefix("0x").unwrap_or(&$hex).into()
+    };
+}
 
 pub async fn run(port: u16) {
     println!("Starting SGX Secure-Signer: localhost:{}", port);
