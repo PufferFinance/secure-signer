@@ -1,16 +1,16 @@
-use crate::crypto::bls_keys;
 use super::eth_types::*;
 use super::slash_protection;
 use crate::constants::ALLOW_GROWABLE_SLASH_PROTECTION_DB;
+use crate::crypto::bls_keys;
 
 use anyhow::{bail, Context, Result};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use ssz::Encode;
 use std::fs;
 use std::path::PathBuf;
 use tree_hash::TreeHash;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use log::{info, debug, error};
+use log::{debug, error, info};
 
 /// Return the signing root for the corresponding signing data.
 fn compute_signing_root<T: Encode + TreeHash>(ssz_object: T, domain: Domain) -> Root {
@@ -123,7 +123,7 @@ pub fn get_block_signature(
     let root: Root = compute_signing_root(block.clone(), domain.clone());
     let b = slash_protection::SignedBlockSlot {
         slot: block.slot,
-        signing_root: Some(root)
+        signing_root: Some(root),
     };
     // Save the new block slot to persistent memory
     sp.new_block(b, ALLOW_GROWABLE_SLASH_PROTECTION_DB)?;
@@ -158,7 +158,7 @@ pub fn get_block_v2_signature(
     let root: Root = compute_signing_root(block_header.clone(), domain.clone());
     let b = slash_protection::SignedBlockSlot {
         slot: block_header.slot,
-        signing_root: Some(root)
+        signing_root: Some(root),
     };
     // Save the new block slot to persistent memory
     sp.new_block(b, ALLOW_GROWABLE_SLASH_PROTECTION_DB)?;
@@ -200,7 +200,7 @@ pub fn get_attestation_signature(
     let a = slash_protection::SignedAttestationEpochs {
         source_epoch: attestation_data.source.epoch,
         target_epoch: attestation_data.target.epoch,
-        signing_root: Some(root)
+        signing_root: Some(root),
     };
     // Save the new attestation data to persistent memory
     sp.new_attestation(a, ALLOW_GROWABLE_SLASH_PROTECTION_DB)?;
@@ -281,8 +281,12 @@ pub fn get_contribution_and_proof_signature(
 
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#submit-deposit
 /// Modified to adhere to https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing
-pub fn get_deposit_signature(pk_hex: String, deposit_message: DepositMessage, fork_version: Version) -> Result<DepositResponse> {
-    let domain = compute_domain(DOMAIN_DEPOSIT, Some(fork_version), None); 
+pub fn get_deposit_signature(
+    pk_hex: String,
+    deposit_message: DepositMessage,
+    fork_version: Version,
+) -> Result<DepositResponse> {
+    let domain = compute_domain(DOMAIN_DEPOSIT, Some(fork_version), None);
     let sig = secure_sign(pk_hex, deposit_message.clone(), domain)?;
 
     let dm_root = deposit_message.tree_hash_root().to_fixed_bytes();
@@ -326,10 +330,10 @@ pub fn get_validator_registration_signature(
     validator_registration: ValidatorRegistration,
 ) -> Result<BLSSignature> {
     // altair - works with Lighthouse Web3Signer test...
-    // let fork_version: Version = [128, 0, 0, 105]; 
+    // let fork_version: Version = [128, 0, 0, 105];
 
     // works with mev-boost test...
-    let fork_version: Version = [0_u8, 0_u8, 0_u8, 0_u8];  // 0x00000000
+    let fork_version: Version = [0_u8, 0_u8, 0_u8, 0_u8]; // 0x00000000
 
     let domain = compute_domain(DOMAIN_APPLICATION_BUILDER, Some(fork_version), None);
     secure_sign(pk_hex, validator_registration, domain)
@@ -380,6 +384,20 @@ pub enum BLSSignMsg {
 }
 
 impl BLSSignMsg {
+    pub fn can_be_slashed(&self) -> bool {
+        if let BLSSignMsg::BLOCK(_)
+        | BLSSignMsg::block(_)
+        | BLSSignMsg::BLOCK_V2(_)
+        | BLSSignMsg::block_v2(_)
+        | BLSSignMsg::ATTESTATION(_)
+        | BLSSignMsg::attestation(_) = self
+        {
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn to_signing_root(&self) -> Root {
         match self {
             // https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#signature
@@ -390,16 +408,18 @@ impl BLSSignMsg {
                     Some(compute_epoch_at_slot(m.block.slot.clone())),
                 );
                 compute_signing_root(m.block.clone(), domain)
-            },
+            }
             // https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#signature
-            BLSSignMsg::BLOCK_V2(m) | BLSSignMsg::block_v2(m)=> {
+            BLSSignMsg::BLOCK_V2(m) | BLSSignMsg::block_v2(m) => {
                 let domain = get_domain(
                     m.fork_info.clone(),
                     DOMAIN_BEACON_PROPOSER,
-                    Some(compute_epoch_at_slot(m.beacon_block.block_header.slot.clone())),
+                    Some(compute_epoch_at_slot(
+                        m.beacon_block.block_header.slot.clone(),
+                    )),
                 );
                 compute_signing_root(m.beacon_block.block_header.clone(), domain)
-            },
+            }
             // https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#attesting
             BLSSignMsg::ATTESTATION(m) | BLSSignMsg::attestation(m) => {
                 let domain = get_domain(
@@ -407,44 +427,56 @@ impl BLSSignMsg {
                     DOMAIN_BEACON_ATTESTER,
                     Some(m.attestation.target.epoch.clone()),
                 );
-            
+
                 compute_signing_root(m.attestation.clone(), domain)
-            },
+            }
             // https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#randao-reveal
             BLSSignMsg::RANDAO_REVEAL(m) | BLSSignMsg::randao_reveal(m) => {
-                let domain = get_domain(m.fork_info.clone(), DOMAIN_RANDAO, Some(m.randao_reveal.epoch));
+                let domain = get_domain(
+                    m.fork_info.clone(),
+                    DOMAIN_RANDAO,
+                    Some(m.randao_reveal.epoch),
+                );
                 compute_signing_root(m.randao_reveal.epoch, domain)
-            },
+            }
             // https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#broadcast-aggregate
             BLSSignMsg::AGGREGATE_AND_PROOF(m) | BLSSignMsg::aggregate_and_proof(m) => {
-                let epoch = compute_epoch_at_slot(m.aggregate_and_proof.aggregate.data.slot.clone());
-                let domain = get_domain(m.fork_info.clone(), DOMAIN_AGGREGATE_AND_PROOF, Some(epoch));
+                let epoch =
+                    compute_epoch_at_slot(m.aggregate_and_proof.aggregate.data.slot.clone());
+                let domain =
+                    get_domain(m.fork_info.clone(), DOMAIN_AGGREGATE_AND_PROOF, Some(epoch));
                 compute_signing_root(m.aggregate_and_proof.clone(), domain)
-            },
+            }
             // https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#aggregation-selection
             BLSSignMsg::AGGREGATION_SLOT(m) | BLSSignMsg::aggregation_slot(m) => {
                 let epoch = compute_epoch_at_slot(m.aggregation_slot.slot.clone());
                 let domain = get_domain(m.fork_info.clone(), DOMAIN_SELECTION_PROOF, Some(epoch));
                 compute_signing_root(m.aggregation_slot.slot.clone(), domain)
-            },
+            }
             // https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#submit-deposit
             BLSSignMsg::DEPOSIT(m) | BLSSignMsg::deposit(m) => {
-                let domain = compute_domain(DOMAIN_DEPOSIT, Some(m.genesis_fork_version.clone()), None); 
+                let domain =
+                    compute_domain(DOMAIN_DEPOSIT, Some(m.genesis_fork_version.clone()), None);
                 compute_signing_root(m.deposit.clone(), domain)
-            },
+            }
             /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#voluntary-exits
             BLSSignMsg::VOLUNTARY_EXIT(m) | BLSSignMsg::voluntary_exit(m) => {
-                let domain = get_domain(m.fork_info.clone(), DOMAIN_VOLUNTARY_EXIT, Some(m.voluntary_exit.epoch.clone()));
+                let domain = get_domain(
+                    m.fork_info.clone(),
+                    DOMAIN_VOLUNTARY_EXIT,
+                    Some(m.voluntary_exit.epoch.clone()),
+                );
                 compute_signing_root(m.voluntary_exit.clone(), domain)
-            },
+            }
             // https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#sync-committee-messages
-            BLSSignMsg::SYNC_COMMITTEE_MESSAGE(m) | BLSSignMsg::sync_committee_message(m)=> {
+            BLSSignMsg::SYNC_COMMITTEE_MESSAGE(m) | BLSSignMsg::sync_committee_message(m) => {
                 let epoch = compute_epoch_at_slot(m.sync_committee_message.slot.clone());
                 let domain = get_domain(m.fork_info.clone(), DOMAIN_SYNC_COMMITTEE, Some(epoch));
                 compute_signing_root(m.sync_committee_message.beacon_block_root, domain)
-            },
+            }
             // https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#aggregation-selection
-            BLSSignMsg::SYNC_COMMITTEE_SELECTION_PROOF(m) | BLSSignMsg::sync_committee_selection_proof(m) => {
+            BLSSignMsg::SYNC_COMMITTEE_SELECTION_PROOF(m)
+            | BLSSignMsg::sync_committee_selection_proof(m) => {
                 let epoch = compute_epoch_at_slot(m.sync_aggregator_selection_data.slot.clone());
                 let domain = get_domain(
                     m.fork_info.clone(),
@@ -452,22 +484,28 @@ impl BLSSignMsg {
                     Some(epoch),
                 );
                 compute_signing_root(m.sync_aggregator_selection_data.clone(), domain)
-            },
+            }
             // https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#broadcast-sync-committee-contribution
-            BLSSignMsg::SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF(m) | BLSSignMsg::sync_committee_contribution_and_proof(m) => {
-                let epoch = compute_epoch_at_slot(m.contribution_and_proof.contribution.slot.clone());
-                let domain = get_domain(m.fork_info.clone(), DOMAIN_CONTRIBUTION_AND_PROOF, Some(epoch));
+            BLSSignMsg::SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF(m)
+            | BLSSignMsg::sync_committee_contribution_and_proof(m) => {
+                let epoch =
+                    compute_epoch_at_slot(m.contribution_and_proof.contribution.slot.clone());
+                let domain = get_domain(
+                    m.fork_info.clone(),
+                    DOMAIN_CONTRIBUTION_AND_PROOF,
+                    Some(epoch),
+                );
                 compute_signing_root(m.contribution_and_proof.clone(), domain)
-            },
+            }
             // https://github.com/ethereum/builder-specs/blob/main/specs/builder.md#signing
             BLSSignMsg::VALIDATOR_REGISTRATION(m) | BLSSignMsg::validator_registration(m) => {
                 // works with mev-boost test...
-                let fork_version: Version = [0_u8, 0_u8, 0_u8, 0_u8];  // 0x00000000
+                let fork_version: Version = [0_u8, 0_u8, 0_u8, 0_u8]; // 0x00000000
                 let domain = compute_domain(DOMAIN_APPLICATION_BUILDER, Some(fork_version), None);
                 compute_signing_root(m.validator_registration.clone(), domain)
-            },
+            }
             // TODO
-            _ => Root::default()
+            _ => Root::default(),
         }
     }
 }
@@ -493,7 +531,7 @@ mod spec_tests {}
 //         // dummy key
 //         let sk_hex = hex::encode(&[85, 40, 245, 17, 84, 193, 234, 155, 24, 234, 181, 58, 171, 193, 209, 164, 120, 147, 10, 174, 189, 228, 119, 48, 181, 19, 117, 223, 2, 240, 7, 108,]);
 //         println!("DEBUG: using sk: {sk_hex}");
-        
+
 //         let sk = key_management_old::bls_sk_from_hex(sk_hex.clone()).unwrap();
 //         let pk = sk.sk_to_pk();
 //         let pk_hex = hex::encode(pk.compress());
@@ -513,9 +551,9 @@ mod spec_tests {}
 //     pub fn setup_keypair2() -> String {
 //         // dummy key
 //         let sk_hex = "0x4e343a647c5a5c44d76c2c58b63f02cdf3a9a0ec40f102ebc26363b4b1b95033".to_string();
-        
+
 //         println!("DEBUG: using sk: {sk_hex}");
-        
+
 //         let sk = key_management_old::bls_sk_from_hex(sk_hex).unwrap();
 //         let pk = sk.sk_to_pk();
 //         let pk_hex = hex::encode(pk.compress());
@@ -528,7 +566,6 @@ mod spec_tests {}
 //         pk_hex
 //     }
 
-    
 //     #[test]
 //     fn load_dummy_keys() {
 //         setup_keypair();
@@ -597,7 +634,7 @@ mod spec_tests {}
 //         // make a request with slot < n and expect panic
 //         let s = n - 1;
 //         let slot = format!("{s}");
-        
+
 //         let req = mock_beacon_block(&slot);
 //         let b: BeaconBlock = serde_json::from_str(&req).unwrap();
 //         let f = ForkInfo::default();
@@ -743,4 +780,3 @@ mod spec_tests {}
 //         let sig = get_attestation_signature(bls_pk_hex.clone(), f, a).unwrap();
 //     }
 // }
-

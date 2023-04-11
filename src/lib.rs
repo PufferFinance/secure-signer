@@ -3,17 +3,18 @@ extern crate anyhow;
 extern crate libc;
 extern crate env_logger;
 
-mod constants;
-mod eth2;
-mod crypto;
-mod io;
-mod eth_signing;
-mod eth_types;
-mod slash_protection;
-mod keys;
-mod remote_attestation;
-mod routes;
-mod route_handlers;
+pub mod constants;
+pub mod eth2;
+pub mod crypto;
+pub mod io;
+pub mod api;
+pub mod eth_signing;
+pub mod eth_types;
+pub mod slash_protection;
+pub mod keys;
+pub mod remote_attestation;
+pub mod routes;
+pub mod route_handlers;
 
 use warp::Filter;
 

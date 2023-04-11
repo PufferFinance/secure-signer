@@ -338,20 +338,21 @@ pub fn get_validator_registration_signature(
 #[cfg(test)]
 mod spec_tests {}
 
+    use super::strip_0x_prefix;
+    use crate::crypto::bls_keys;
 #[cfg(test)]
 pub mod slash_resistance_tests {
-
-    use ssz_types::FixedVector;
+    use super::*;
+    use blsttc::SecretKeySet;
 
     use crate::keys::new_keystore;
 
     use crate::slash_protection::SlashingProtectionData;
-    use super::*;
     use std::fs;
     use std::path::Path;
 
     /// hardcoded bls sk from Lighthouse Web3Signer tests
-    pub fn setup_keypair() -> String {
+    pub fn setup_keypair3() -> String {
         // dummy key
         let sk_hex = hex::encode(&[85, 40, 245, 17, 84, 193, 234, 155, 24, 234, 181, 58, 171, 193, 209, 164, 120, 147, 10, 174, 189, 228, 119, 48, 181, 19, 117, 223, 2, 240, 7, 108,]);
         println!("DEBUG: using sk: {sk_hex}");
@@ -369,6 +370,7 @@ pub mod slash_resistance_tests {
 
         pk_hex
     }
+    
 
     /// hardcoded bls sk from mev-boost tests
     /// https://github.com/flashbots/mev-boost/blob/33c9b946c940ef279fe2b8bf1492e913cc0b0c49/server/service_test.go#L165
@@ -387,6 +389,24 @@ pub mod slash_resistance_tests {
         // init slashing protection db
         let db = SlashingProtectionData::from_pk_hex(pk_hex.clone()).unwrap();
         db.write().unwrap();
+        pk_hex
+    }
+
+    /// hardcoded bls sk from Lighthouse Web3Signer tests
+    pub fn setup_keypair() -> String {
+        // dummy key
+        let sk_hex = "5528f51154c1ea9b18eab53aabc1d1a478930aaebde47730b51375df02f0076c";
+        println!("DEBUG: using sk: {sk_hex}");
+        let sk_hex: String = strip_0x_prefix!(sk_hex);
+        let sk_bytes = hex::decode(sk_hex).unwrap();
+        let sk_set = SecretKeySet::from_bytes(sk_bytes).unwrap();
+        bls_keys::save_bls_key(&sk_set).unwrap();
+        let pk_hex = sk_set.public_keys().public_key().to_hex();
+
+        // init slashing protection db
+        let db = SlashingProtectionData::from_pk_hex(pk_hex.clone()).unwrap();
+        db.write().unwrap();
+
         pk_hex
     }
 
