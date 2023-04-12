@@ -3,6 +3,8 @@ use crate::strip_0x_prefix;
 use super::eth_types::{
     de_signing_root, se_signing_root, from_hex_to_ssz_type, to_hex_from_ssz_type, BLSPubkey, Epoch, Root, Slot,
 };
+use crate::constants::SLASHING_PROTECTION_DIR;
+
 use anyhow::{bail, Context, Result};
 use hex;
 use serde::{Deserialize, Serialize};
@@ -12,9 +14,8 @@ use ssz::Encode;
 use ssz_types::FixedVector;
 use std::fs;
 use std::path::PathBuf;
-use log::{debug, error};
+use log::debug;
 
-pub const SLASHING_PROTECTION_DIR: &str = "./etc/slashing/";
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SlashingProtectionMetaData {
@@ -210,7 +211,6 @@ impl SlashingProtectionDB {
 pub mod test_slash_protection {
     use super::*;
     use hex;
-    use serde_json;
     use ssz::Encode;
 
     pub fn dummy_slash_protection_data() -> String {
@@ -433,7 +433,7 @@ pub mod test_slash_protection {
             signing_root: None,
         };
 
-        data.new_attestation(a, grow);
+        data.new_attestation(a, grow).unwrap();
         assert_eq!(data.signed_attestations.len(), 1);
         assert_eq!(data.get_latest_signed_attestation_epochs(), (10, 20));
 
@@ -447,7 +447,7 @@ pub mod test_slash_protection {
             ]),
         };
 
-        data.new_attestation(a, grow);
+        data.new_attestation(a, grow).unwrap();
         assert_eq!(data.signed_attestations.len(), 1);
         assert_eq!(data.get_latest_signed_attestation_epochs(), (20, 30));
 
@@ -458,7 +458,7 @@ pub mod test_slash_protection {
             signing_root: None,
         };
 
-        data.new_attestation(a, grow);
+        assert!(data.new_attestation(a, grow).is_err());
         assert_eq!(data.signed_attestations.len(), 1);
         assert_eq!(data.get_latest_signed_attestation_epochs(), (20, 30));
 
@@ -468,7 +468,7 @@ pub mod test_slash_protection {
             target_epoch: 30, // same => slashable
             signing_root: None,
         };
-        data.new_attestation(a, grow);
+        assert!(data.new_attestation(a, grow).is_err());
         assert_eq!(data.signed_attestations.len(), 1);
         assert_eq!(data.get_latest_signed_attestation_epochs(), (20, 30));
 
@@ -478,7 +478,7 @@ pub mod test_slash_protection {
             target_epoch: 29, // decreasing => slashable
             signing_root: None,
         };
-        data.new_attestation(a, grow);
+        assert!(data.new_attestation(a, grow).is_err());
         assert_eq!(data.signed_attestations.len(), 1);
         assert_eq!(data.get_latest_signed_attestation_epochs(), (20, 30));
 
@@ -489,7 +489,7 @@ pub mod test_slash_protection {
             target_epoch: 31, // increasing => ok
             signing_root: None,
         };
-        data.new_attestation(a, grow);
+        assert!(data.new_attestation(a, grow).is_ok());
         assert_eq!(data.signed_attestations.len(), 2);
         assert_eq!(data.get_latest_signed_attestation_epochs(), (20, 31));
 
@@ -500,7 +500,7 @@ pub mod test_slash_protection {
             signing_root: None,
         };
 
-        data.new_attestation(a, grow);
+        assert!(data.new_attestation(a, grow).is_err());
         assert_eq!(data.signed_attestations.len(), 2);
         assert_eq!(data.get_latest_signed_attestation_epochs(), (20, 31));
 
@@ -510,7 +510,7 @@ pub mod test_slash_protection {
             target_epoch: 31, // same => slashable
             signing_root: None,
         };
-        data.new_attestation(a, grow);
+        assert!(data.new_attestation(a, grow).is_err());
         assert_eq!(data.signed_attestations.len(), 2);
         assert_eq!(data.get_latest_signed_attestation_epochs(), (20, 31));
 
@@ -520,7 +520,7 @@ pub mod test_slash_protection {
             target_epoch: 29, // decreasing => slashable
             signing_root: None,
         };
-        data.new_attestation(a, grow);
+        assert!(data.new_attestation(a, grow).is_err());
         assert_eq!(data.signed_attestations.len(), 2);
         assert_eq!(data.get_latest_signed_attestation_epochs(), (20, 31));
 

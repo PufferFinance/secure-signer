@@ -11,8 +11,7 @@ use ecies::PublicKey as EthPublicKey;
 use puffersecuresigner::strip_0x_prefix;
 use std::fs;
 
-// use self::register_helper::register_new_pod;
-
+pub mod bls_import_helper;
 pub mod bls_keygen_helper;
 pub mod eth_keygen_helper;
 pub mod eth_specs;
@@ -50,7 +49,7 @@ pub fn setup_dummy_keypair() -> String {
     let pk_hex = sk_set.public_keys().public_key().to_hex();
 
     // init slashing protection db
-    let db = SlashingProtectionData::from_pk_hex(pk_hex.clone()).unwrap();
+    let db = SlashingProtectionData::from_pk_hex(&pk_hex).unwrap();
     db.write().unwrap();
 
     pk_hex
