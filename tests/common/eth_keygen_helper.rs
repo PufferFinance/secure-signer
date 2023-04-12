@@ -7,7 +7,6 @@ use puffersecuresigner::{
 };
 
 use anyhow::{Context, Result};
-use blsttc::PublicKey;
 use reqwest::{Client, Response, StatusCode};
 use serde_json;
 

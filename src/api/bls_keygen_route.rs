@@ -1,7 +1,8 @@
 use super::helpers::{error_response, success_response};
 use super::KeyGenResponse;
+use crate::eth2::slash_protection::SlashingProtectionData;
 use crate::{crypto::bls_keys, io::remote_attestation::AttestationEvidence};
-use anyhow::Result;
+use anyhow::{Result, Context};
 use blsttc::PublicKey;
 use log::info;
 use warp::{http::StatusCode, Filter, Rejection, Reply};
@@ -20,6 +21,10 @@ fn attest_new_bls_key() -> Result<(AttestationEvidence, PublicKey)> {
     // Generate a fresh BLS keypair (saving BLS private key)
     let sk = bls_keys::new_bls_key(0);
     let pk = sk.public_keys().public_key();
+    bls_keys::save_bls_key(&sk).with_context(|| "Failed to save BLS key")?;
+
+    // Create a new slashing protection database
+    SlashingProtectionData::from_pk_hex(pk.to_hex())?.write()?;
 
     // Commit to the payload
     let proof = AttestationEvidence::new(&pk.to_bytes())?;

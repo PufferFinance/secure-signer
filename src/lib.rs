@@ -26,7 +26,6 @@ macro_rules! strip_0x_prefix {
 }
 
 pub async fn run(port: u16) {
-    println!("Starting SGX Secure-Signer: localhost:{}", port);
 
     env_logger::init();
 
