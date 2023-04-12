@@ -19,7 +19,7 @@ fn attestation_req(
     BLSSignMsg::ATTESTATION(signing_data)
 }
 
-pub fn mock_attestation_request(src_epoch: u64, tgt_epoch: u64) -> String {
+fn mock_attestation_request(src_epoch: u64, tgt_epoch: u64) -> String {
     let req = format!(
         r#"
         {{

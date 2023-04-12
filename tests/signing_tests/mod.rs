@@ -1,5 +1,5 @@
 pub mod attestation;
-// pub mod block;
+pub mod block;
 // pub mod block_v2;
 // pub mod randao_reveal;
 // pub mod aggregate_and_proof;
