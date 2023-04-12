@@ -1,3 +1,5 @@
+use crate::strip_0x_prefix;
+
 use super::eth_types::{
     de_signing_root, se_signing_root, from_hex_to_ssz_type, to_hex_from_ssz_type, BLSPubkey, Epoch, Root, Slot,
 };
@@ -38,8 +40,8 @@ impl SlashingProtectionData {
         }
     }
 
-    pub fn from_pk_hex(pk_hex: String) -> Result<Self> {
-        let pk_hex: String = pk_hex.strip_prefix("0x").unwrap_or(&pk_hex).into();
+    pub fn from_pk_hex(pk_hex: &String) -> Result<Self> {
+        let pk_hex: String = strip_0x_prefix!(pk_hex);
         let pk_bytes = hex::decode(pk_hex)?;
         let pk_bytes: BLSPubkey = FixedVector::from(pk_bytes.to_vec());
         Ok(SlashingProtectionData::new(pk_bytes))
@@ -131,7 +133,7 @@ impl SlashingProtectionData {
     }
 
     pub fn read(pk_hex: &str) -> Result<Self> {
-        let pk_hex: String = pk_hex.strip_prefix("0x").unwrap_or(&pk_hex).into();
+        let pk_hex: String = strip_0x_prefix!(pk_hex);
         let file_path: PathBuf = [SLASHING_PROTECTION_DIR, &pk_hex].iter().collect();
         let json_vec = fs::read(file_path)?;
         let json = serde_json::from_slice(&json_vec).with_context(|| "failed to read protection data")?;

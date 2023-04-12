@@ -131,7 +131,7 @@ pub fn envelope_decrypt(secret_key: &EthSecretKey, encrypted_message: &[u8]) -> 
 /// Wrapper over `envelope_decrypt` that fetches the secret key corresponding to the
 /// provided `eth_pk_hex` from the saved secret key file and uses it to decrypt the
 /// encrypted message.
-pub fn envelope_decrypt_from_saved_sk(eth_pk_hex: String, encrypted_message: &[u8]) -> Result<Vec<u8>> {
+pub fn envelope_decrypt_from_saved_sk(eth_pk_hex: &String, encrypted_message: &[u8]) -> Result<Vec<u8>> {
     // Fetch the secret key from file
     let secret_key = fetch_eth_key(&eth_pk_hex)?;
 
@@ -144,8 +144,6 @@ pub fn envelope_decrypt_from_saved_sk(eth_pk_hex: String, encrypted_message: &[u
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ecies::PublicKey as EthPublicKey;
-    use ecies::SecretKey as EthSecretKey;
 
     #[test]
     fn test_sign_message() {
@@ -280,7 +278,7 @@ mod tests {
         let encrypted_message = envelope_encrypt(&public_key, &message[..]).unwrap();
 
         // Decrypt the encrypted message using the saved secret key
-        let decrypted_message = envelope_decrypt_from_saved_sk(eth_pk_hex, &encrypted_message).unwrap();
+        let decrypted_message = envelope_decrypt_from_saved_sk(&eth_pk_hex, &encrypted_message).unwrap();
 
         // The decrypted message should be the same as the original message
         assert_eq!(message.to_vec(), decrypted_message);

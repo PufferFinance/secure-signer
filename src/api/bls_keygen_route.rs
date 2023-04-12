@@ -24,7 +24,7 @@ fn attest_new_bls_key() -> Result<(AttestationEvidence, PublicKey)> {
     bls_keys::save_bls_key(&sk).with_context(|| "Failed to save BLS key")?;
 
     // Create a new slashing protection database
-    SlashingProtectionData::from_pk_hex(pk.to_hex())?.write()?;
+    SlashingProtectionData::from_pk_hex(&pk.to_hex())?.write()?;
 
     // Commit to the payload
     let proof = AttestationEvidence::new(&pk.to_bytes())?;

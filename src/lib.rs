@@ -37,7 +37,7 @@ pub async fn run(port: u16) {
 
         // Endpoint to securely import a BLS sk 
         // curl -X POST localhost:3031/eth/v1/keystores -H "Content-Type: application/json"  -d '{"ct_bls_sk_hex": "0x123123", "bls_pk_hex": "0x123", "encrypting_pk_hex": "0x123"}'  
-        .or(routes::bls_key_import_route())
+        .or(api::bls_import_route::bls_key_import_route())
 
         // Endpoint to list pks of saved bls keys that were imported into the enclave
         // curl -X GET localhost:3031/eth/v1/keystores
@@ -45,7 +45,6 @@ pub async fn run(port: u16) {
 
         // Endpoint to request a signature using BLS sk 
         // curl -X POST localhost:3031/eth/v1/sign/bls -H "Content-Type: application/json"  -d '{"msg_hex": "0xdeadbeef", "bls_pk_hex": "0x123"}'  
-        // .or(routes::bls_sign_route())
         .or(api::signing_route::bls_sign_route())
 
         // --------- Addition to Web3Signer ---------
