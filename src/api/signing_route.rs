@@ -112,8 +112,9 @@ async fn secure_sign_bls(
             ));
         }
     };
-    // info!("Validator pubkey {bls_pk_hex}");
-    // info!("Request:\n{:#?}", req);
+
+    info!("Request for validator pubkey: {bls_pk_hex}");
+    info!("Request:\n{:#?}", req);
 
     // Verify not a slashable msg
     match is_slashable(&bls_pk_hex, &req) {
@@ -139,26 +140,22 @@ async fn secure_sign_bls(
 
     // Update the slash protection DB if msg was a block or attestation
     if req.can_be_slashed() {
-        match update_slash_protection_db(&bls_pk_hex, &req) {
-            Ok(()) => {}
-            Err(e) => {
-                return Ok(error_response(
-                    &format!("Signing operation failed: {:?}", e),
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                ))
-            }
+        if let Err(e) = update_slash_protection_db(&bls_pk_hex, &req) {
+            return Ok(error_response(
+                &format!("Signing operation failed: {:?}", e),
+                StatusCode::INTERNAL_SERVER_ERROR,
+            ))
         }
     }
 
-    let signature = match bls_keys::bls_agg_sign_from_saved_sk(&bls_pk_hex, &signing_root) {
-        Ok(sk) => sk,
+    // Sign the message
+    match bls_keys::bls_agg_sign_from_saved_sk(&bls_pk_hex, &signing_root) {
+        Ok(sig) => Ok(signature_success_response(&sig.to_bytes())),
         Err(e) => {
             return Ok(error_response(
                 &format!("Signing operation failed: {:?}", e),
                 StatusCode::INTERNAL_SERVER_ERROR,
             ))
         }
-    };
-
-    Ok(signature_success_response(&signature.to_bytes()))
+    }
 }

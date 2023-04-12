@@ -392,23 +392,7 @@ pub mod slash_resistance_tests {
         pk_hex
     }
 
-    /// hardcoded bls sk from Lighthouse Web3Signer tests
-    // pub fn setup_keypair() -> String {
-    //     // dummy key
-    //     let sk_hex = "5528f51154c1ea9b18eab53aabc1d1a478930aaebde47730b51375df02f0076c";
-    //     println!("DEBUG: using sk: {sk_hex}");
-    //     let sk_hex: String = strip_0x_prefix!(sk_hex);
-    //     let sk_bytes = hex::decode(sk_hex).unwrap();
-    //     let sk_set = SecretKeySet::from_bytes(sk_bytes).unwrap();
-    //     bls_keys::save_bls_key(&sk_set).unwrap();
-    //     let pk_hex = sk_set.public_keys().public_key().to_hex();
 
-    //     // init slashing protection db
-    //     let db = SlashingProtectionData::from_pk_hex(pk_hex.clone()).unwrap();
-    //     db.write().unwrap();
-
-    //     pk_hex
-    // }
 
     
     #[test]

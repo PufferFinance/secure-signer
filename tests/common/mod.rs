@@ -5,18 +5,18 @@ use puffersecuresigner::eth2::eth_signing::BLSSignMsg;
 use puffersecuresigner::eth2::slash_protection::SlashingProtectionData;
 use puffersecuresigner::io::key_management;
 
-use anyhow::{Result};
-use blsttc::{PublicKeyShare, SecretKeySet, SecretKeyShare, SignatureShare, PublicKeySet};
-use ecies::{PublicKey as EthPublicKey};
+use anyhow::Result;
+use blsttc::{PublicKeySet, PublicKeyShare, SecretKeySet, SecretKeyShare, SignatureShare};
+use ecies::PublicKey as EthPublicKey;
 use puffersecuresigner::strip_0x_prefix;
 use std::fs;
 
 // use self::register_helper::register_new_pod;
 
-mod eth_keygen_helper; 
-mod bls_keygen_helper; 
-mod signing_helper; 
-mod eth_specs; 
+pub mod bls_keygen_helper;
+pub mod eth_keygen_helper;
+pub mod eth_specs;
+pub mod signing_helper;
 
 /// Reads the `SECURE_SIGNER_PORT` environment variable.
 /// If the return value is Some(port), it is expected that Secure-Aggregator is running on localhost:port
@@ -36,4 +36,22 @@ pub fn read_secure_signer_port() -> Option<u16> {
         dbg!("Testing against local and mocked HTTP endpoints");
     }
     port
+}
+
+/// hardcoded bls sk from Lighthouse Web3Signer tests
+pub fn setup_dummy_keypair() -> String {
+    // dummy key
+    let sk_hex = "5528f51154c1ea9b18eab53aabc1d1a478930aaebde47730b51375df02f0076c";
+    dbg!(&sk_hex);
+    let sk_hex: String = strip_0x_prefix!(sk_hex);
+    let sk_bytes = hex::decode(sk_hex).unwrap();
+    let sk_set = SecretKeySet::from_bytes(sk_bytes).unwrap();
+    bls_keys::save_bls_key(&sk_set).unwrap();
+    let pk_hex = sk_set.public_keys().public_key().to_hex();
+
+    // init slashing protection db
+    let db = SlashingProtectionData::from_pk_hex(pk_hex.clone()).unwrap();
+    db.write().unwrap();
+
+    pk_hex
 }
