@@ -1,10 +1,9 @@
 use crate::common;
 use crate::common::bls_keygen_helper::register_new_bls_key;
-use crate::common::{eth_specs, signing_helper::*};
+use crate::common::signing_helper::*;
 use puffersecuresigner::eth2::eth_signing::*;
 use puffersecuresigner::eth2::eth_types::*;
 use puffersecuresigner::strip_0x_prefix;
-use std::path::PathBuf;
 
 fn randao_reveal_request() -> BLSSignMsg {
     // Create a RandaoRevealRequest
