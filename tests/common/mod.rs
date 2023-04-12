@@ -16,6 +16,7 @@ use std::fs;
 mod eth_keygen_helper; 
 mod bls_keygen_helper; 
 mod signing_helper; 
+mod eth_specs; 
 
 /// Reads the `SECURE_SIGNER_PORT` environment variable.
 /// If the return value is Some(port), it is expected that Secure-Aggregator is running on localhost:port
