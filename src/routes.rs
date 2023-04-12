@@ -106,7 +106,7 @@ pub fn list_generated_bls_keys_route() -> impl Filter<Extract = impl warp::Reply
 
 
 // use crate::puffersecuresigner::api::signing_route::bls_sign_route as bls_sign_route2;
-use crate::api::signing_route::bls_sign_route as bls_sign_route2;
+// use crate::api::signing_route::bls_sign_route as bls_sign_route2;
 #[cfg(test)]
 pub mod api_signing_tests {
     use super::*;
@@ -117,8 +117,8 @@ pub mod api_signing_tests {
     use crate::eth_types::{RandaoRevealRequest, BlockV2Request};
 
     pub async fn mock_secure_sign_bls_route(bls_pk: &String, json_req: &String) -> warp::http::Response<bytes::Bytes> {
-        // let filter = bls_sign_route();
-        let filter = bls_sign_route2();
+        let filter = bls_sign_route();
+        // let filter = bls_sign_route2();
         let uri = format!("/api/v1/eth2/sign/{}", bls_pk);
 
         println!("mocking request to: {uri}");

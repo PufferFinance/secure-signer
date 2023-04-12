@@ -46,7 +46,8 @@ pub async fn run(port: u16) {
 
         // Endpoint to request a signature using BLS sk 
         // curl -X POST localhost:3031/eth/v1/sign/bls -H "Content-Type: application/json"  -d '{"msg_hex": "0xdeadbeef", "bls_pk_hex": "0x123"}'  
-        .or(routes::bls_sign_route())
+        // .or(routes::bls_sign_route())
+        .or(api::signing_route::bls_sign_route())
 
         // --------- Addition to Web3Signer ---------
 
@@ -56,7 +57,8 @@ pub async fn run(port: u16) {
 
         // Endpoint to securely generate and save an ETH sk 
         // curl -X POST localhost:3031/eth/v1/keygen/eth
-        .or(routes::eth_key_gen_route())
+        // .or(routes::eth_key_gen_route())
+        .or(api::eth_keygen_route::eth_keygen_route())
 
         // Endpoint to list the pks of all the generated ETH keys
         // curl -X GET localhost:3031/eth/v1/keygen/eth
@@ -64,7 +66,8 @@ pub async fn run(port: u16) {
 
         // Endpoint to securely generate and save a BLS sk 
         // curl -X POST localhost:3031/eth/v1/keygen/bls
-        .or(routes::bls_key_gen_route())
+        // .or(routes::bls_key_gen_route())
+        .or(api::bls_keygen_route::bls_keygen_route())
 
         // Endpoint to list pks of saved bls keys that were generated in the enclave
         // curl -X GET localhost:3031/eth/v1/keygen/bls
