@@ -10,7 +10,6 @@ use log::{info, error};
 use ssz::Encode;
 use warp::{http::StatusCode, Filter, Rejection, Reply};
 
-
 /// Imports a BLS private key to the Enclave. 
 /// https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Keymanager
 pub fn bls_key_import_route() -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
@@ -26,8 +25,6 @@ pub fn bls_key_import_route() -> impl Filter<Extract = impl Reply, Error = Rejec
 /// safeguarded by the TEE, then saves the bls key to enclave memory. Expects the 
 /// ETH encrypting_pk_hex to be compressed (33 bytes) and hex-encoded. 
 pub fn decrypt_and_save_imported_bls_key(req: &KeyImportRequest) -> Result<String> {
-    dbg!("KeyImportRequest: {:?}", &req);
-
     // Decrypt bls secret key from keystore json
     let eth_sk = eth_keys::fetch_eth_key(&req.encrypting_pk_hex)?;
     let sk_bytes = import_keystore(&req.keystore, &req.ct_password_hex, &eth_sk)?;

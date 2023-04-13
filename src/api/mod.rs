@@ -3,11 +3,21 @@ pub mod signing_route;
 pub mod bls_keygen_route;
 pub mod eth_keygen_route;
 pub mod bls_import_route;
+pub mod getter_routes;
 
 use crate::{crypto::eth_keys, io::remote_attestation::AttestationEvidence, strip_0x_prefix};
 use serde::{Deserialize, Serialize};
 use ecies::PublicKey as EthPublicKey;
 use blsttc::PublicKey as BlsPublicKey;
+use warp::{Filter,Reply, Rejection};
+
+
+/// Returns a 200 status code if server is alive
+pub fn upcheck_route() -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+    warp::get()
+        .and(warp::path("upcheck"))
+        .and(warp::any().map(warp::reply))
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct KeyGenResponse {
