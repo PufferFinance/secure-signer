@@ -127,11 +127,13 @@ pub async fn import_bls_key_with_slash_protection(slot: u64, src: u64, tgt: u64,
 
     // Prep a slash protection db
     let mut db = SlashingProtectionDB::new();
+    dbg!("here");
     let mut slashing_protection = SlashingProtectionData::from_pk_hex(&expected_pk).unwrap();
     slashing_protection.new_block(SignedBlockSlot {
         slot,
         signing_root: None
     }, false).unwrap();
+    dbg!("here");
     slashing_protection.new_attestation(SignedAttestationEpochs {
         source_epoch: src,
         target_epoch: tgt,
@@ -139,6 +141,8 @@ pub async fn import_bls_key_with_slash_protection(slot: u64, src: u64, tgt: u64,
     }, false).unwrap();
     slashing_protection.write().unwrap();
     db.data.push(slashing_protection);
+
+    dbg!("here");
 
     // serialize to string
     let sp = Some(serde_json::to_string(&db).unwrap());

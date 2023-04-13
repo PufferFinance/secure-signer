@@ -1,4 +1,5 @@
 use crate::common;
+use crate::common::bls_import_helper::import_bls_key_with_slash_protection;
 use crate::common::bls_keygen_helper::register_new_bls_key;
 use crate::common::{eth_specs, signing_helper::*};
 use puffersecuresigner::eth2::eth_signing::*;
@@ -114,6 +115,50 @@ pub async fn test_aggregate_block_slash_protection_prevents_decreasing_slot() {
     let req = block_proposal_request(START_SLOT - 1);
     let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
     assert_eq!(status, 412);
+}
+
+#[tokio::test]
+pub async fn test_bls_import_with_slash_prevention() {
+    // let port = common::read_secure_signer_port();
+    let port = None;
+    // Init slash protection START_SLOT as last block slot signed
+    let bls_pk_hex = import_bls_key_with_slash_protection(START_SLOT, 10, 11, port).await;
+
+    // mock data for BLOCK request (attempt a slashable offense - same slot)
+    let req = block_proposal_request(START_SLOT);
+    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    assert_eq!(status, 412);
+
+    // mock data for BLOCK request (attempt a slashable offense - decreasing slot)
+    let req = block_proposal_request(START_SLOT - 1);
+    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    assert_eq!(status, 412);
+
+    // Valid increasing block
+    let req = block_proposal_request(START_SLOT + 1);
+    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    assert_eq!(status, 200);
+
+    // Sanity check
+    let req = block_proposal_request(START_SLOT + 99999);
+    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    assert_eq!(status, 200);
+}
+
+async fn perf_test(n: u64, bls_pk_hex: &String, port: Option<u16>) {
+    for i in 1..n {
+        let req = block_proposal_request(i);
+        let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+        assert_eq!(status, 200);
+    }
+}
+
+#[tokio::test]
+pub async fn perf_tester() {
+    let n = 1000;
+    let port = common::read_secure_signer_port();
+    let bls_pk_hex = register_new_bls_key(port).await.pk_hex;
+    perf_test(n, &bls_pk_hex, port).await;
 }
 
 #[tokio::test]

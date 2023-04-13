@@ -14,7 +14,7 @@ use ssz::Encode;
 use ssz_types::FixedVector;
 use std::fs;
 use std::path::PathBuf;
-use log::debug;
+use log::{debug, error};
 
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -64,7 +64,7 @@ impl SlashingProtectionData {
     /// overwrite the 0th element.
     pub fn new_block(&mut self, block: SignedBlockSlot, growable: bool) -> Result<()> {
         if block.slot <= self.get_latest_signed_block_slot() {
-            bail!("Will not save this slashable evidence!");
+            bail!("Will not save this slashable Block!");
         }
         if growable || self.signed_blocks.is_empty() {
             self.signed_blocks.push(block);
@@ -108,10 +108,12 @@ impl SlashingProtectionData {
     ) -> Result<()> {
         let (prev_src, prev_tgt) = self.get_latest_signed_attestation_epochs();
         if attest.source_epoch < prev_src {
-            bail!("Will not save this slashable evidence!");
+            error!("Attestation source epoch is decreasing");
+            bail!("Will not save this slashable Attestation!");
         }
         if attest.target_epoch <= prev_tgt {
-            bail!("Will not save this slashable evidence!");
+            error!("Attestation target epoch is non-increasing");
+            bail!("Will not save this slashable Attestation!");
         }
 
         if growable || self.signed_attestations.is_empty() {
