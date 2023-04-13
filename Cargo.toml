@@ -66,6 +66,6 @@ sgx = []
 name = "secure-signer"
 path = "src/main.rs"
 
-[[bin]] # Bin to run the client 
-name = "client"
-path = "src/client.rs"
+# [[bin]] # Bin to run the client 
+# name = "client"
+# path = "src/client.rs"
