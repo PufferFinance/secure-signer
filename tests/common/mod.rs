@@ -1,15 +1,7 @@
-// use puffersecuresigner::api::aggregate_route::AggregateRequest;
+use blsttc::SecretKeySet;
 use puffersecuresigner::crypto::bls_keys;
-use puffersecuresigner::crypto::eth_keys;
-use puffersecuresigner::eth2::eth_signing::BLSSignMsg;
 use puffersecuresigner::eth2::slash_protection::SlashingProtectionData;
-use puffersecuresigner::io::key_management;
-
-use anyhow::Result;
-use blsttc::{PublicKeySet, PublicKeyShare, SecretKeySet, SecretKeyShare, SignatureShare};
-use ecies::PublicKey as EthPublicKey;
 use puffersecuresigner::strip_0x_prefix;
-use std::fs;
 
 pub mod bls_import_helper;
 pub mod bls_keygen_helper;

@@ -37,7 +37,7 @@ pub async fn make_bls_keygen_request(port: Option<u16>) -> (StatusCode, Result<K
         Some(p) => {
             let resp = match request_bls_keygen_route(p).await {
                 Ok(resp) => resp,
-                Err(e) => panic!("Failed request_eth_keygen_route"),
+                Err(_) => panic!("Failed request_eth_keygen_route"),
             };
             dbg!(&resp);
             let status = resp.status();

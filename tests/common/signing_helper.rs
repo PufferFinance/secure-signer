@@ -3,10 +3,9 @@ use super::bls_keygen_helper::register_new_bls_key;
 use super::read_secure_signer_port;
 
 use anyhow::{Context, Result};
-use blsttc::{PublicKey, Signature};
 use puffersecuresigner::{
-    api::{signing_route::bls_sign_route, helpers::SignatureResponse},
-    constants::BLS_PUB_KEY_BYTES, eth2::eth_signing::BLSSignMsg, strip_0x_prefix,
+    api::{helpers::SignatureResponse, signing_route::bls_sign_route},
+    eth2::eth_signing::BLSSignMsg,
 };
 use reqwest::{Client, Response, StatusCode};
 use serde_json;
@@ -41,7 +40,8 @@ pub async fn request_secure_sign_route(
     let url = format!("http://localhost:{}/api/v1/eth2/sign/{}", port, bls_pk);
 
     // Make the HTTP request
-    let response = client.post(&url)
+    let response = client
+        .post(&url)
         .header("Content-Type", "application/json")
         .body(json_req.clone())
         .send()
@@ -63,7 +63,7 @@ pub async fn make_signing_route_request(
         Some(p) => {
             let resp = match request_secure_sign_route(&bls_pk_hex, &json_req, p).await {
                 Ok(resp) => resp,
-                Err(e) => panic!("Failed request_secure_sign_route"),
+                Err(_) => panic!("Failed request_secure_sign_route"),
             };
             dbg!(&resp);
             let status = resp.status();
@@ -83,15 +83,6 @@ pub async fn make_signing_route_request(
         }
     }
 }
-
-pub fn validate_response(resp: SignatureResponse, exp_sig: Signature) -> Result<bool> {
-    let got_sig: &str = strip_0x_prefix!(resp.signature);
-    let got_bytes = hex::decode(got_sig)?;
-    Ok(got_bytes == exp_sig.to_bytes().to_vec())
-}
-
-
-
 
 #[tokio::test]
 async fn test_sign_route() {
@@ -132,4 +123,3 @@ async fn test_sign_route() {
     assert_eq!(status, 200);
     dbg!(resp.unwrap().signature);
 }
-

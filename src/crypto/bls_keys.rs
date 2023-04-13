@@ -3,7 +3,7 @@ use crate::io::key_management::{read_bls_key, write_bls_key};
 use crate::strip_0x_prefix;
 
 use blsttc::{
-    PublicKey, PublicKeySet, PublicKeyShare, SecretKey, SecretKeySet, SecretKeyShare, Signature,
+    PublicKeySet, PublicKeyShare, SecretKeySet, SecretKeyShare, Signature,
     SignatureShare,
 };
 
@@ -212,7 +212,7 @@ mod tests {
         );
 
         let msg = b"Hello, world!";
-        let pk_set = secret_key_set.public_keys();
+        let _pk_set = secret_key_set.public_keys();
 
         // Sign the message with each secret key share
         let sig_shares: Vec<SignatureShare> = key_shares

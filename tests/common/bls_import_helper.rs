@@ -4,7 +4,11 @@ use super::read_secure_signer_port;
 use anyhow::{Context, Result};
 use puffersecuresigner::{
     api::{bls_import_route::bls_key_import_route, KeyImportRequest, KeyImportResponse},
-    crypto::eth_keys, strip_0x_prefix, eth2::slash_protection::{SlashingProtectionData, SignedBlockSlot, SignedAttestationEpochs, SlashingProtectionDB},
+    crypto::eth_keys,
+    eth2::slash_protection::{
+        SignedAttestationEpochs, SignedBlockSlot, SlashingProtectionDB, SlashingProtectionData,
+    },
+    strip_0x_prefix,
 };
 use reqwest::{Client, Response, StatusCode};
 use serde_json;
@@ -54,7 +58,7 @@ pub async fn make_bls_import_request(
         Some(p) => {
             let resp = match request_bls_import_route(&json_req, p).await {
                 Ok(resp) => resp,
-                Err(e) => panic!("Failed request_bls_import_route"),
+                Err(_) => panic!("Failed request_bls_import_route"),
             };
             dbg!(&resp);
             let status = resp.status();
@@ -81,7 +85,12 @@ pub async fn import_bls_key(req: KeyImportRequest, port: Option<u16>) -> KeyImpo
     resp.unwrap()
 }
 
-pub async fn import_bls_key_with_slash_protection(slot: u64, src: u64, tgt: u64, port: Option<u16>) -> String {
+pub async fn import_bls_key_with_slash_protection(
+    slot: u64,
+    src: u64,
+    tgt: u64,
+    port: Option<u16>,
+) -> String {
     let keystore = r#"
     {
         "crypto": {
@@ -129,16 +138,26 @@ pub async fn import_bls_key_with_slash_protection(slot: u64, src: u64, tgt: u64,
     let mut db = SlashingProtectionDB::new();
     dbg!("here");
     let mut slashing_protection = SlashingProtectionData::from_pk_hex(&expected_pk).unwrap();
-    slashing_protection.new_block(SignedBlockSlot {
-        slot,
-        signing_root: None
-    }, false).unwrap();
+    slashing_protection
+        .new_block(
+            SignedBlockSlot {
+                slot,
+                signing_root: None,
+            },
+            false,
+        )
+        .unwrap();
     dbg!("here");
-    slashing_protection.new_attestation(SignedAttestationEpochs {
-        source_epoch: src,
-        target_epoch: tgt,
-        signing_root: None
-    }, false).unwrap();
+    slashing_protection
+        .new_attestation(
+            SignedAttestationEpochs {
+                source_epoch: src,
+                target_epoch: tgt,
+                signing_root: None,
+            },
+            false,
+        )
+        .unwrap();
     slashing_protection.write().unwrap();
     db.data.push(slashing_protection);
 
@@ -152,7 +171,7 @@ pub async fn import_bls_key_with_slash_protection(slot: u64, src: u64, tgt: u64,
         keystore,
         ct_password_hex,
         slashing_protection: sp,
-        encrypting_pk_hex: eth_keys::eth_pk_to_hex(&eth_pk)
+        encrypting_pk_hex: eth_keys::eth_pk_to_hex(&eth_pk),
     };
 
     // make the request
@@ -160,14 +179,10 @@ pub async fn import_bls_key_with_slash_protection(slot: u64, src: u64, tgt: u64,
 
     // verify we imported the expected key
     let imported_bls_pk: String = strip_0x_prefix!(resp.data[0].message);
-    assert_eq!(
-        imported_bls_pk,
-        expected_pk,
-    );
+    assert_eq!(imported_bls_pk, expected_pk,);
 
     imported_bls_pk
 }
-
 
 #[tokio::test]
 async fn test_import_bls_key() {

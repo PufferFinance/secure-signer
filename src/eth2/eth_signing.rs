@@ -3,14 +3,12 @@ use super::slash_protection;
 use crate::constants::ALLOW_GROWABLE_SLASH_PROTECTION_DB;
 use crate::crypto::bls_keys;
 
-use anyhow::{bail, Context, Result};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use anyhow::{bail, Result};
+use serde::{Deserialize, Serialize};
 use ssz::Encode;
-use std::fs;
-use std::path::PathBuf;
 use tree_hash::TreeHash;
 
-use log::{debug, error, info};
+use log::{error, info};
 
 /// Return the signing root for the corresponding signing data.
 fn compute_signing_root<T: Encode + TreeHash>(ssz_object: T, domain: Domain) -> Root {
@@ -354,6 +352,7 @@ impl Signable for BLSSignMsg {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
+#[allow(non_camel_case_types)]
 pub enum BLSSignMsg {
     BLOCK(BlockRequest),
     BLOCK_V2(BlockV2Request),
@@ -459,7 +458,7 @@ impl BLSSignMsg {
                     compute_domain(DOMAIN_DEPOSIT, Some(m.genesis_fork_version.clone()), None);
                 compute_signing_root(m.deposit.clone(), domain)
             }
-            /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#voluntary-exits
+            // https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#voluntary-exits
             BLSSignMsg::VOLUNTARY_EXIT(m) | BLSSignMsg::voluntary_exit(m) => {
                 let domain = get_domain(
                     m.fork_info.clone(),
@@ -504,279 +503,6 @@ impl BLSSignMsg {
                 let domain = compute_domain(DOMAIN_APPLICATION_BUILDER, Some(fork_version), None);
                 compute_signing_root(m.validator_registration.clone(), domain)
             }
-            // TODO
-            _ => Root::default(),
         }
     }
 }
-
-#[cfg(test)]
-mod spec_tests {}
-
-// #[cfg(test)]
-// pub mod slash_resistance_tests {
-
-//     use ssz_types::FixedVector;
-
-//     use crate::key_management_old::new_keystore;
-//     use crate::key_management_old;
-
-//     use crate::slash_protection::SlashingProtectionData;
-//     use super::*;
-//     use std::fs;
-//     use std::path::Path;
-
-//     /// hardcoded bls sk from Lighthouse Web3Signer tests
-//     pub fn setup_keypair() -> String {
-//         // dummy key
-//         let sk_hex = hex::encode(&[85, 40, 245, 17, 84, 193, 234, 155, 24, 234, 181, 58, 171, 193, 209, 164, 120, 147, 10, 174, 189, 228, 119, 48, 181, 19, 117, 223, 2, 240, 7, 108,]);
-//         println!("DEBUG: using sk: {sk_hex}");
-
-//         let sk = key_management_old::bls_sk_from_hex(sk_hex.clone()).unwrap();
-//         let pk = sk.sk_to_pk();
-//         let pk_hex = hex::encode(pk.compress());
-//         // save keystore
-//         let name = new_keystore(Path::new("./etc/keys/bls_keys/generated/"), "", &pk_hex, &sk.serialize()).unwrap();
-//         println!("DEBUG: using pk: {pk_hex}");
-
-//         // init slashing protection db
-//         let db = SlashingProtectionData::from_pk_hex(pk_hex.clone()).unwrap();
-//         db.write().unwrap();
-
-//         pk_hex
-//     }
-
-//     /// hardcoded bls sk from mev-boost tests
-//     /// https://github.com/flashbots/mev-boost/blob/33c9b946c940ef279fe2b8bf1492e913cc0b0c49/server/service_test.go#L165
-//     pub fn setup_keypair2() -> String {
-//         // dummy key
-//         let sk_hex = "0x4e343a647c5a5c44d76c2c58b63f02cdf3a9a0ec40f102ebc26363b4b1b95033".to_string();
-
-//         println!("DEBUG: using sk: {sk_hex}");
-
-//         let sk = key_management_old::bls_sk_from_hex(sk_hex).unwrap();
-//         let pk = sk.sk_to_pk();
-//         let pk_hex = hex::encode(pk.compress());
-//         // save keystore
-//         let name = new_keystore(Path::new("./etc/keys/bls_keys/generated/"), "", &pk_hex, &sk.serialize()).unwrap();
-//         println!("DEBUG: using pk: {pk_hex}");
-//         // init slashing protection db
-//         let db = SlashingProtectionData::from_pk_hex(pk_hex.clone()).unwrap();
-//         db.write().unwrap();
-//         pk_hex
-//     }
-
-//     #[test]
-//     fn load_dummy_keys() {
-//         setup_keypair();
-//     }
-
-//     pub fn mock_beacon_block(slot: &str) -> String {
-//         let req = format!(r#"
-//             {{
-//                 "slot":"{slot}",
-//                 "proposer_index":"5",
-//                 "parent_root":"0xb2eedb01adbd02c828d5eec09b4c70cbba12ffffba525ebf48aca33028e8ad89",
-//                 "state_root":"0x2b530d6262576277f1cc0dbe341fd919f9f8c5c92fc9140dff6db4ef34edea0d",
-//                 "body":{{
-//                     "randao_reveal":"0xa686652aed2617da83adebb8a0eceea24bb0d2ccec9cd691a902087f90db16aa5c7b03172a35e874e07e3b60c5b2435c0586b72b08dfe5aee0ed6e5a2922b956aa88ad0235b36dfaa4d2255dfeb7bed60578d982061a72c7549becab19b3c12f",
-//                     "eth1_data":{{
-//                     "deposit_root":"0x6a0f9d6cb0868daa22c365563bb113b05f7568ef9ee65fdfeb49a319eaf708cf",
-//                     "deposit_count":"8",
-//                     "block_hash":"0x4242424242424242424242424242424242424242424242424242424242424242"
-//                     }},
-//                     "graffiti":"0x74656b752f76302e31322e31302d6465762d6338316361363235000000000000",
-//                     "proposer_slashings":[],
-//                     "attester_slashings":[],
-//                     "attestations":[],
-//                     "deposits":[],
-//                     "voluntary_exits":[]
-//                 }}
-//             }}"#);
-//         req
-//     }
-
-//     fn send_n_proposals(n: u64) -> (String, Vec<BLSSignature>) {
-//         // clear state
-//         fs::remove_dir_all("./etc");
-
-//         // new keypair
-//         let bls_pk_hex = setup_keypair();
-
-//         // make n requests
-//         let sigs = (1..n+1).map(|s| {
-//             let slot = format!("{s}");
-//             let req = mock_beacon_block(&slot);
-//             let b: BeaconBlock = serde_json::from_str(&req).unwrap();
-//             let f = ForkInfo::default();
-//             assert_eq!(b.slot, s);
-
-//             let sig = get_block_signature(bls_pk_hex.clone(), f, b).unwrap();
-//             println!("sig: {}", hex::encode(sig.to_vec()));
-//             sig
-//         }).collect();
-//         (bls_pk_hex, sigs)
-//     }
-
-//     #[test]
-//     fn test_propose_block_request() -> Result<()>{
-//         let n = 5;
-//         let (bls_pk_hex, sigs) = send_n_proposals(n);
-//         Ok(())
-//     }
-
-//     #[test]
-//     #[should_panic]
-//     fn test_propose_block_prevents_slash_when_decreasing_slot() {
-//         let n = 5;
-//         let (bls_pk_hex, sigs) = send_n_proposals(n);
-
-//         // make a request with slot < n and expect panic
-//         let s = n - 1;
-//         let slot = format!("{s}");
-
-//         let req = mock_beacon_block(&slot);
-//         let b: BeaconBlock = serde_json::from_str(&req).unwrap();
-//         let f = ForkInfo::default();
-//         assert_eq!(b.slot, s);
-
-//         let sig = get_block_signature(bls_pk_hex.clone(), f, b).unwrap();
-//         println!("sig: {}", hex::encode(sig.to_vec()));
-//     }
-
-//     #[test]
-//     #[should_panic]
-//     fn test_propose_block_prevents_slash_when_non_increasing_slot() {
-//         let n = 5;
-//         let (bls_pk_hex, sigs) = send_n_proposals(n);
-
-//         // make a request with slot = n and expect panic
-//         let s = n;
-//         let slot = format!("{s}");
-//         let req = mock_beacon_block(&slot);
-//         let b: BeaconBlock = serde_json::from_str(&req).unwrap();
-//         let f = ForkInfo::default();
-//         assert_eq!(b.slot, s);
-
-//         let sig = get_block_signature(bls_pk_hex.clone(), f, b).unwrap();
-//         println!("sig: {}", hex::encode(sig.to_vec()));
-//     }
-
-//     pub fn mock_attestation(src_epoch: &str, tgt_epoch: &str) -> String {
-//         let req = format!(r#"
-//         {{
-//             "slot": "255",
-//             "index": "65535",
-//             "beacon_block_root": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69",
-//             "source": {{
-//                 "epoch": "{src_epoch}",
-//                 "root": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69"
-//             }},
-//             "target": {{
-//                 "epoch": "{tgt_epoch}",
-//                 "root": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69"
-//             }}
-//         }}"#);
-//         req
-//     }
-
-//     fn send_n_attestations(n: u64) -> (String, Vec<BLSSignature>) {
-//         // clear state
-//         fs::remove_dir_all("./etc");
-
-//         // new keypair
-//         let bls_pk_hex = setup_keypair();
-
-//         // make n requests
-//         let sigs = (1..n+1).map(|s| {
-//             // source epoch will be non-decreasing
-//             let src_epoch = format!("{s}");
-//             // target epoch will be strictly increasing
-//             let tgt_epoch = format!("{s}");
-//             let req = mock_attestation(&src_epoch, &tgt_epoch);
-//             let a: AttestationData = serde_json::from_str(&req).unwrap();
-//             let f = ForkInfo::default();
-//             assert_eq!(a.slot, 255);
-//             assert_eq!(a.index, 65535);
-//             assert_eq!(a.source.epoch, s);
-//             assert_eq!(a.target.epoch, s);
-
-//             let sig = get_attestation_signature(bls_pk_hex.clone(), f, a).unwrap();
-//             println!("sig: {}", hex::encode(sig.to_vec()));
-//             sig
-//         }).collect();
-//         (bls_pk_hex, sigs)
-//     }
-
-//     #[test]
-//     fn test_attestation_request() -> Result<()>{
-//         let n = 5;
-//         let (bls_pk_hex, sigs) = send_n_attestations(n);
-//         Ok(())
-//     }
-
-//     #[test]
-//     #[should_panic]
-//     fn test_attestation_request_prevents_slash_when_decreasing_src_epoch(){
-//         let n = 5;
-//         let (bls_pk_hex, sigs) = send_n_attestations(n);
-
-//         // prev src epoch should be 50, but send 0
-//         let src_epoch = "0";
-
-//         // target epoch will be strictly increasing
-//         let tgt_epoch = format!("{:x}", n + 1);
-
-//         let req = mock_attestation(&src_epoch, &tgt_epoch);
-//         let a: AttestationData = serde_json::from_str(&req).unwrap();
-//         let f = ForkInfo::default();
-
-//         let sig = get_attestation_signature(bls_pk_hex.clone(), f, a).unwrap();
-//         println!("sig: {}", hex::encode(sig.to_vec()));
-//     }
-
-//     #[test]
-//     #[should_panic]
-//     fn test_attestation_request_prevents_slash_when_non_increasing_tgt_epoch(){
-//         let n = 5;
-//         let (bls_pk_hex, sigs) = send_n_attestations(n);
-
-//         // prev src epoch should be non-decreasing
-//         let src_epoch = format!("{}", n + 1);
-//         // target epoch will be equal (non-increasing)
-//         let tgt_epoch = format!("{}", n);
-
-//         let req = mock_attestation(&src_epoch, &tgt_epoch);
-//         let a: AttestationData = serde_json::from_str(&req).unwrap();
-//         assert_eq!(a.slot, 255);
-//         assert_eq!(a.index, 65535);
-//         assert_eq!(a.source.epoch, n+1);
-//         assert_eq!(a.target.epoch, n);
-
-//         let f = ForkInfo::default();
-//         let sig = get_attestation_signature(bls_pk_hex.clone(), f, a).unwrap();
-//         println!("sig: {}", hex::encode(sig.to_vec()));
-//     }
-
-//     #[test]
-//     #[should_panic]
-//     fn test_attestation_request_prevents_slash_when_decreasing_tgt_epoch(){
-//         let n = 5;
-//         let (bls_pk_hex, sigs) = send_n_attestations(n);
-
-//         // prev src epoch should be non-decreasing
-//         let src_epoch = format!("{:x}", n + 1);
-//         // target epoch will be decreasing
-//         let tgt_epoch = "0";
-
-//         let req = mock_attestation(&src_epoch, &tgt_epoch);
-//         let a: AttestationData = serde_json::from_str(&req).unwrap();
-//         assert_eq!(a.slot, 255);
-//         assert_eq!(a.index, 65535);
-//         assert_eq!(a.source.epoch, n + 1);
-//         assert_eq!(a.target.epoch, 0);
-
-//         let f = ForkInfo::default();
-//         let sig = get_attestation_signature(bls_pk_hex.clone(), f, a).unwrap();
-//     }
-// }

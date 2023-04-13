@@ -1,13 +1,13 @@
-use serde::{Deserialize, Serialize};
+use num_bigint::BigUint;
 use serde::de::{self, Deserializer};
 use serde::ser::{self, Serializer};
+use serde::{Deserialize, Serialize};
 use serde_hex::{SerHex, StrictPfx};
-use serde_utils:: quoted_u64;
+use serde_utils::quoted_u64;
 use ssz::{Decode, Encode};
 use ssz_derive::{Decode, Encode};
 use ssz_types::{typenum, BitList, BitVector, FixedVector, VariableList};
 use tree_hash_derive::TreeHash;
-use num_bigint::BigUint;
 
 use crate::strip_0x_prefix;
 
@@ -34,12 +34,19 @@ pub type Domain = Bytes32;
 pub type ExecutionAddress = Bytes20;
 
 // typenums for specifying the length of FixedVector
+#[allow(non_camel_case_types)]
 pub type MAX_VALIDATORS_PER_COMMITTEE = typenum::U2048;
+#[allow(non_camel_case_types)]
 pub type DEPOSIT_CONTRACT_TREE_DEPTH_PLUS_ONE = typenum::U33;
+#[allow(non_camel_case_types)]
 pub type MAX_PROPOSER_SLASHINGS = typenum::U16;
+#[allow(non_camel_case_types)]
 pub type MAX_ATTESTER_SLASHINGS = typenum::U2;
+#[allow(non_camel_case_types)]
 pub type MAX_ATTESTATIONS = typenum::U128;
+#[allow(non_camel_case_types)]
 pub type MAX_DEPOSITS = typenum::U16;
+#[allow(non_camel_case_types)]
 pub type MAX_VOLUNTARY_EXITS = typenum::U16;
 
 // Domains
@@ -60,19 +67,29 @@ pub const GENESIS_FORK_VERSION: Version = [0_u8, 0_u8, 0_u8, 0_u8]; // '0x000000
 pub const SLOTS_PER_EPOCH: u64 = 32;
 
 // altair
+#[allow(non_camel_case_types)]
 pub type SYNC_COMMITTEE_SIZE = typenum::U512;
+#[allow(non_camel_case_types)]
 pub type SYNC_COMMITTEE_SUBNET_COUNT = typenum::U4;
+#[allow(non_camel_case_types)]
 pub type SYNC_COMMITTEE_SIZE_BY_SYNC_COMMITTEE_SUBNET_COUNT = typenum::U128; // 512 / 4
 
 // bellatrix
+#[allow(non_camel_case_types)]
 pub type MAX_EXTRA_DATA_BYTES = typenum::U32;
+#[allow(non_camel_case_types)]
 pub type MAX_TRANSACTIONS_PER_PAYLOAD = typenum::U1048576;
+#[allow(non_camel_case_types)]
 pub type BYTES_PER_LOGS_BLOOM = typenum::U256;
+#[allow(non_camel_case_types)]
 pub type MAX_BYTES_PER_TRANSACTION = typenum::U1073741824;
+#[allow(non_camel_case_types)]
 pub type Transaction = VariableList<u8, MAX_BYTES_PER_TRANSACTION>;
 
 // capella
+#[allow(non_camel_case_types)]
 pub type MAX_BLS_TO_EXECUTION_CHANGES = typenum::U16;
+#[allow(non_camel_case_types)]
 pub type MAX_WITHDRAWALS_PER_PAYLOAD = typenum::U16;
 
 // Custom deserializers
@@ -113,7 +130,12 @@ where
     };
     match T::from_ssz_bytes(&bytes.as_ssz_bytes()) {
         Ok(out) => Ok(out),
-        Err(e) => return Err(de::Error::custom(format!("Filaed to deserialize hex string to BitList/BitVector: {:?}", e))),
+        Err(e) => {
+            return Err(de::Error::custom(format!(
+                "Filaed to deserialize hex string to BitList/BitVector: {:?}",
+                e
+            )))
+        }
     }
 }
 
@@ -130,7 +152,9 @@ where
     };
 
     if bytes.len() != 4 {
-        return Err(de::Error::custom("Decimal string doesn't match the required length for U256"));
+        return Err(de::Error::custom(
+            "Decimal string doesn't match the required length for U256",
+        ));
     }
 
     let out: U256 = FixedVector::from(bytes);
@@ -156,7 +180,7 @@ where
 
     let bytes: Root = match SerHex::<StrictPfx>::from_hex(&hex_string) {
         Ok(bs) => bs,
-        Err(e) => return Err(de::Error::custom(format!("Not valid hex: {:?}", e)))
+        Err(e) => return Err(de::Error::custom(format!("Not valid hex: {:?}", e))),
     };
     let mut array = [0u8; 32];
     array.copy_from_slice(&bytes[..32]);
@@ -261,7 +285,10 @@ pub struct BeaconBlockHeader {
 #[derive(Debug, Deserialize, Serialize, Encode, Decode, TreeHash, Clone)]
 pub struct SignedBeaconBlockHeader {
     pub message: BeaconBlockHeader,
-    #[serde(deserialize_with = "from_hex_to_ssz_type", serialize_with = "to_hex_from_ssz_type")]
+    #[serde(
+        deserialize_with = "from_hex_to_ssz_type",
+        serialize_with = "to_hex_from_ssz_type"
+    )]
     pub signature: BLSSignature,
 }
 
@@ -275,7 +302,10 @@ pub struct ProposerSlashing {
 pub struct IndexedAttestation {
     pub attesting_indices: VariableList<ValidatorIndex, MAX_VALIDATORS_PER_COMMITTEE>,
     pub data: AttestationData,
-    #[serde(deserialize_with = "from_hex_to_ssz_type", serialize_with = "to_hex_from_ssz_type")]
+    #[serde(
+        deserialize_with = "from_hex_to_ssz_type",
+        serialize_with = "to_hex_from_ssz_type"
+    )]
     pub signature: BLSSignature,
 }
 
@@ -299,7 +329,10 @@ pub struct Eth1Data {
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#depositdata
 /// used by Web3Signer type = "DEPOSIT"
 pub struct DepositMessage {
-    #[serde(deserialize_with = "from_hex_to_ssz_type", serialize_with = "to_hex_from_ssz_type")]
+    #[serde(
+        deserialize_with = "from_hex_to_ssz_type",
+        serialize_with = "to_hex_from_ssz_type"
+    )]
     pub pubkey: BLSPubkey,
     #[serde(with = "SerHex::<StrictPfx>")]
     pub withdrawal_credentials: Bytes32,
@@ -311,13 +344,19 @@ pub struct DepositMessage {
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#depositdata
 /// used by Web3Signer type = "DEPOSIT"
 pub struct DepositData {
-    #[serde(deserialize_with = "from_hex_to_ssz_type", serialize_with = "to_hex_from_ssz_type")]
+    #[serde(
+        deserialize_with = "from_hex_to_ssz_type",
+        serialize_with = "to_hex_from_ssz_type"
+    )]
     pub pubkey: BLSPubkey,
     #[serde(with = "SerHex::<StrictPfx>")]
     pub withdrawal_credentials: Bytes32,
     #[serde(with = "quoted_u64")]
     pub amount: Gwei,
-    #[serde(deserialize_with = "from_hex_to_ssz_type", serialize_with = "to_hex_from_ssz_type")]
+    #[serde(
+        deserialize_with = "from_hex_to_ssz_type",
+        serialize_with = "to_hex_from_ssz_type"
+    )]
     pub signature: BLSSignature, // Signing over DepositMessage
 }
 
@@ -340,7 +379,10 @@ pub struct VoluntaryExit {
 #[derive(Debug, Deserialize, Serialize, Encode, Decode, TreeHash, Clone)]
 pub struct SignedVoluntaryExit {
     pub message: VoluntaryExit,
-    #[serde(deserialize_with = "from_hex_to_ssz_type", serialize_with = "to_hex_from_ssz_type")]
+    #[serde(
+        deserialize_with = "from_hex_to_ssz_type",
+        serialize_with = "to_hex_from_ssz_type"
+    )]
     pub signature: BLSSignature,
 }
 
@@ -363,24 +405,39 @@ pub struct ValidatorRegistration {
 
 #[derive(Debug, Deserialize, Serialize, Encode, Decode, TreeHash, Clone)]
 pub struct Attestation {
-    #[serde(deserialize_with = "from_hex_to_ssz_bits_type", serialize_with = "to_hex_from_ssz_type")]
+    #[serde(
+        deserialize_with = "from_hex_to_ssz_bits_type",
+        serialize_with = "to_hex_from_ssz_type"
+    )]
     pub aggregation_bits: BitList<MAX_VALIDATORS_PER_COMMITTEE>,
     pub data: AttestationData,
-    #[serde(deserialize_with = "from_hex_to_ssz_type", serialize_with = "to_hex_from_ssz_type")]
+    #[serde(
+        deserialize_with = "from_hex_to_ssz_type",
+        serialize_with = "to_hex_from_ssz_type"
+    )]
     pub signature: BLSSignature,
 }
 
 #[derive(Debug, Deserialize, Serialize, Encode, Decode, TreeHash, Clone)]
 pub struct SyncAggregate {
-    #[serde(deserialize_with = "from_hex_to_ssz_bits_type", serialize_with = "to_hex_from_ssz_type")]
+    #[serde(
+        deserialize_with = "from_hex_to_ssz_bits_type",
+        serialize_with = "to_hex_from_ssz_type"
+    )]
     pub sync_committee_bits: BitVector<SYNC_COMMITTEE_SIZE>,
-    #[serde(deserialize_with = "from_hex_to_ssz_type", serialize_with = "to_hex_from_ssz_type")]
+    #[serde(
+        deserialize_with = "from_hex_to_ssz_type",
+        serialize_with = "to_hex_from_ssz_type"
+    )]
     pub sync_committee_signature: BLSSignature,
 }
 
 #[derive(Debug, Deserialize, Serialize, Encode, Decode, TreeHash, Clone)]
 pub struct BeaconBlockBody {
-    #[serde(deserialize_with = "from_hex_to_ssz_type", serialize_with = "to_hex_from_ssz_type")]
+    #[serde(
+        deserialize_with = "from_hex_to_ssz_type",
+        serialize_with = "to_hex_from_ssz_type"
+    )]
     pub randao_reveal: BLSSignature,
     pub eth1_data: Eth1Data, // Eth1 data vote
     #[serde(with = "SerHex::<StrictPfx>")]
@@ -406,13 +463,19 @@ pub struct ExecutionPayload {
     // Execution block header fields
     #[serde(with = "SerHex::<StrictPfx>")]
     pub parent_hash: Root,
-    #[serde(deserialize_with = "from_hex_to_ssz_type", serialize_with = "to_hex_from_ssz_type")]
+    #[serde(
+        deserialize_with = "from_hex_to_ssz_type",
+        serialize_with = "to_hex_from_ssz_type"
+    )]
     pub fee_recipient: ExecutionAddress, // 'beneficiary' in the yellow paper
     #[serde(with = "SerHex::<StrictPfx>")]
     pub state_root: Root,
     #[serde(with = "SerHex::<StrictPfx>")]
     pub receipts_root: Root,
-    #[serde(deserialize_with = "from_hex_to_ssz_type", serialize_with = "to_hex_from_ssz_type")]
+    #[serde(
+        deserialize_with = "from_hex_to_ssz_type",
+        serialize_with = "to_hex_from_ssz_type"
+    )]
     pub logs_bloom: FixedVector<u8, BYTES_PER_LOGS_BLOOM>,
     #[serde(with = "SerHex::<StrictPfx>")]
     pub prev_randao: Root, // 'difficulty' in the yellow paper
@@ -424,10 +487,16 @@ pub struct ExecutionPayload {
     pub gas_used: u64,
     #[serde(with = "quoted_u64")]
     pub timestamp: u64,
-    #[serde(deserialize_with = "from_hex_to_ssz_type", serialize_with = "to_hex_from_ssz_type")]
+    #[serde(
+        deserialize_with = "from_hex_to_ssz_type",
+        serialize_with = "to_hex_from_ssz_type"
+    )]
     pub extra_data: VariableList<u8, MAX_EXTRA_DATA_BYTES>,
-    #[serde(deserialize_with = "from_u256_string", serialize_with = "to_u256_string")]
-    pub base_fee_per_gas: U256, 
+    #[serde(
+        deserialize_with = "from_u256_string",
+        serialize_with = "to_u256_string"
+    )]
+    pub base_fee_per_gas: U256,
     // Extra payload fields,
     #[serde(with = "SerHex::<StrictPfx>")]
     pub block_hash: Root, // Hash of execution block
@@ -438,20 +507,28 @@ pub struct ExecutionPayload {
 #[derive(Debug, Deserialize, Serialize, Encode, Decode, TreeHash, Clone)]
 pub struct BLSToExecutionChange {
     #[serde(with = "quoted_u64")]
-    pub validator_index: ValidatorIndex, 
-    #[serde(deserialize_with = "from_hex_to_ssz_type", serialize_with = "to_hex_from_ssz_type")]
-    pub from_bls_pubkey: BLSPubkey, 
-    #[serde(deserialize_with = "from_hex_to_ssz_type", serialize_with = "to_hex_from_ssz_type")]
-    pub to_execution_address: ExecutionAddress, 
+    pub validator_index: ValidatorIndex,
+    #[serde(
+        deserialize_with = "from_hex_to_ssz_type",
+        serialize_with = "to_hex_from_ssz_type"
+    )]
+    pub from_bls_pubkey: BLSPubkey,
+    #[serde(
+        deserialize_with = "from_hex_to_ssz_type",
+        serialize_with = "to_hex_from_ssz_type"
+    )]
+    pub to_execution_address: ExecutionAddress,
 }
 
 #[derive(Debug, Deserialize, Serialize, Encode, Decode, TreeHash, Clone)]
 pub struct SignedBLSToExecutionChange {
     pub message: BLSToExecutionChange,
-    #[serde(deserialize_with = "from_hex_to_ssz_type", serialize_with = "to_hex_from_ssz_type")]
+    #[serde(
+        deserialize_with = "from_hex_to_ssz_type",
+        serialize_with = "to_hex_from_ssz_type"
+    )]
     pub signature: BLSSignature,
 }
-
 
 #[derive(Debug, Deserialize, Serialize, Encode, Decode, TreeHash, Clone)]
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#beaconblock
@@ -475,7 +552,10 @@ pub struct Withdrawal {
     pub index: WithdrawalIndex,
     #[serde(with = "quoted_u64")]
     pub validator_index: ValidatorIndex,
-    #[serde(deserialize_with = "from_hex_to_ssz_type", serialize_with = "to_hex_from_ssz_type")]
+    #[serde(
+        deserialize_with = "from_hex_to_ssz_type",
+        serialize_with = "to_hex_from_ssz_type"
+    )]
     pub address: ExecutionAddress,
     #[serde(with = "quoted_u64")]
     pub amount: Gwei,
@@ -488,7 +568,10 @@ pub struct AggregateAndProof {
     #[serde(with = "quoted_u64")]
     pub aggregator_index: ValidatorIndex,
     pub aggregate: Attestation,
-    #[serde(deserialize_with = "from_hex_to_ssz_type", serialize_with = "to_hex_from_ssz_type")]
+    #[serde(
+        deserialize_with = "from_hex_to_ssz_type",
+        serialize_with = "to_hex_from_ssz_type"
+    )]
     pub selection_proof: BLSSignature,
 }
 
@@ -506,7 +589,10 @@ pub struct SyncCommitteeMessage {
     #[serde(with = "quoted_u64")]
     pub validator_index: ValidatorIndex,
     // Signature by the validator over the block root of `slot`
-    #[serde(deserialize_with = "from_hex_to_ssz_type", serialize_with = "to_hex_from_ssz_type")]
+    #[serde(
+        deserialize_with = "from_hex_to_ssz_type",
+        serialize_with = "to_hex_from_ssz_type"
+    )]
     pub signature: BLSSignature,
 }
 
@@ -525,10 +611,16 @@ pub struct SyncCommitteeContribution {
     pub subcommittee_index: u64,
     // A bit is set if a signature from the validator at the corresponding
     // index in the subcommittee is present in the aggregate `signature`.
-    #[serde(deserialize_with = "from_hex_to_ssz_bits_type", serialize_with = "to_hex_from_ssz_type")]
+    #[serde(
+        deserialize_with = "from_hex_to_ssz_bits_type",
+        serialize_with = "to_hex_from_ssz_type"
+    )]
     pub aggregation_bits: BitVector<SYNC_COMMITTEE_SIZE_BY_SYNC_COMMITTEE_SUBNET_COUNT>,
     // Signature by the validator(s) over the block root of `slot`
-    #[serde(deserialize_with = "from_hex_to_ssz_type", serialize_with = "to_hex_from_ssz_type")]
+    #[serde(
+        deserialize_with = "from_hex_to_ssz_type",
+        serialize_with = "to_hex_from_ssz_type"
+    )]
     pub signature: BLSSignature,
 }
 
@@ -539,7 +631,10 @@ pub struct ContributionAndProof {
     #[serde(with = "quoted_u64")]
     pub aggregator_index: ValidatorIndex,
     pub contribution: SyncCommitteeContribution,
-    #[serde(deserialize_with = "from_hex_to_ssz_type", serialize_with = "to_hex_from_ssz_type")]
+    #[serde(
+        deserialize_with = "from_hex_to_ssz_type",
+        serialize_with = "to_hex_from_ssz_type"
+    )]
     pub selection_proof: BLSSignature,
 }
 
@@ -561,6 +656,7 @@ pub struct AggregationSlot {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+#[allow(non_snake_case)]
 pub struct BlockRequest {
     pub fork_info: ForkInfo,
     #[serde(default)]
@@ -572,6 +668,7 @@ pub struct BlockRequest {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+#[allow(non_snake_case)]
 pub struct BlockV2Request {
     pub fork_info: ForkInfo,
     #[serde(default)]
@@ -589,6 +686,7 @@ pub struct BlockV2RequestWrapper {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+#[allow(non_snake_case)]
 pub struct AttestationRequest {
     pub fork_info: ForkInfo,
     #[serde(default)]
@@ -600,6 +698,7 @@ pub struct AttestationRequest {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+#[allow(non_snake_case)]
 pub struct RandaoRevealRequest {
     pub fork_info: ForkInfo,
     #[serde(default)]
@@ -611,6 +710,7 @@ pub struct RandaoRevealRequest {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+#[allow(non_snake_case)]
 pub struct AggregateAndProofRequest {
     pub fork_info: ForkInfo,
     #[serde(default)]
@@ -622,6 +722,7 @@ pub struct AggregateAndProofRequest {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+#[allow(non_snake_case)]
 pub struct AggregationSlotRequest {
     pub fork_info: ForkInfo,
     #[serde(default)]
@@ -633,6 +734,7 @@ pub struct AggregationSlotRequest {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+#[allow(non_snake_case)]
 pub struct DepositRequest {
     #[serde(default)]
     #[serde(deserialize_with = "de_signing_root")]
@@ -656,6 +758,7 @@ pub struct DepositResponse {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+#[allow(non_snake_case)]
 pub struct VoluntaryExitRequest {
     pub fork_info: ForkInfo,
     #[serde(default)]
@@ -667,6 +770,7 @@ pub struct VoluntaryExitRequest {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+#[allow(non_snake_case)]
 pub struct SyncCommitteeMessageRequest {
     pub fork_info: ForkInfo,
     #[serde(default)]
@@ -693,6 +797,7 @@ pub struct SyncCommitteeMessageRequestWrapper {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+#[allow(non_snake_case)]
 pub struct SyncCommitteeSelectionProofRequest {
     pub fork_info: ForkInfo,
     #[serde(default)]
@@ -704,6 +809,7 @@ pub struct SyncCommitteeSelectionProofRequest {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+#[allow(non_snake_case)]
 pub struct SyncCommitteeContributionAndProofRequest {
     pub fork_info: ForkInfo,
     #[serde(default)]
@@ -715,6 +821,7 @@ pub struct SyncCommitteeContributionAndProofRequest {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+#[allow(non_snake_case)]
 pub struct ValidatorRegistrationRequest {
     #[serde(default)]
     #[serde(deserialize_with = "de_signing_root")]

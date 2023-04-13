@@ -214,7 +214,7 @@ mod tests {
 
     #[test]
     fn test_eth_pk_from_hex() {
-        let (secret_key, public_key) = new_eth_key().unwrap();
+        let (_secret_key, public_key) = new_eth_key().unwrap();
 
         let public_key_hex = eth_pk_to_hex(&public_key);
         let recovered_public_key = eth_pk_from_hex(&public_key_hex.clone()).unwrap();

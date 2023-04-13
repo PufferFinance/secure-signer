@@ -38,7 +38,7 @@ pub async fn make_eth_keygen_request(port: Option<u16>) -> (StatusCode, Result<K
         Some(p) => {
             let resp = match request_eth_keygen_route(p).await {
                 Ok(resp) => resp,
-                Err(e) => panic!("Failed request_eth_keygen_route"),
+                Err(_) => panic!("Failed request_eth_keygen_route"),
             };
             dbg!(&resp);
             let status = resp.status();
@@ -69,7 +69,7 @@ pub async fn register_new_eth_key(port: Option<u16>) -> KeyGenResponse {
 async fn test_register_new_eth_key() {
     let port = read_secure_signer_port();
     let resp = register_new_eth_key(port).await;
-    let pk = eth_keys::eth_pk_from_hex(&resp.pk_hex).unwrap();
+    let _pk = eth_keys::eth_pk_from_hex(&resp.pk_hex).unwrap();
     dbg!(resp.pk_hex);
 }
 

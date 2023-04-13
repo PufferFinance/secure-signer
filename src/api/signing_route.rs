@@ -6,9 +6,8 @@ use crate::eth2::eth_types::*;
 use crate::eth2::slash_protection::{
     SignedAttestationEpochs, SignedBlockSlot, SlashingProtectionData,
 };
-use crate::strip_0x_prefix;
 use anyhow::{bail, Result};
-use log::{debug, error, info};
+use log::{error, info};
 use warp::{http::StatusCode, Filter, Rejection, Reply};
 
 /// BLS signs a valid Eth2 message if it is not slashable

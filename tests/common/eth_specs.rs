@@ -1,9 +1,9 @@
 use puffersecuresigner::eth2::eth_signing::BLSSignMsg;
 use puffersecuresigner::{eth2::eth_types::*, strip_0x_prefix};
 
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use snap::raw::Decoder;
-use ssz::{Decode, Encode};
+use ssz::Decode;
 use tree_hash::TreeHash;
 
 use anyhow::{bail, Context, Result};
