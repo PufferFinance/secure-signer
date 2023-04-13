@@ -9,7 +9,7 @@ use anyhow::{Context, Result};
 use reqwest::{Client, Response, StatusCode};
 use serde_json;
 
-pub async fn mock_puffer_list_eth_keys_route() -> warp::http::Response<bytes::Bytes> {
+pub async fn mock_list_eth_keys_route() -> warp::http::Response<bytes::Bytes> {
     let filter = list_eth_keys_route();
     let res = warp::test::request()
         .method("GET")
@@ -19,7 +19,7 @@ pub async fn mock_puffer_list_eth_keys_route() -> warp::http::Response<bytes::By
     res
 }
 
-pub async fn request_puffer_list_eth_keys_route(port: u16) -> Result<Response, reqwest::Error> {
+pub async fn request_list_eth_keys_route(port: u16) -> Result<Response, reqwest::Error> {
     let client = Client::new();
     let url = format!("http://localhost:{}/eth/v1/keygen/secp256k1", port);
     let response = client
@@ -30,7 +30,7 @@ pub async fn request_puffer_list_eth_keys_route(port: u16) -> Result<Response, r
     response
 }
 
-pub async fn mock_puffer_list_bls_keys_route() -> warp::http::Response<bytes::Bytes> {
+pub async fn mock_list_bls_keys_route() -> warp::http::Response<bytes::Bytes> {
     let filter = list_bls_keys_route();
     let res = warp::test::request()
         .method("GET")
@@ -40,7 +40,7 @@ pub async fn mock_puffer_list_bls_keys_route() -> warp::http::Response<bytes::By
     res
 }
 
-pub async fn request_puffer_list_bls_keys_route(port: u16) -> Result<Response, reqwest::Error> {
+pub async fn request_list_bls_keys_route(port: u16) -> Result<Response, reqwest::Error> {
     let client = Client::new();
     let url = format!("http://localhost:{}/eth/v1/keystores", port);
     let response = client
@@ -60,12 +60,12 @@ pub async fn make_list_request(
     port: Option<u16>,
 ) -> (StatusCode, Result<ListKeysResponse>) {
     match port {
-        // Make the actual http req to a running Secure-Aggregator instance
+        // Make the actual http req to a running Secure-Signer instance
         Some(p) => match t {
             ListRequestKind::BLS => {
-                let resp = match request_puffer_list_bls_keys_route(p).await {
+                let resp = match request_list_bls_keys_route(p).await {
                     Ok(resp) => resp,
-                    Err(_) => panic!("Failed request_puffer_list_bls_keys_route"),
+                    Err(_) => panic!("Failed request_list_bls_keys_route"),
                 };
                 dbg!(&resp);
                 let status = resp.status();
@@ -77,9 +77,9 @@ pub async fn make_list_request(
             }
             ListRequestKind::ETH => {
                 dbg!("asdfasfasdf");
-                let resp = match request_puffer_list_eth_keys_route(p).await {
+                let resp = match request_list_eth_keys_route(p).await {
                     Ok(resp) => resp,
-                    Err(_) => panic!("Failed request_puffer_list_eth_keys_route"),
+                    Err(_) => panic!("Failed request_list_eth_keys_route"),
                 };
                 dbg!(&resp);
 
@@ -95,14 +95,14 @@ pub async fn make_list_request(
         // Mock an http request
         None => match t {
             ListRequestKind::BLS => {
-                let resp = mock_puffer_list_bls_keys_route().await;
+                let resp = mock_list_bls_keys_route().await;
                 dbg!(&resp);
                 let keys: Result<ListKeysResponse> = serde_json::from_slice(resp.body())
                 .with_context(|| "Failed to parse to ListKeysResponse");
                 (resp.status().into(), keys)
             }
             ListRequestKind::ETH => {
-                let resp = mock_puffer_list_eth_keys_route().await;
+                let resp = mock_list_eth_keys_route().await;
                 dbg!(&resp);
                 let keys: Result<ListKeysResponse> = serde_json::from_slice(resp.body())
                 .with_context(|| "Failed to parse to ListKeysResponse");
@@ -113,7 +113,7 @@ pub async fn make_list_request(
 }
 
 
-/// Verifies the supplied bls_pk_hex is one of the returned keys when querying the Secure-Aggregator's known bls keys
+/// Verifies the supplied bls_pk_hex is one of the returned keys when querying the Secure-Signer's known bls keys
 pub async fn bls_key_exists(bls_pk_hex: &str, port: Option<u16>) -> bool {
     let bls_pk_hex: String = strip_0x_prefix!(bls_pk_hex);
     let (status, keys) = make_list_request(ListRequestKind::BLS, port).await;
@@ -126,7 +126,7 @@ pub async fn bls_key_exists(bls_pk_hex: &str, port: Option<u16>) -> bool {
     })
 }
 
-/// Verifies the supplied eth_pk_hex is one of the returned keys when querying the Secure-Aggregator's known eth keys
+/// Verifies the supplied eth_pk_hex is one of the returned keys when querying the Secure-Signer's known eth keys
 pub async fn eth_key_exists(eth_pk_hex: &str, port: Option<u16>) -> bool {
     let eth_pk_hex: String = strip_0x_prefix!(eth_pk_hex);
     let (status, keys) = make_list_request(ListRequestKind::ETH, port).await;

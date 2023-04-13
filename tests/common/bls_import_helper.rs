@@ -161,8 +161,6 @@ pub async fn import_bls_key_with_slash_protection(
     slashing_protection.write().unwrap();
     db.data.push(slashing_protection);
 
-    dbg!("here");
-
     // serialize to string
     let sp = Some(serde_json::to_string(&db).unwrap());
 
