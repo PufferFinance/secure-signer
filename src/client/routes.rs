@@ -1,5 +1,5 @@
-use anyhow::{bail, Context, Result};
 use puffersecuresigner::api::{KeyGenResponse, getter_routes::ListKeysResponse, helpers::SignatureResponse, KeyImportResponse};
+use anyhow::{bail, Context, Result};
 use reqwest::{Client, Response, StatusCode};
 use serde::{Deserialize, de::DeserializeOwned};
 use std::path::PathBuf;
@@ -19,7 +19,7 @@ impl RouteType {
             RouteType::Upcheck => "/upcheck",
             RouteType::BlsSign => "/api/v1/eth2/sign",
             RouteType::BlsKeygen => "/eth/v1/keygen/bls",
-            RouteType::BlsKeyImport => "/api/v1/keystores",
+            RouteType::BlsKeyImport => "/eth/v1/keystores",
             RouteType::ListBlsKeys => "/eth/v1/keystores",
             RouteType::EthKeygen => "/eth/v1/keygen/secp256k1",
             RouteType::ListEthKeys => "/eth/v1/keygen/secp256k1",
@@ -104,7 +104,7 @@ pub async fn is_alive(port: u16) -> Result<()> {
 }
 
 pub async fn bls_sign(port: u16, json: &String) -> Result<SignatureResponse> {
-    is_alive(port)?;
+    is_alive(port).await?;
     let url = build_req_url(port, RouteType::BlsSign, None)?;
     let (status, resp) = post::<SignatureResponse>(&url, Some(json)).await?;
     if status != 200 {
@@ -114,7 +114,7 @@ pub async fn bls_sign(port: u16, json: &String) -> Result<SignatureResponse> {
 }
 
 pub async fn bls_key_import(port: u16, json: &String) -> Result<KeyImportResponse> {
-    is_alive(port)?;
+    is_alive(port).await?;
     let url = build_req_url(port, RouteType::BlsKeyImport, None)?;
     let (status, resp) = post::<KeyImportResponse>(&url, Some(json)).await?;
     if status != 200 {
@@ -124,7 +124,7 @@ pub async fn bls_key_import(port: u16, json: &String) -> Result<KeyImportRespons
 }
 
 pub async fn bls_keygen(port: u16) -> Result<KeyGenResponse> {
-    is_alive(port)?;
+    is_alive(port).await?;
     let url = build_req_url(port, RouteType::BlsKeygen, None)?;
     let (status, resp) = post::<KeyGenResponse>(&url, None).await?;
     if status != 200 {
@@ -134,7 +134,7 @@ pub async fn bls_keygen(port: u16) -> Result<KeyGenResponse> {
 }
 
 pub async fn eth_keygen(port: u16) -> Result<KeyGenResponse> {
-    is_alive(port)?;
+    is_alive(port).await?;
     let url = build_req_url(port, RouteType::EthKeygen, None)?;
     let (status, resp) = post::<KeyGenResponse>(&url, None).await?;
     if status != 200 {
@@ -144,7 +144,7 @@ pub async fn eth_keygen(port: u16) -> Result<KeyGenResponse> {
 }
 
 pub async fn list_eth_keys(port: u16) -> Result<ListKeysResponse> {
-    is_alive(port)?;
+    is_alive(port).await?;
     let url = build_req_url(port, RouteType::ListEthKeys, None)?;
     let (status, resp) = get_json::<ListKeysResponse>(&url).await?;
     if status != 200 {
@@ -154,7 +154,7 @@ pub async fn list_eth_keys(port: u16) -> Result<ListKeysResponse> {
 }
 
 pub async fn list_bls_keys(port: u16) -> Result<ListKeysResponse> {
-    is_alive(port)?;
+    is_alive(port).await?;
     let url = build_req_url(port, RouteType::ListBlsKeys, None)?;
     let (status, resp) = get_json::<ListKeysResponse>(&url).await?;
     if status != 200 {

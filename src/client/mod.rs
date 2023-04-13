@@ -1,4 +1,5 @@
 mod routes;
+mod bls_import;
 
 
 #[tokio::main]

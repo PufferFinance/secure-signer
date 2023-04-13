@@ -4,7 +4,7 @@ use crate::constants::BLS_PRIV_KEY_BYTES;
 use crate::crypto::bls_keys;
 use crate::eth2::slash_protection::{SlashingProtectionData, SlashingProtectionDB};
 use crate::crypto::{eth_keys, keystore::import_keystore};
-use anyhow::{Result, bail};
+use anyhow::{Result, bail, Context};
 use blsttc::SecretKeySet;
 use log::{info, error};
 use ssz::Encode;
@@ -47,8 +47,7 @@ pub fn decrypt_and_save_imported_bls_key(req: &KeyImportRequest) -> Result<Strin
             db.write()?;
         },
         Some(sp) => {
-            // Verify the supplied slash protection matches the pk
-            let db: SlashingProtectionDB = serde_json::from_str(sp)?;
+            let db: SlashingProtectionDB = SlashingProtectionDB::from_str(sp).with_context(|| "Failed to deserialize SlashProtectionDB")?;
             // KNOWN LIMITATION: Only support one keystore
             match db.data.first() {
                 None => {
@@ -57,6 +56,7 @@ pub fn decrypt_and_save_imported_bls_key(req: &KeyImportRequest) -> Result<Strin
                     db.write()?;
                 }, 
                 Some(data) => {
+                    // Verify the supplied slash protection matches the pk
                     if hex::encode(data.pubkey.as_ssz_bytes()) == pk_hex {
                         data.write()?
                     } else {
