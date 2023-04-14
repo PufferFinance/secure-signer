@@ -1,11 +1,13 @@
 use super::routes;
 use super::NetworkConfig;
+use anyhow::Context;
 use anyhow::{bail, Result};
 use puffersecuresigner::{
     constants::BLS_PUB_KEY_BYTES,
     eth2::eth_types::{DepositMessage, DepositRequest, DepositResponse, Version},
     strip_0x_prefix,
 };
+use serde_json::Value;
 
 const DEPOSIT_AMOUNT: u64 = 32000000000;
 
@@ -74,7 +76,7 @@ pub async fn get_deposit_signature(
     Ok(resp)
 }
 
-pub fn deposit_data_payload(d: DepositResponse, config: NetworkConfig) -> String {
+pub fn deposit_data_payload(d: DepositResponse, config: NetworkConfig) -> Result<Value> {
     let pubkey = d.pubkey;
     let withdrawal_credentials = d.withdrawal_credentials;
     let amount = d.amount;
@@ -86,7 +88,7 @@ pub fn deposit_data_payload(d: DepositResponse, config: NetworkConfig) -> String
     let deposit_cli_version = config.deposit_cli_version;
 
     // Build deposit JSON that works with https://goerli.launchpad.ethereum.org/en/upload-deposit-data
-    format!(
+    let json_string = format!(
         r#"
         [{{
             "pubkey": "{pubkey}",
@@ -99,5 +101,6 @@ pub fn deposit_data_payload(d: DepositResponse, config: NetworkConfig) -> String
             "network_name": "{network_name}",
             "deposit_cli_version": "{deposit_cli_version}"
         }}]"#
-    )
+    );
+    serde_json::from_str(&json_string).with_context(|| "Failed to serialize final DepositData json")
 }

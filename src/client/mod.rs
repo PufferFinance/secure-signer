@@ -3,11 +3,12 @@ mod bls_import;
 mod deposit;
 mod withdraw;
 
-use serde::{Serialize, Deserialize};
+use serde::{Serialize, Deserialize, de::DeserializeOwned};
 use clap::Parser;
-use anyhow::{bail, Result};
+use anyhow::{bail, Result, Context};
+use log::info;
 
-use std::{path::{Path, PathBuf}, fs::{File, self}, io::BufReader};
+use std::{path::{Path, PathBuf}, fs::{File, self}, io::{BufReader, BufWriter}};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NetworkConfig {
@@ -82,9 +83,13 @@ struct Args {
 }
 
 impl Args {
-    pub fn init_out_dir() {
+    pub fn out_dir() -> PathBuf {
         let args = Args::parse();
-        let dir = Path::new(&args.outdir);
+        PathBuf::from(&args.outdir)
+    }
+
+    pub fn init_out_dir() {
+        let dir = Args::out_dir();
         if let Some(dir_str) = &dir.to_str() {
             fs::create_dir_all(dir);
         } else {
@@ -127,6 +132,14 @@ impl Args {
         let execution_addr = args.execution_addr.expect("ETH address (hex) required for withdrawal credentials");
         (validator_pk_hex, execution_addr)
     }
+
+    pub fn write_to_file<T: Serialize>(fname: &str, data: T) -> Result<()>{
+        let p = Args::out_dir().join(fname);
+        info!("Writing data to {:?}", p);
+        let file = File::create(&p)?;
+        let writer = BufWriter::new(file);
+        serde_json::to_writer_pretty(writer, &data).with_context(|| format!("Failed to write to {:?}", p))
+    }
 }
 
 
@@ -135,13 +148,14 @@ async fn main() -> Result<()> {
     Args::init_out_dir();
     let port = Args::port();
 
-    println!("- Connecting to Secure-Signer on port {}", port);
     assert!(routes::is_alive(port).await.is_ok(), "Failed to reach Secure-Signer on port: {port}");
-    println!("- Secure-Signer was reached!");
+    println!("- Connected to Secure-Signer on port {}", port);
 
     if Args::do_keygen() {
         let resp = routes::bls_keygen(port).await.unwrap();
-        // todo write to file
+        // todo verify remote attesation + mrenclave
+        info!("{:?}", resp);
+        Args::write_to_file("keygen_response", resp)?;
     }
 
     if Args::do_import() {
@@ -154,33 +168,17 @@ async fn main() -> Result<()> {
             &mrenclave
         )
         .await?;
-        dbg!(resp);
+        info!("{:?}", resp);
+        Args::write_to_file("import_response", resp)?;
     }
 
     if Args::do_deposit() {
         let (validator_pk_hex, execution_addr) = Args::get_deposit_args();
         let resp = deposit::get_deposit_signature(port, &validator_pk_hex, &execution_addr, &Args::config().fork_version).await?;
-        let deposit_data_json = deposit::deposit_data_payload(resp, Args::config());
-        dbg!(deposit_data_json);
-        // todo write to file
+        let deposit_data_json = deposit::deposit_data_payload(resp, Args::config())?;
+        info!("{:#?}", deposit_data_json);
+        Args::write_to_file("deposit_data.json", deposit_data_json)?;
     }
 
     Ok(())
 }
-
-
-    // println!("Starting Client");
-    // assert!(routes::is_alive(9001).await.is_ok());
-
-    // let resp = routes::bls_keygen(9001).await.unwrap();
-    // dbg!(resp.pk_hex);
-
-    // let resp = routes::list_bls_keys(9001).await.unwrap();
-    // dbg!(resp.data);
-
-    // let resp = routes::eth_keygen(9001).await.unwrap();
-    // dbg!(resp.pk_hex);
-
-    // let resp = routes::list_eth_keys(9001).await.unwrap();
-    // dbg!(resp.data);
-    // println!("Stopping Client");
