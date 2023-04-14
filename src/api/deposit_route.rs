@@ -2,6 +2,7 @@ use super::helpers::{error_response, success_response};
 use crate::crypto::bls_keys;
 use crate::eth2::eth_signing::*;
 use crate::eth2::eth_types::*;
+use crate::io::key_management;
 use anyhow::Result;
 use log::info;
 use ssz::Encode;
@@ -33,6 +34,14 @@ async fn sign_deposit_data(
             ));
         }
     };
+
+    if !key_management::bls_key_exists(&bls_pk_hex) {
+        return Ok(error_response(
+            &format!("This validator key does not exist"),
+            StatusCode::PRECONDITION_FAILED,
+        ))
+
+    }
 
     info!("Deposit request for validator pubkey: {bls_pk_hex}");
     info!("Request:\n{:#?}", req);

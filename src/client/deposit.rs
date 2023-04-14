@@ -24,7 +24,7 @@ fn eth_addr_to_credentials(execution_addr: &str) -> Result<String> {
 fn build_deposit_request(
     validator_pk_hex: &str,
     withdrawal_credentials: &str,
-    fork_version: &str,
+    fork_version: Version,
 ) -> Result<DepositRequest> {
     let validator_pk_hex: String = strip_0x_prefix!(validator_pk_hex);
     let pk_bytes = hex::decode(validator_pk_hex)?;
@@ -50,14 +50,10 @@ fn build_deposit_request(
         amount: DEPOSIT_AMOUNT,
     };
 
-    let fork_version: String = strip_0x_prefix!(fork_version);
-    let mut genesis_fork_version: Version = Version::default();
-    genesis_fork_version.copy_from_slice(&hex::decode(fork_version)?);
-
     let msg = DepositRequest {
         signingRoot: None,
         deposit,
-        genesis_fork_version,
+        genesis_fork_version: fork_version,
     };
 
     Ok(msg)
@@ -67,7 +63,7 @@ pub async fn get_deposit_signature(
     port: u16,
     bls_pk_hex: &str,
     execution_addr: &str,
-    fork_version: &str,
+    fork_version: Version,
 ) -> Result<DepositResponse> {
     let withdrawal_creds = eth_addr_to_credentials(execution_addr)?;
     let deposit_req = build_deposit_request(bls_pk_hex, &withdrawal_creds, fork_version)?;
@@ -84,7 +80,7 @@ pub fn deposit_data_payload(d: DepositResponse, config: NetworkConfig) -> Result
     let deposit_message_root = d.deposit_message_root;
     let deposit_data_root = d.deposit_data_root;
     let network_name = config.network_name;
-    let fork_version = config.fork_version;
+    let fork_version = hex::encode(config.fork_info.fork.current_version);
     let deposit_cli_version = config.deposit_cli_version;
 
     // Build deposit JSON that works with https://goerli.launchpad.ethereum.org/en/upload-deposit-data

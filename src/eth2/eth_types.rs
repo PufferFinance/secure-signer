@@ -112,7 +112,6 @@ where
     S: Serializer,
     T: Encode,
 {
-    // let hex_string = hex::encode(data.as_ssz_bytes());
     let hex_string = "0x".to_string() + &hex::encode(data.as_ssz_bytes());
     serializer.serialize_str(&hex_string)
 }

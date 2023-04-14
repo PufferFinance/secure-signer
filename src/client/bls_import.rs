@@ -1,4 +1,4 @@
-use std::{fs::{read_to_string, File}, path::{Path, PathBuf}, io::Write};
+use std::{fs::{read_to_string, File}, path::PathBuf, io::Write};
 
 use super::routes::{bls_key_import, eth_keygen};
 use puffersecuresigner::{

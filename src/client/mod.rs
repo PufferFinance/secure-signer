@@ -3,6 +3,7 @@ mod bls_import;
 mod deposit;
 mod withdraw;
 
+use puffersecuresigner::eth2::eth_types::ForkInfo;
 use serde::{Serialize, Deserialize, de::DeserializeOwned};
 use clap::Parser;
 use anyhow::{bail, Result, Context};
@@ -13,15 +14,14 @@ use std::{path::{Path, PathBuf}, fs::{File, self}, io::{BufReader, BufWriter}};
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NetworkConfig {
     pub network_name: String,
-    pub fork_version: String,
     pub deposit_cli_version: String,
+    pub fork_info: ForkInfo,
 }
 
 impl NetworkConfig {
     fn new(path: &String) -> Self {
-        let file = File::open(path).expect("bad config path");
-        let reader = BufReader::new(file);
-        serde_json::from_reader(reader).expect("bad deserialize config")
+        let s = fs::read_to_string(path).expect("bad network config");
+        serde_json::from_str(&s).expect("bad deserialize config")
     }
 }
 
@@ -80,6 +80,16 @@ struct Args {
     /// The path to the JSON network config file
     #[arg(short, long, default_value = "./conf/network_config.json")]
     config: String,
+
+    /// Requests Secure-Signer to sign a VoluntaryExitMesssage [requires --validator-pk-hex, --epoch, --validator-index]
+    #[arg(short, long)]
+    withdraw: bool,
+
+    #[arg(long)]
+    epoch: Option<u64>,
+
+    #[arg(long)]
+    validator_index: Option<u64>,
 }
 
 impl Args {
@@ -105,6 +115,10 @@ impl Args {
         Args::parse().port
     }
 
+    pub fn do_list() -> bool {
+        Args::parse().list
+    }
+
     pub fn do_keygen() -> bool {
         Args::parse().bls_keygen
     }
@@ -117,20 +131,37 @@ impl Args {
         Args::parse().deposit
     }
 
+    pub fn do_withdrawal() -> bool {
+        Args::parse().withdraw
+    }
+
+    pub fn get_keygen_args() -> String {
+        let args = Args::parse();
+        args.mrenclave.expect("--mrenclave expected")
+    }
+
     pub fn get_import_args() -> (PathBuf, PathBuf, Option<PathBuf>, String) {
         let args = Args::parse();
-        let keystore_path = args.keystore_path.expect("keystore path expected");
-        let password_path = args.password_path.expect("password path expected");
+        let keystore_path = args.keystore_path.expect("--keystore-path expected");
+        let password_path = args.password_path.expect("--password-path expected");
         let slashing_db_path = args.slash_protection_path;
-        let mrenclave = args.mrenclave.expect("--mrenclave missing");
+        let mrenclave = args.mrenclave.expect("--mrenclave expected");
         (keystore_path, password_path, slashing_db_path, mrenclave)
     }
 
     pub fn get_deposit_args() -> (String, String) {
         let args = Args::parse();
-        let validator_pk_hex = args.validator_pk_hex.expect("Validator public key (hex) required for DepositData");
+        let validator_pk_hex = args.validator_pk_hex.expect("--validator_pk_hex expected");
         let execution_addr = args.execution_addr.expect("ETH address (hex) required for withdrawal credentials");
         (validator_pk_hex, execution_addr)
+    }
+
+    pub fn get_withdraw_args() -> (String, u64, u64) {
+        let args = Args::parse();
+        let validator_pk_hex = args.validator_pk_hex.expect("--validator_pk_hex expected");
+        let validator_index: u64 = args.validator_index.expect("--validator-index expected");
+        let epoch: u64 = args.epoch.expect("--epoch expected");
+        (validator_pk_hex, validator_index, epoch)
     }
 
     pub fn write_to_file<T: Serialize>(fname: &str, data: T) -> Result<()>{
@@ -154,6 +185,7 @@ async fn main() -> Result<()> {
     if Args::do_keygen() {
         let resp = routes::bls_keygen(port).await.unwrap();
         // todo verify remote attesation + mrenclave
+        let mrenclave = Args::get_keygen_args();
         info!("{:?}", resp);
         Args::write_to_file("keygen_response", resp)?;
     }
@@ -174,10 +206,34 @@ async fn main() -> Result<()> {
 
     if Args::do_deposit() {
         let (validator_pk_hex, execution_addr) = Args::get_deposit_args();
-        let resp = deposit::get_deposit_signature(port, &validator_pk_hex, &execution_addr, &Args::config().fork_version).await?;
+        let resp = deposit::get_deposit_signature(port, &validator_pk_hex, &execution_addr, Args::config().fork_info.fork.current_version).await?;
         let deposit_data_json = deposit::deposit_data_payload(resp, Args::config())?;
         info!("{:#?}", deposit_data_json);
         Args::write_to_file("deposit_data.json", deposit_data_json)?;
+    }
+
+    if Args::do_withdrawal() {
+        let (validator_pk_hex, validator_index, epoch) = Args::get_withdraw_args();
+        let vem = withdraw::exit_validator(
+            port,
+            &validator_pk_hex,
+            epoch,
+            validator_index,
+            Args::config()
+        ).await?;
+        info!("{:#?}", vem);
+        Args::write_to_file("voluntary_exit_message.json", vem)?;
+        // Args::write_to_file("list_eth_keys", vem)?;
+    }
+
+    if Args::do_list() {
+        let eth_keys = routes::list_eth_keys(port).await?;
+        info!("{:?}", eth_keys);
+        Args::write_to_file("list_eth_keys", eth_keys)?;
+
+        let bls_keys = routes::list_bls_keys(port).await?;
+        info!("{:?}", bls_keys);
+        Args::write_to_file("list_bls_keys", bls_keys)?;
     }
 
     Ok(())

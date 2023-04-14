@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
+use anyhow::Result;
 use warp::{http::StatusCode, reply};
 use std::collections::HashMap;
+
+use crate::{eth2::eth_types::BLSSignature, strip_0x_prefix};
 
 pub fn success_response<T: Serialize>(payload: T) -> warp::reply::WithStatus<reply::Json> {
     reply::with_status(
@@ -25,6 +28,12 @@ impl SignatureResponse {
         SignatureResponse {
             signature: format!("0x{}", hex::encode(sig)),
         }
+    }
+
+    pub fn to_ssz_bytes(&self) -> Result<BLSSignature> {
+        let sig_stripped: String = strip_0x_prefix!(self.signature.clone());
+        let sig_bytes = hex::decode(sig_stripped)?;
+        Ok(BLSSignature::from(sig_bytes))
     }
 }
 
