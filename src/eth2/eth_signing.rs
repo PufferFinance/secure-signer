@@ -1,14 +1,11 @@
 use super::eth_types::*;
-use super::slash_protection;
-use crate::constants::ALLOW_GROWABLE_SLASH_PROTECTION_DB;
 use crate::crypto::bls_keys;
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use ssz::Encode;
 use tree_hash::TreeHash;
-
-use log::{error, info};
+use log::info;
 
 /// Return the signing root for the corresponding signing data.
 fn compute_signing_root<T: Encode + TreeHash>(ssz_object: T, domain: Domain) -> Root {
@@ -95,188 +92,6 @@ pub fn secure_sign<T: Encode + TreeHash>(
     Ok(<_>::from(sig.to_bytes().to_vec()))
 }
 
-/// Slash-protected block proposing - bail statements prevent slashable offenses (phase0).
-/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#signature
-pub fn get_block_signature(
-    pk_hex: String,
-    fork_info: ForkInfo,
-    block: BeaconBlock,
-) -> Result<BLSSignature> {
-    // read previous slot from mem
-    let mut sp = slash_protection::SlashingProtectionData::read(&pk_hex)?;
-    let previous_block_slot = sp.get_latest_signed_block_slot();
-
-    // The block slot number must be strictly increasing to prevent slashing
-    if block.slot <= previous_block_slot {
-        error!("Prevented slashable offense");
-        bail!("block.slot <= previous_block_slot")
-    }
-
-    let domain = get_domain(
-        fork_info,
-        DOMAIN_BEACON_PROPOSER,
-        Some(compute_epoch_at_slot(block.slot)),
-    );
-
-    let root: Root = compute_signing_root(block.clone(), domain.clone());
-    let b = slash_protection::SignedBlockSlot {
-        slot: block.slot,
-        signing_root: Some(root),
-    };
-    // Save the new block slot to persistent memory
-    sp.new_block(b, ALLOW_GROWABLE_SLASH_PROTECTION_DB)?;
-    sp.write()?;
-
-    secure_sign(pk_hex, block, domain)
-}
-
-/// Slash-protected block proposing - bail statements prevent slashable offenses (phase0).
-/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#signature
-pub fn get_block_v2_signature(
-    pk_hex: String,
-    fork_info: ForkInfo,
-    block_header: BeaconBlockHeader,
-) -> Result<BLSSignature> {
-    // read previous slot from mem
-    let mut sp = slash_protection::SlashingProtectionData::read(&pk_hex)?;
-    let previous_block_slot = sp.get_latest_signed_block_slot();
-
-    // The block slot number must be strictly increasing to prevent slashing
-    if block_header.slot <= previous_block_slot {
-        error!("Prevented slashable offense");
-        bail!("block_header.slot <= previous_block_slot")
-    }
-
-    let domain = get_domain(
-        fork_info,
-        DOMAIN_BEACON_PROPOSER,
-        Some(compute_epoch_at_slot(block_header.slot)),
-    );
-
-    let root: Root = compute_signing_root(block_header.clone(), domain.clone());
-    let b = slash_protection::SignedBlockSlot {
-        slot: block_header.slot,
-        signing_root: Some(root),
-    };
-    // Save the new block slot to persistent memory
-    sp.new_block(b, ALLOW_GROWABLE_SLASH_PROTECTION_DB)?;
-    sp.write()?;
-
-    secure_sign(pk_hex, block_header, domain)
-}
-
-/// Slash-protected attestations - bail statements prevent slashable offenses.
-/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#aggregate-signature
-pub fn get_attestation_signature(
-    pk_hex: String,
-    fork_info: ForkInfo,
-    attestation_data: AttestationData,
-) -> Result<BLSSignature> {
-    let mut sp = slash_protection::SlashingProtectionData::read(&pk_hex)?;
-    let (prev_src_epoch, prev_tgt_epoch) = sp.get_latest_signed_attestation_epochs();
-
-    // The attestation source epoch must be non-decreasing to prevent slashing
-    if attestation_data.source.epoch < prev_src_epoch {
-        error!("Prevented slashable offense");
-        bail!("attestation_data.source.epoch < prev_src_epoch")
-    }
-
-    // The attestation target epoch must be strictly increasing to prevent slashing
-    if attestation_data.target.epoch <= prev_tgt_epoch {
-        error!("Prevented slashable offense");
-        bail!("attestation_data.target.epoch <= prev_tgt_epoch")
-    }
-
-    // Sign the Attestation
-    let domain = get_domain(
-        fork_info,
-        DOMAIN_BEACON_ATTESTER,
-        Some(attestation_data.target.epoch),
-    );
-
-    let root: Root = compute_signing_root(attestation_data.clone(), domain.clone());
-    let a = slash_protection::SignedAttestationEpochs {
-        source_epoch: attestation_data.source.epoch,
-        target_epoch: attestation_data.target.epoch,
-        signing_root: Some(root),
-    };
-    // Save the new attestation data to persistent memory
-    sp.new_attestation(a, ALLOW_GROWABLE_SLASH_PROTECTION_DB)?;
-    sp.write()?;
-
-    secure_sign(pk_hex, attestation_data, domain)
-}
-
-/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#randao-reveal
-pub fn get_epoch_signature(
-    pk_hex: String,
-    fork_info: ForkInfo,
-    epoch: Epoch,
-) -> Result<BLSSignature> {
-    let domain = get_domain(fork_info, DOMAIN_RANDAO, Some(epoch));
-    secure_sign(pk_hex, epoch, domain)
-}
-
-/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#attestation-aggregation
-/// Modified to adhere to https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing
-pub fn get_slot_signature(pk_hex: String, fork_info: ForkInfo, slot: Slot) -> Result<BLSSignature> {
-    let epoch = compute_epoch_at_slot(slot);
-    let domain = get_domain(fork_info, DOMAIN_SELECTION_PROOF, Some(epoch));
-    secure_sign(pk_hex, slot, domain)
-}
-
-/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#broadcast-aggregate
-/// Modified to adhere to https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing
-pub fn get_aggregate_and_proof(
-    pk_hex: String,
-    fork_info: ForkInfo,
-    aggregate_and_proof: AggregateAndProof,
-) -> Result<BLSSignature> {
-    let epoch = compute_epoch_at_slot(aggregate_and_proof.aggregate.data.slot);
-    let domain = get_domain(fork_info, DOMAIN_AGGREGATE_AND_PROOF, Some(epoch));
-    secure_sign(pk_hex, aggregate_and_proof, domain)
-}
-
-/// https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#sync-committee-messages
-/// Modified to adhere to https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing
-pub fn get_sync_committee_message(
-    pk_hex: String,
-    fork_info: ForkInfo,
-    sync_committee_message: SyncCommitteeMessage,
-) -> Result<BLSSignature> {
-    let epoch = compute_epoch_at_slot(sync_committee_message.slot);
-    let domain = get_domain(fork_info, DOMAIN_SYNC_COMMITTEE, Some(epoch));
-    secure_sign(pk_hex, sync_committee_message.beacon_block_root, domain)
-}
-
-/// https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#aggregation-selection
-/// Modified to adhere to https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing
-pub fn get_sync_committee_selection_proof(
-    pk_hex: String,
-    fork_info: ForkInfo,
-    sync_aggregator_selection_data: SyncAggregatorSelectionData,
-) -> Result<BLSSignature> {
-    let epoch = compute_epoch_at_slot(sync_aggregator_selection_data.slot);
-    let domain = get_domain(
-        fork_info,
-        DOMAIN_SYNC_COMMITTEE_SELECTION_PROOF,
-        Some(epoch),
-    );
-    secure_sign(pk_hex, sync_aggregator_selection_data, domain)
-}
-
-/// https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#broadcast-sync-committee-contribution
-/// Modified to adhere to https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing
-pub fn get_contribution_and_proof_signature(
-    pk_hex: String,
-    fork_info: ForkInfo,
-    contribution_and_proof: ContributionAndProof,
-) -> Result<BLSSignature> {
-    let epoch = compute_epoch_at_slot(contribution_and_proof.contribution.slot);
-    let domain = get_domain(fork_info, DOMAIN_CONTRIBUTION_AND_PROOF, Some(epoch));
-    secure_sign(pk_hex, contribution_and_proof, domain)
-}
-
 /// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#submit-deposit
 /// Modified to adhere to https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing
 pub fn get_deposit_signature(
@@ -308,17 +123,6 @@ pub fn get_deposit_signature(
     };
 
     Ok(dr)
-}
-
-/// https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#voluntary-exits
-/// Modified to adhere to https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing
-pub fn get_voluntary_exit_signature(
-    pk_hex: String,
-    fork_info: ForkInfo,
-    voluntary_exit: VoluntaryExit,
-) -> Result<BLSSignature> {
-    let domain = get_domain(fork_info, DOMAIN_VOLUNTARY_EXIT, Some(voluntary_exit.epoch));
-    secure_sign(pk_hex, voluntary_exit, domain)
 }
 
 /// https://github.com/ethereum/builder-specs/blob/main/specs/builder.md#signing

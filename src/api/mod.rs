@@ -3,6 +3,7 @@ pub mod signing_route;
 pub mod bls_keygen_route;
 pub mod eth_keygen_route;
 pub mod bls_import_route;
+pub mod deposit_route;
 pub mod getter_routes;
 
 use crate::{crypto::eth_keys, io::remote_attestation::AttestationEvidence, strip_0x_prefix};

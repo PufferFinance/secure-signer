@@ -44,7 +44,10 @@ pub async fn run(port: u16) {
         .or(api::eth_keygen_route::eth_keygen_route())
 
         // Endpoint to list the pks of all the generated ETH keys
-        .or(api::getter_routes::list_eth_keys_route());
+        .or(api::getter_routes::list_eth_keys_route())
+
+        // Endpoint to sign DepositData message for registering validator on beacon chain
+        .or(api::deposit_route::validator_deposit_route());
 
     warp::serve(routes).run(([127, 0, 0, 1], port)).await;
 }

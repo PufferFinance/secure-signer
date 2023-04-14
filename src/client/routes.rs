@@ -1,7 +1,7 @@
-use puffersecuresigner::api::{KeyGenResponse, getter_routes::ListKeysResponse, helpers::SignatureResponse, KeyImportResponse};
+use puffersecuresigner::{api::{KeyGenResponse, getter_routes::ListKeysResponse, helpers::SignatureResponse, KeyImportResponse}, eth2::eth_types::DepositResponse};
 use anyhow::{bail, Context, Result};
 use reqwest::{Client, Response, StatusCode};
-use serde::{Deserialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned};
 use std::path::PathBuf;
 pub enum RouteType {
     Upcheck,
@@ -11,6 +11,7 @@ pub enum RouteType {
     EthKeygen,
     ListEthKeys,
     ListBlsKeys,
+    Deposit,
 }
 
 impl RouteType {
@@ -23,6 +24,7 @@ impl RouteType {
             RouteType::ListBlsKeys => "/eth/v1/keystores",
             RouteType::EthKeygen => "/eth/v1/keygen/secp256k1",
             RouteType::ListEthKeys => "/eth/v1/keygen/secp256k1",
+            RouteType::Deposit => "/api/v1/eth2/deposit",
         }
     }
 }
@@ -103,12 +105,22 @@ pub async fn is_alive(port: u16) -> Result<()> {
     }
 }
 
-pub async fn bls_sign(port: u16, json: &String) -> Result<SignatureResponse> {
+pub async fn bls_sign(port: u16, json: &String, pk_hex: &String) -> Result<SignatureResponse> {
     is_alive(port).await?;
-    let url = build_req_url(port, RouteType::BlsSign, None)?;
+    let url = build_req_url(port, RouteType::BlsSign, Some(pk_hex))?;
     let (status, resp) = post::<SignatureResponse>(&url, Some(json)).await?;
     if status != 200 {
-        bail!("bls_keygen_route received {status} response")
+        bail!("bls_sign_route received {status} response")
+    }
+    resp
+}
+
+pub async fn deposit(port: u16, json: &String) -> Result<DepositResponse> {
+    is_alive(port).await?;
+    let url = build_req_url(port, RouteType::Deposit, None)?;
+    let (status, resp) = post::<DepositResponse>(&url, Some(json)).await?;
+    if status != 200 {
+        bail!("deposit received {status} response")
     }
     resp
 }
@@ -118,7 +130,7 @@ pub async fn bls_key_import(port: u16, json: &String) -> Result<KeyImportRespons
     let url = build_req_url(port, RouteType::BlsKeyImport, None)?;
     let (status, resp) = post::<KeyImportResponse>(&url, Some(json)).await?;
     if status != 200 {
-        bail!("bls_keygen_route received {status} response")
+        bail!("bls_key_import_route received {status} response")
     }
     resp
 }
@@ -158,7 +170,7 @@ pub async fn list_bls_keys(port: u16) -> Result<ListKeysResponse> {
     let url = build_req_url(port, RouteType::ListBlsKeys, None)?;
     let (status, resp) = get_json::<ListKeysResponse>(&url).await?;
     if status != 200 {
-        bail!("list_eth_keys_route received {status} response")
+        bail!("list_bls_keys_route received {status} response")
     }
     resp
 }
