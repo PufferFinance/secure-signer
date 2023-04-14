@@ -1,6 +1,7 @@
 mod routes;
 mod bls_import;
 mod deposit;
+mod withdraw;
 
 use serde::{Serialize, Deserialize};
 use clap::Parser;
@@ -43,19 +44,23 @@ struct Args {
     #[arg(short, long)]
     list: bool,
 
-    /// The path to a BLS keystore [requires --password, --mrenclave]
-    #[arg(long)]
-    import: Option<String>,
+    /// Requests Secure-Signer to import a keystore [requires --mrenclave, --keystore-path, --password-path]
+    #[arg(short, long)]
+    import: bool,
 
     /// The password to the keystore
     #[arg(long)]
-    password: Option<String>,
+    keystore_path: Option<PathBuf>,
 
-    /// The path to EIP-3076 .JSON
+    /// The password to the keystore
     #[arg(long)]
-    slash_protection_path: Option<String>,
+    password_path: Option<PathBuf>,
 
-    /// Request Secure-Signer to generate a DepositData [requires validator-pk-hex, --withdrawal-addr]
+    /// The path to EIP-3076 .JSON to import with the keystore
+    #[arg(long)]
+    slash_protection_path: Option<PathBuf>,
+
+    /// Request Secure-Signer to generate a DepositData [requires validator-pk-hex, --execution-addr]
     #[arg(short, long)]
     deposit: bool,
 
@@ -74,51 +79,90 @@ struct Args {
     /// The path to the JSON network config file
     #[arg(short, long, default_value = "./conf/network_config.json")]
     config: String,
-
-    /// Locally generates a BLS keystore with the supplied name [requires --password]
-    #[arg(short, long)]
-    new_local_bls: Option<String>,
 }
 
-// impl Args {
-//     pub fn init(&self) -> NetworkConfig {
-//         let args = Args::parse();
-//         let config = NetworkConfig::new(&args.config); 
-//         (args, config)
-//     }
-// }
+impl Args {
+    pub fn init_out_dir() {
+        let args = Args::parse();
+        let dir = Path::new(&args.outdir);
+        if let Some(dir_str) = &dir.to_str() {
+            fs::create_dir_all(dir);
+        } else {
+            panic!("Failed to create {:?}", dir);
+        }
+    }
+
+    pub fn config() -> NetworkConfig {
+        NetworkConfig::new(&Args::parse().config)
+    }
+    
+    pub fn port() -> u16 {
+        Args::parse().port
+    }
+
+    pub fn do_keygen() -> bool {
+        Args::parse().bls_keygen
+    }
+
+    pub fn do_import() -> bool {
+        Args::parse().import
+    }
+
+    pub fn do_deposit() -> bool {
+        Args::parse().deposit
+    }
+
+    pub fn get_import_args() -> (PathBuf, PathBuf, Option<PathBuf>, String) {
+        let args = Args::parse();
+        let keystore_path = args.keystore_path.expect("keystore path expected");
+        let password_path = args.password_path.expect("password path expected");
+        let slashing_db_path = args.slash_protection_path;
+        let mrenclave = args.mrenclave.expect("--mrenclave missing");
+        (keystore_path, password_path, slashing_db_path, mrenclave)
+    }
+
+    pub fn get_deposit_args() -> (String, String) {
+        let args = Args::parse();
+        let validator_pk_hex = args.validator_pk_hex.expect("Validator public key (hex) required for DepositData");
+        let execution_addr = args.execution_addr.expect("ETH address (hex) required for withdrawal credentials");
+        (validator_pk_hex, execution_addr)
+    }
+}
 
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let args = Args::parse();
-    let dir = Path::new(&args.outdir);
-    let dir_str = &dir.to_str().unwrap();
-    fs::create_dir_all(dir);
+    Args::init_out_dir();
+    let port = Args::port();
 
-    let config = NetworkConfig::new(&args.config); 
-
-    let port = args.port;
     println!("- Connecting to Secure-Signer on port {}", port);
     assert!(routes::is_alive(port).await.is_ok(), "Failed to reach Secure-Signer on port: {port}");
     println!("- Secure-Signer was reached!");
 
-    // ------- for generating BLS key in SS -------
-    if args.bls_keygen {
+    if Args::do_keygen() {
+        let resp = routes::bls_keygen(port).await.unwrap();
         // todo write to file
     }
 
-    // ------- for importing BLS key into SS -------
-    if args.import.is_some() {
-
+    if Args::do_import() {
+        let (keystore_path, password_path, slashing_db_path, mrenclave) =  Args::get_import_args(); 
+        let resp = bls_import::import_from_files(
+            port,
+            keystore_path,
+            password_path,
+            slashing_db_path,
+            &mrenclave
+        )
+        .await?;
+        dbg!(resp);
     }
 
-    if args.deposit {
-        let validator_pk_hex = args.validator_pk_hex.expect("Validator public key (hex) required for DepositData");
-        let execution_addr = args.execution_addr.expect("ETH address (hex) required for withdrawal credentials");
-        let resp = deposit::get_deposit_signature(port, &validator_pk_hex, &execution_addr, &config.fork_version).await?;
-        let deposit_data_json = deposit::deposit_data_payload(resp, config.clone());
+    if Args::do_deposit() {
+        let (validator_pk_hex, execution_addr) = Args::get_deposit_args();
+        let resp = deposit::get_deposit_signature(port, &validator_pk_hex, &execution_addr, &Args::config().fork_version).await?;
+        let deposit_data_json = deposit::deposit_data_payload(resp, Args::config());
         dbg!(deposit_data_json);
+        // todo write to file
     }
 
     Ok(())

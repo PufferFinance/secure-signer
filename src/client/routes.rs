@@ -110,7 +110,7 @@ pub async fn bls_sign(port: u16, json: &String, pk_hex: &String) -> Result<Signa
     let url = build_req_url(port, RouteType::BlsSign, Some(pk_hex))?;
     let (status, resp) = post::<SignatureResponse>(&url, Some(json)).await?;
     if status != 200 {
-        bail!("bls_sign_route received {status} response")
+        bail!("bls_sign_route received {status} response: {:?}", resp)
     }
     resp
 }
@@ -120,7 +120,7 @@ pub async fn deposit(port: u16, json: &String) -> Result<DepositResponse> {
     let url = build_req_url(port, RouteType::Deposit, None)?;
     let (status, resp) = post::<DepositResponse>(&url, Some(json)).await?;
     if status != 200 {
-        bail!("deposit received {status} response")
+        bail!("deposit received {status} response: {:?}", resp)
     }
     resp
 }
@@ -130,7 +130,7 @@ pub async fn bls_key_import(port: u16, json: &String) -> Result<KeyImportRespons
     let url = build_req_url(port, RouteType::BlsKeyImport, None)?;
     let (status, resp) = post::<KeyImportResponse>(&url, Some(json)).await?;
     if status != 200 {
-        bail!("bls_key_import_route received {status} response")
+        bail!("bls_key_import_route received {status} response: {:?}", resp)
     }
     resp
 }
@@ -140,7 +140,7 @@ pub async fn bls_keygen(port: u16) -> Result<KeyGenResponse> {
     let url = build_req_url(port, RouteType::BlsKeygen, None)?;
     let (status, resp) = post::<KeyGenResponse>(&url, None).await?;
     if status != 200 {
-        bail!("bls_keygen_route received {status} response")
+        bail!("bls_keygen_route received {status} response: {:?}", resp)
     }
     resp
 }
@@ -150,7 +150,7 @@ pub async fn eth_keygen(port: u16) -> Result<KeyGenResponse> {
     let url = build_req_url(port, RouteType::EthKeygen, None)?;
     let (status, resp) = post::<KeyGenResponse>(&url, None).await?;
     if status != 200 {
-        bail!("eth_keygen_route received {status} response")
+        bail!("eth_keygen_route received {status} response: {:?}", resp)
     }
     resp
 }
@@ -160,7 +160,7 @@ pub async fn list_eth_keys(port: u16) -> Result<ListKeysResponse> {
     let url = build_req_url(port, RouteType::ListEthKeys, None)?;
     let (status, resp) = get_json::<ListKeysResponse>(&url).await?;
     if status != 200 {
-        bail!("list_eth_keys_route received {status} response")
+        bail!("list_eth_keys_route received {status} response: {:?}", resp)
     }
     resp
 }
@@ -170,7 +170,7 @@ pub async fn list_bls_keys(port: u16) -> Result<ListKeysResponse> {
     let url = build_req_url(port, RouteType::ListBlsKeys, None)?;
     let (status, resp) = get_json::<ListKeysResponse>(&url).await?;
     if status != 200 {
-        bail!("list_bls_keys_route received {status} response")
+        bail!("list_bls_keys_route received {status} response: {:?}", resp)
     }
     resp
 }

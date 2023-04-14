@@ -1,4 +1,4 @@
-use std::{fs::{read_to_string, File}, path::Path, io::Write};
+use std::{fs::{read_to_string, File}, path::{Path, PathBuf}, io::Write};
 
 use super::routes::{bls_key_import, eth_keygen};
 use puffersecuresigner::{
@@ -9,6 +9,7 @@ use puffersecuresigner::{
 
 use anyhow::{bail, Context, Result};
 use ecies::PublicKey as EthPublicKey;
+use log::info;
 
 fn validate_eth_ra(resp: KeyGenResponse) -> Result<EthPublicKey> {
     // Verify the report is valid
@@ -36,18 +37,19 @@ fn encrypt_password(password: &String, encrypting_pk: &EthPublicKey) -> Result<S
 
 pub async fn import_from_files(
     port: u16,
-    keystore_file: &Path,
-    password_file: &Path,
-    slash_protection_file: Option<&Path>,
+    keystore_file: PathBuf,
+    password_file: PathBuf,
+    slash_protection_file: Option<PathBuf>,
+    mrenclave: &str,
 ) -> Result<KeyImportResponse> {
     // Read keystore file
-    let keystore = read_to_string(keystore_file)
+    let keystore = read_to_string(keystore_file.clone())
         .with_context(|| format!("Failed to read keystore file: {:?}", keystore_file))?;
 
     // Read slash_protection file
     let slashing_protection = match slash_protection_file {
         Some(path) => {
-            let content = read_to_string(path)
+            let content = read_to_string(path.clone())
                 .with_context(|| format!("Failed to read slash protection file: {:?}", path))?;
             Some(content)
         }
@@ -55,7 +57,7 @@ pub async fn import_from_files(
     };
 
     // Read password file
-    let password = read_to_string(password_file)
+    let password = read_to_string(password_file.clone())
         .with_context(|| format!("Failed to read password file: {:?}", password_file))?;
 
     // Request a new ETH key + remote attestation
@@ -65,6 +67,8 @@ pub async fn import_from_files(
     // let enclave_eth_pk = validate_eth_ra(resp)?; // todo only should run if we know we are talking to sgx
     let enclave_eth_pk = eth_keys::eth_pk_from_hex(&resp.pk_hex)?;
     let encrypting_pk_hex = eth_keys::eth_pk_to_hex(&enclave_eth_pk);
+    info!("Using enclave generated eth pk to encrypt password: {encrypting_pk_hex}");
+    // todo compare to mrenclave
 
     // Encrypt the password
     let ct_password_hex = encrypt_password(&password, &enclave_eth_pk)?;
@@ -170,11 +174,13 @@ async fn dummy_import() {
     write!(slashing_protection_file, "{}", slashing_protection).unwrap();
 
     let port = 9001;
+    let mrenclave = "9756111746cf7549c9f8c3ca180a29674196fe1300865b47936c5b71fc0a3b94";
     let result = import_from_files(
         port,
-        &keystore_path,
-        &password_path,
-        Some(&slashing_protection_path),
+        keystore_path.clone(),
+        password_path.clone(),
+        Some(slashing_protection_path.clone()),
+        mrenclave
     )
     .await;
 
