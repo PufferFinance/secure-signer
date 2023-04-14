@@ -4,12 +4,12 @@ mod deposit;
 mod withdraw;
 
 use puffersecuresigner::eth2::eth_types::ForkInfo;
-use serde::{Serialize, Deserialize, de::DeserializeOwned};
+use serde::{Serialize, Deserialize};
 use clap::Parser;
-use anyhow::{bail, Result, Context};
+use anyhow::{Result, Context};
 use log::info;
 
-use std::{path::{Path, PathBuf}, fs::{File, self}, io::{BufReader, BufWriter}};
+use std::{path::PathBuf, fs::{File, self}, io::BufWriter};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NetworkConfig {
@@ -65,6 +65,11 @@ struct Args {
     #[arg(short, long)]
     deposit: bool,
 
+
+    /// Skips checking remote attestation, allowing the client to interface with a non-SGX-enabled Secure-Signer instance
+    #[arg(long)]
+    debug: bool,
+
     /// The validator public key in hex
     #[arg(short, long)]
     validator_pk_hex: Option<String>,
@@ -100,11 +105,7 @@ impl Args {
 
     pub fn init_out_dir() {
         let dir = Args::out_dir();
-        if let Some(dir_str) = &dir.to_str() {
-            fs::create_dir_all(dir);
-        } else {
-            panic!("Failed to create {:?}", dir);
-        }
+        fs::create_dir_all(dir).expect("Failed to create {dir}");
     }
 
     pub fn config() -> NetworkConfig {
@@ -135,18 +136,20 @@ impl Args {
         Args::parse().withdraw
     }
 
-    pub fn get_keygen_args() -> String {
+    pub fn get_keygen_args() -> (String, bool) {
         let args = Args::parse();
-        args.mrenclave.expect("--mrenclave expected")
+        let verify_ra_evidence = !args.debug;
+        (args.mrenclave.expect("--mrenclave expected"), verify_ra_evidence)
     }
 
-    pub fn get_import_args() -> (PathBuf, PathBuf, Option<PathBuf>, String) {
+    pub fn get_import_args() -> (PathBuf, PathBuf, Option<PathBuf>, String, bool) {
         let args = Args::parse();
         let keystore_path = args.keystore_path.expect("--keystore-path expected");
         let password_path = args.password_path.expect("--password-path expected");
         let slashing_db_path = args.slash_protection_path;
         let mrenclave = args.mrenclave.expect("--mrenclave expected");
-        (keystore_path, password_path, slashing_db_path, mrenclave)
+        let verify_ra_evidence = !args.debug;
+        (keystore_path, password_path, slashing_db_path, mrenclave, verify_ra_evidence)
     }
 
     pub fn get_deposit_args() -> (String, String) {
@@ -184,20 +187,23 @@ async fn main() -> Result<()> {
 
     if Args::do_keygen() {
         let resp = routes::bls_keygen(port).await.unwrap();
-        // todo verify remote attesation + mrenclave
-        let mrenclave = Args::get_keygen_args();
+        let (mrenclave, verify_ra_evidence) = Args::get_keygen_args();
+        if verify_ra_evidence {
+            resp.validate_bls_ra(&mrenclave)?;
+        }
         info!("{:?}", resp);
         Args::write_to_file("keygen_response", resp)?;
     }
 
     if Args::do_import() {
-        let (keystore_path, password_path, slashing_db_path, mrenclave) =  Args::get_import_args(); 
+        let (keystore_path, password_path, slashing_db_path, mrenclave, verify_ra_evidence) =  Args::get_import_args(); 
         let resp = bls_import::import_from_files(
             port,
             keystore_path,
             password_path,
             slashing_db_path,
-            &mrenclave
+            &mrenclave,
+            verify_ra_evidence
         )
         .await?;
         info!("{:?}", resp);
@@ -223,7 +229,6 @@ async fn main() -> Result<()> {
         ).await?;
         info!("{:#?}", vem);
         Args::write_to_file("voluntary_exit_message.json", vem)?;
-        // Args::write_to_file("list_eth_keys", vem)?;
     }
 
     if Args::do_list() {

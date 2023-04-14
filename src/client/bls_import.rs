@@ -1,32 +1,14 @@
-use std::{fs::{read_to_string, File}, path::PathBuf, io::Write};
+use std::{fs::read_to_string, path::PathBuf};
 
 use super::routes::{bls_key_import, eth_keygen};
 use puffersecuresigner::{
     api::{KeyGenResponse, KeyImportRequest, KeyImportResponse},
-    constants::ETH_COMPRESSED_PK_BYTES,
     crypto::eth_keys,
 };
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use ecies::PublicKey as EthPublicKey;
 use log::info;
-
-fn validate_eth_ra(resp: KeyGenResponse) -> Result<EthPublicKey> {
-    // Verify the report is valid
-    resp.evidence.verify_intel_signing_certificate()?;
-
-    // Verify the payload
-    let pk = eth_keys::eth_pk_from_hex(&resp.pk_hex)?;
-
-    // Read the 64B payload from RA report
-    let got_payload: [u8; 64] = resp.evidence.get_report_data()?;
-
-    // Verify the first ETH_COMPRESSED_PK_BYTES contains the expected ETH comporessed public key
-    if &got_payload[0..ETH_COMPRESSED_PK_BYTES] != pk.serialize_compressed() {
-        bail!("Remote attestation payload does not match the expected")
-    }
-    Ok(pk)
-}
 
 fn encrypt_password(password: &String, encrypting_pk: &EthPublicKey) -> Result<String> {
     // Envelope encrypt the keystore password
@@ -40,7 +22,8 @@ pub async fn import_from_files(
     keystore_file: PathBuf,
     password_file: PathBuf,
     slash_protection_file: Option<PathBuf>,
-    mrenclave: &str,
+    mrenclave: &String,
+    verify_ra_evidence: bool
 ) -> Result<KeyImportResponse> {
     // Read keystore file
     let keystore = read_to_string(keystore_file.clone())
@@ -64,11 +47,20 @@ pub async fn import_from_files(
     let resp: KeyGenResponse = eth_keygen(port).await?;
 
     // Verify remote attestation evidence
-    // let enclave_eth_pk = validate_eth_ra(resp)?; // todo only should run if we know we are talking to sgx
-    let enclave_eth_pk = eth_keys::eth_pk_from_hex(&resp.pk_hex)?;
-    let encrypting_pk_hex = eth_keys::eth_pk_to_hex(&enclave_eth_pk);
+    let (enclave_eth_pk, encrypting_pk_hex) = match verify_ra_evidence {
+        true => {
+            let enclave_eth_pk = resp.validate_eth_ra(mrenclave)?;
+            let encrypting_pk_hex = eth_keys::eth_pk_to_hex(&enclave_eth_pk);
+            (enclave_eth_pk, encrypting_pk_hex)
+        },
+        false => {
+            let enclave_eth_pk = eth_keys::eth_pk_from_hex(&resp.pk_hex)?;
+            let encrypting_pk_hex = eth_keys::eth_pk_to_hex(&enclave_eth_pk);
+            (enclave_eth_pk, encrypting_pk_hex)
+        } 
+    };
+
     info!("Using enclave generated eth pk to encrypt password: {encrypting_pk_hex}");
-    // todo compare to mrenclave
 
     // Encrypt the password
     let ct_password_hex = encrypt_password(&password, &enclave_eth_pk)?;
