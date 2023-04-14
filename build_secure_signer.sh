@@ -51,9 +51,9 @@ function new_ss_instance()
         cp /etc/resolv.conf ./image/etc
         cp /etc/hosts ./image/etc
 
-        new_json="$(jq '.resource_limits.user_space_size = "128MB" |
-                        .resource_limits.kernel_space_heap_size="256MB" |
-                        .process.default_heap_size = "32MB" |
+        new_json="$(jq '.resource_limits.user_space_size = "1024MB" |
+                        .resource_limits.kernel_space_heap_size="512MB" |
+                        .process.default_heap_size = "512MB" |
                         .resource_limits.max_num_of_threads = 32 |
                         .env.default = ["OCCLUM=yes", "RUST_LOG=info"] |
                         .metadata.debuggable = false' Occlum.json)" && \
