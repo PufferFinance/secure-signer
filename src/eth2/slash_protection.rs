@@ -1,17 +1,21 @@
-use crate::eth_types::{
-    de_signing_root, se_signing_root, to_bls_pk_hex, from_bls_pk_hex, from_u64_string, to_u64_string, BLSPubkey, Epoch, Root, Slot,
+use crate::strip_0x_prefix;
+
+use super::eth_types::{
+    de_signing_root, se_signing_root, from_hex_to_ssz_type, to_hex_from_ssz_type, BLSPubkey, Epoch, Root, Slot,
 };
+use crate::constants::SLASHING_PROTECTION_DIR;
+
 use anyhow::{bail, Context, Result};
 use hex;
 use serde::{Deserialize, Serialize};
 use serde_hex::{SerHex, StrictPfx};
+use serde_utils::quoted_u64;
 use ssz::Encode;
 use ssz_types::FixedVector;
 use std::fs;
 use std::path::PathBuf;
 use log::{debug, error};
 
-pub const SLASHING_PROTECTION_DIR: &str = "./etc/slashing/";
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SlashingProtectionMetaData {
@@ -22,7 +26,7 @@ pub struct SlashingProtectionMetaData {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SlashingProtectionData {
-    #[serde(deserialize_with = "from_bls_pk_hex", serialize_with = "to_bls_pk_hex")]
+    #[serde(deserialize_with = "from_hex_to_ssz_type", serialize_with = "to_hex_from_ssz_type")]
     pub pubkey: BLSPubkey,
     pub signed_blocks: Vec<SignedBlockSlot>,
     pub signed_attestations: Vec<SignedAttestationEpochs>,
@@ -37,8 +41,8 @@ impl SlashingProtectionData {
         }
     }
 
-    pub fn from_pk_hex(pk_hex: String) -> Result<Self> {
-        let pk_hex: String = pk_hex.strip_prefix("0x").unwrap_or(&pk_hex).into();
+    pub fn from_pk_hex(pk_hex: &String) -> Result<Self> {
+        let pk_hex: String = strip_0x_prefix!(pk_hex);
         let pk_bytes = hex::decode(pk_hex)?;
         let pk_bytes: BLSPubkey = FixedVector::from(pk_bytes.to_vec());
         Ok(SlashingProtectionData::new(pk_bytes))
@@ -51,11 +55,16 @@ impl SlashingProtectionData {
         }
     }
 
+    pub fn is_slashable_block_slot(&self, slot: Slot) -> bool {
+        let last_slot = self.get_latest_signed_block_slot();
+        slot <= last_slot
+    }
+
     /// If the SlashingProtectionDB is growable, append the new block, otherwise
     /// overwrite the 0th element.
     pub fn new_block(&mut self, block: SignedBlockSlot, growable: bool) -> Result<()> {
         if block.slot <= self.get_latest_signed_block_slot() {
-            bail!("Will not save this slashable evidence!");
+            bail!("Will not save this slashable Block!");
         }
         if growable || self.signed_blocks.is_empty() {
             self.signed_blocks.push(block);
@@ -85,6 +94,11 @@ impl SlashingProtectionData {
         (latest_src, latest_tgt)
     }
 
+    pub fn is_slashable_attestation_epochs(&self, src: Epoch, tgt: Epoch) -> bool {
+        let (last_src, last_tgt) = self.get_latest_signed_attestation_epochs();
+        src < last_src || tgt <= last_tgt
+    }
+
     /// If the SlashingProtectionDB is growable, append the new attestation epochs, otherwise
     /// overwrite the 0th element.
     pub fn new_attestation(
@@ -94,10 +108,12 @@ impl SlashingProtectionData {
     ) -> Result<()> {
         let (prev_src, prev_tgt) = self.get_latest_signed_attestation_epochs();
         if attest.source_epoch < prev_src {
-            bail!("Will not save this slashable evidence!");
+            error!("Attestation source epoch is decreasing");
+            bail!("Will not save this slashable Attestation!");
         }
         if attest.target_epoch <= prev_tgt {
-            bail!("Will not save this slashable evidence!");
+            error!("Attestation target epoch is non-increasing");
+            bail!("Will not save this slashable Attestation!");
         }
 
         if growable || self.signed_attestations.is_empty() {
@@ -120,7 +136,7 @@ impl SlashingProtectionData {
     }
 
     pub fn read(pk_hex: &str) -> Result<Self> {
-        let pk_hex: String = pk_hex.strip_prefix("0x").unwrap_or(&pk_hex).into();
+        let pk_hex: String = strip_0x_prefix!(pk_hex);
         let file_path: PathBuf = [SLASHING_PROTECTION_DIR, &pk_hex].iter().collect();
         let json_vec = fs::read(file_path)?;
         let json = serde_json::from_slice(&json_vec).with_context(|| "failed to read protection data")?;
@@ -131,9 +147,9 @@ impl SlashingProtectionData {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SignedAttestationEpochs {
-    #[serde(deserialize_with = "from_u64_string", serialize_with = "to_u64_string")]
+    #[serde(with = "quoted_u64")]
     pub source_epoch: Epoch,
-    #[serde(deserialize_with = "from_u64_string", serialize_with = "to_u64_string")]
+    #[serde(with = "quoted_u64")]
     pub target_epoch: Epoch,
     #[serde(default)]
     #[serde(
@@ -146,7 +162,7 @@ pub struct SignedAttestationEpochs {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SignedBlockSlot {
-    #[serde(deserialize_with = "from_u64_string", serialize_with = "to_u64_string")]
+    #[serde(with = "quoted_u64")]
     pub slot: Slot,
     #[serde(default)]
     #[serde(
@@ -197,7 +213,6 @@ impl SlashingProtectionDB {
 pub mod test_slash_protection {
     use super::*;
     use hex;
-    use serde_json;
     use ssz::Encode;
 
     pub fn dummy_slash_protection_data() -> String {
@@ -420,7 +435,7 @@ pub mod test_slash_protection {
             signing_root: None,
         };
 
-        data.new_attestation(a, grow);
+        data.new_attestation(a, grow).unwrap();
         assert_eq!(data.signed_attestations.len(), 1);
         assert_eq!(data.get_latest_signed_attestation_epochs(), (10, 20));
 
@@ -434,7 +449,7 @@ pub mod test_slash_protection {
             ]),
         };
 
-        data.new_attestation(a, grow);
+        data.new_attestation(a, grow).unwrap();
         assert_eq!(data.signed_attestations.len(), 1);
         assert_eq!(data.get_latest_signed_attestation_epochs(), (20, 30));
 
@@ -445,7 +460,7 @@ pub mod test_slash_protection {
             signing_root: None,
         };
 
-        data.new_attestation(a, grow);
+        assert!(data.new_attestation(a, grow).is_err());
         assert_eq!(data.signed_attestations.len(), 1);
         assert_eq!(data.get_latest_signed_attestation_epochs(), (20, 30));
 
@@ -455,7 +470,7 @@ pub mod test_slash_protection {
             target_epoch: 30, // same => slashable
             signing_root: None,
         };
-        data.new_attestation(a, grow);
+        assert!(data.new_attestation(a, grow).is_err());
         assert_eq!(data.signed_attestations.len(), 1);
         assert_eq!(data.get_latest_signed_attestation_epochs(), (20, 30));
 
@@ -465,7 +480,7 @@ pub mod test_slash_protection {
             target_epoch: 29, // decreasing => slashable
             signing_root: None,
         };
-        data.new_attestation(a, grow);
+        assert!(data.new_attestation(a, grow).is_err());
         assert_eq!(data.signed_attestations.len(), 1);
         assert_eq!(data.get_latest_signed_attestation_epochs(), (20, 30));
 
@@ -476,7 +491,7 @@ pub mod test_slash_protection {
             target_epoch: 31, // increasing => ok
             signing_root: None,
         };
-        data.new_attestation(a, grow);
+        assert!(data.new_attestation(a, grow).is_ok());
         assert_eq!(data.signed_attestations.len(), 2);
         assert_eq!(data.get_latest_signed_attestation_epochs(), (20, 31));
 
@@ -487,7 +502,7 @@ pub mod test_slash_protection {
             signing_root: None,
         };
 
-        data.new_attestation(a, grow);
+        assert!(data.new_attestation(a, grow).is_err());
         assert_eq!(data.signed_attestations.len(), 2);
         assert_eq!(data.get_latest_signed_attestation_epochs(), (20, 31));
 
@@ -497,7 +512,7 @@ pub mod test_slash_protection {
             target_epoch: 31, // same => slashable
             signing_root: None,
         };
-        data.new_attestation(a, grow);
+        assert!(data.new_attestation(a, grow).is_err());
         assert_eq!(data.signed_attestations.len(), 2);
         assert_eq!(data.get_latest_signed_attestation_epochs(), (20, 31));
 
@@ -507,7 +522,7 @@ pub mod test_slash_protection {
             target_epoch: 29, // decreasing => slashable
             signing_root: None,
         };
-        data.new_attestation(a, grow);
+        assert!(data.new_attestation(a, grow).is_err());
         assert_eq!(data.signed_attestations.len(), 2);
         assert_eq!(data.get_latest_signed_attestation_epochs(), (20, 31));
 

@@ -1,5 +1,12 @@
 {
-    "fork_version": "00001020",
     "network_name": "goerli",
-    "deposit_cli_version": "2.3.0"
+    "deposit_cli_version": "2.3.0",
+    "fork_info": {
+        "fork": {
+            "previous_version": "0x00001020",
+            "current_version": "0x00001020",
+            "epoch": "0"
+        },
+        "genesis_validators_root": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69"
+    }
 }
