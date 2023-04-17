@@ -17,13 +17,44 @@ components:
       type: string
       description: |
         JSON serialized representation of a single keystore in EIP-2335: BLS12-381 Keystore format.
-      example: '{"crypto":{"cipher":"aes-128-ctr","cipherparams":{"iv":"0a68d3bf7100eee506501964a38462a5"},"ciphertext":"fcdf80c4ab4b932715d7aa64de0437d60b0b32c07638e6d817b31716d0468820","kdf":"scrypt","kdfparams":{"dklen":32,"n":8192,"p":1,"r":8,"salt":"72309c01a897cebb754838ddb0d4073706445202ce2e7728771bdefc47484f50"},"mac":"0c920db1858f12479f5a5fd3e6c247ad3b1196ea2a9d7335148cef6d816422c1"},"id":"a88d18e2-4a70-4261-b6c6-96edd76ba5c5","version":3}'
+      example: '{
+    "crypto": {
+        "kdf": {
+            "function": "scrypt",
+            "params": {
+                "dklen": 32,
+                "n": 262144,
+                "p": 1,
+                "r": 8,
+                "salt": "d4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3"
+            },
+            "message": ""
+        },
+        "checksum": {
+            "function": "sha256",
+            "params": {},
+            "message": "d2217fe5f3e9a1e34581ef8a78f7c9928e436d36dacc5e846690a5581e8ea484"
+        },
+        "cipher": {
+            "function": "aes-128-ctr",
+            "params": {
+                "iv": "264daa3f303d7259501c93d997d84fe6"
+            },
+            "message": "06ae90d55fe0a6e9c5c3bc5b170827b2e5cce3929ed3f116c2811e6366dfe20f"
+        }
+    },
+    "description": "This is a test keystore that uses scrypt to secure the secret.",
+    "pubkey": "9612d7a727c9d0a22e185a1c768478dfe919cada9266988cb32359c11f2b7b27f4ae4040902382ae2910c15e2b420d07",
+    "path": "m/12381/60/3141592653/589793238",
+    "uuid": "1d85ae20-35c5-4611-98e8-aa14a633906f",
+    "version": 4
+}'
 
     SlashingProtectionData:
       type: string
       description: |
         JSON serialized representation of the slash protection data in format defined in EIP-3076: Slashing Protection Interchange Format.
-      example: '{"metadata":{"interchange_format_version":"5","genesis_validators_root":"0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2"},"data":[{"pubkey":"0x93247f2209abcacf57b75a51dafae777f9dd38bc7053d1af526f220a7489a6d3a2753e5f3e8b1cfe39b56f43611df74a","signed_blocks":[],"signed_attestations":[]}]}'
+      example: '{"metadata":{"interchange_format_version":"5","genesis_validators_root":"0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2"},"data":[{"pubkey":"0x9612d7a727c9d0a22e185a1c768478dfe919cada9266988cb32359c11f2b7b27f4ae4040902382ae2910c15e2b420d07","signed_blocks":[],"signed_attestations":[]}]}'
 
     ErrorResponse:
       type: object

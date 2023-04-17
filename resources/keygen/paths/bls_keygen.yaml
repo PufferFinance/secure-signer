@@ -2,8 +2,7 @@ post:
   operationId: BLS_KEYGEN
   summary: Generate BLS Key.
   description: |
-    Generates a fresh BLS keypair within Secure-Signer. Returns the hex-encoded BLS public 
-    key for the private BLS key that was generated in Secure-Signer.
+    Generates a fresh BLS keypair within Secure-Signer. Returns the hex-encoded BLS public key for the private BLS key that was generated in Secure-Signer. The 48-Byte compressed BLS public key is committed to in a remote attestation report, and the resulting remote attestation evidence is also returned. 
   security:
     - bearerAuth: []
   tags:
@@ -16,46 +15,14 @@ post:
           schema:
             title: KeyGenResponse
             type: object
-            required: [pk_hex]
+            required: [pk_hex, evidence]
             properties:
               pk_hex:
                 $ref: "../schemas.yaml#/components/schemas/Pubkey"
+              evidence:
+                $ref: "../../signing/schemas.yaml#/components/schemas/AttestationEvidence"
     "400":
       $ref: "../schemas.yaml#/components/responses/BadRequest"
-    "401":
-      $ref: "../schemas.yaml#/components/responses/Unauthorized"
-    "403":
-      $ref: "../schemas.yaml#/components/responses/Forbidden"
-    "500":
-      $ref: "../schemas.yaml#/components/responses/InternalError"
-
-get:
-  operationId: BLS_KEYGEN_LIST
-  summary: List Generated BLS Keys.
-  description: |
-    Returns a list of hex-encoded BLS public keys for the private BLS keys that were generated in Secure-Signer.
-  security:
-    - bearerAuth: []
-  tags:
-    - BLS Keygen
-  responses:
-    "200":
-      description: Success response
-      content:
-        application/json:
-          schema:
-            title: ListKeysResponse
-            type: object
-            required: [data]
-            properties:
-              data:
-                type: array
-                items:
-                  type: object
-                  required: [pubkey]
-                  properties:
-                    pubkey:
-                      $ref: "../schemas.yaml#/components/schemas/Pubkey"
     "401":
       $ref: "../schemas.yaml#/components/responses/Unauthorized"
     "403":

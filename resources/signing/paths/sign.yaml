@@ -10,7 +10,7 @@ post:
       required: true
       description: 'Key for which data to sign'
       schema:
-        type: 'string'
+        $ref: "../../keygen/schemas.yaml#/components/schemas/Pubkey"
   requestBody:
     required: true
     content:

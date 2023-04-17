@@ -2,8 +2,7 @@ post:
   operationId: ETH_KEYGEN
   summary: Generate ETH Key.
   description: |
-    Generates a fresh ETH (SECP256K1) keypair within Secure-Signer. Returns the hex-encoded ETH public 
-    key for the private ETH key that was generated in Secure-Signer.
+    Generates a fresh ETH (SECP256K1) keypair within Secure-Signer. Returns the hex-encoded ETH public key for the private ETH key that was generated in Secure-Signer. The 33-Byte compressed ETH public key is committed to in a remote attestation report, and the resulting remote attestation evidence is also returned. The `evidence` should be verified before trusting the ETH key, which is used to encrypt a BLS keystore password during importing.
   security:
     - bearerAuth: []
   tags:
@@ -16,10 +15,12 @@ post:
           schema:
             title: KeyGenResponse
             type: object
-            required: [pk_hex]
+            required: [pk_hex, evidence]
             properties:
               pk_hex:
                 $ref: "../schemas.yaml#/components/schemas/EthPubkey"
+              evidence:
+                $ref: "../../signing/schemas.yaml#/components/schemas/AttestationEvidence"
     "400":
       $ref: "../schemas.yaml#/components/responses/BadRequest"
     "401":

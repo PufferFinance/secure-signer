@@ -340,6 +340,43 @@ components:
           type: "string"
         signature:
           type: "string"
+    DepositResponse:
+      type: "object"
+      properties:
+        pubkey:
+          type: "string"
+        withdrawal_credentials:
+          type: "string"
+        amount:
+          type: string
+          format: uint64
+        signature:
+          type: "string"
+        deposit_message_root:
+          type: "string"
+          description: Bytes32 hexadecimal
+        deposit_data_root:
+          type: "string"
+          description: Bytes32 hexadecimal
+    DepositRequest:
+      type: "object"
+      properties:
+        signingRoot:
+          type: "string"
+        deposit:
+          "$ref": "#/components/schemas/DepositMessage"
+        genesis_fork_version:
+          type: "string"
+          description: Bytes4 hexadecimal
+    DepositMessage:
+      type: "object"
+      properties:
+        pubkey:
+          type: "string"
+        withdrawal_credentials:
+          type: "string"
+        amount:
+          type: "string"
     VoluntaryExit:
       type: object
       properties:

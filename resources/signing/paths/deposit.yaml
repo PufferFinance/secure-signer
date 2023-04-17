@@ -1,0 +1,26 @@
+post:
+  tags:
+    - 'Deposit'
+  summary: 'Register a validator'
+  description: 'Given a `DepositRequest`, uses the specified BLS public key to sign a `DepositResponse`.'
+  operationId: 'ETH2_DEPOSIT'
+  parameters:
+    - name: 'identifier'
+      in: 'path'
+      required: true
+      description: 'Key for which data to sign'
+      schema:
+        $ref: "../../keygen/schemas.yaml#/components/schemas/Pubkey"
+  responses:
+    '200':
+      description: 'Success reponse: a JSON encoded DepositResponse'
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas.yaml#/components/schemas/DepositResponse'
+    '400':
+      description: 'Bad request format'
+    '412':
+      description: 'This validator key does not exist'
+    '500':
+      description: 'Internal Secure-Signer server error'
