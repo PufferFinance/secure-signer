@@ -26,8 +26,8 @@ url: "https://github.com/PufferFinance" # the base hostname & protocol for your 
 permalink: pretty
 
 # Build settings
-theme: just-the-docs
-# remote_theme: pmarsceill/just-the-docs
+# theme: just-the-docs
+remote_theme: pmarsceill/just-the-docs
 
 
 
