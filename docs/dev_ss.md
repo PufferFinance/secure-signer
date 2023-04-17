@@ -45,14 +45,72 @@ usage: run_secure_signer.sh [OPTION]...
 ```
 </div>
 
-Run the following command to launch and attach to the development container. The script will mount the `~/secure-signer` repo as a volume so any development work done inside the container will persist.
+Run the following command to launch, attach to the development container, and install the correct Rust version. The script will mount the `~/secure-signer` repo as a volume so any development work done inside the container will persist. 
 <div class="code-example" markdown="1">
 ```bash
-puffer@Puffer-Dev:~/secure-signer$ ./run_secure_signer.sh -d -a
-Launching secure_signer_container_dev...
-e2439f4ed4e6317c67dd51261b99061a365adb6e05222e9abb064c00ca774972
-Attaching to secure_signer_container_dev...
-root@Puffer-Dev:~#
+puffer@Puffer-Dev:~/secure-signer$ ./run_secure_signer.sh -d -a                                                                                                                                                 
+secure_signer_container_dev not found, launching now...                                                                                                                                                         
+Start Secure-Signer server on port 9001...                                                                                                                                                                      
+Unable to find image 'occlum/occlum:0.29.1-ubuntu20.04' locally                                                                                                                                                 
+0.29.1-ubuntu20.04: Pulling from occlum/occlum                                                                                                                                                                  
+fb0b3276a519: Pull complete                                                                                                                                                                                     
+d99b42c9728d: Pull complete                                                                                                                                                                                     
+74b74e144ba8: Pull complete                                                                                                                                                                                     
+e966edf39081: Pull complete                                                                                                                                                                                     
+0494b33f9566: Pull complete                                                                                                                                                                                     
+4f4fb700ef54: Pull complete                                                                                                                                                                                     
+9e819f8f491e: Pull complete                                                                                                                                                                                     
+77da17ee521a: Pull complete                                                                                                                                                                                     
+4287aaf1a461: Pull complete                                                                                                                                                                                     
+045d8386501c: Pull complete                                                                                                                                                                                     
+2c050312405e: Pull complete                                                                                                                                                                                     
+9ddebcb08677: Pull complete                                                                                                                                                                                     
+5fe71afa18d3: Pull complete                                                                                                                                                                                     
+b0dde9b3e61d: Pull complete                                                                                                                                                                                     
+d2fa00b1a4fd: Pull complete                                                                                                                                                                                     
+3b267634335f: Pull complete 
+785554322247: Pull complete 
+1a33b2bf8917: Pull complete 
+4e75289cdfaa: Pull complete 
+0357ef5f921c: Pull complete 
+ac2932fe67d2: Pull complete 
+802f60431b8d: Pull complete 
+2c649add70af: Pull complete 
+Digest: sha256:de5388e0609d15a4d7797083d69b11d8dcc364c4bc3b9f897922b5e74363cff6                                                                                                                                 
+Status: Downloaded newer image for occlum/occlum:0.29.1-ubuntu20.04                                                                                                                                             
+2e19c8fc0b246105909a405be6408377644adc5fd73df1dbe6293b8f8d43076e                                                                                                                                                
+info: syncing channel updates for '1.64.0-x86_64-unknown-linux-gnu'                                                                                                                                             
+warning: Signature verification failed for 'https://static.rust-lang.org/dist/channel-rust-1.64.0.toml'                                                                                                         
+info: latest update on 2022-09-22, rust version 1.64.0 (a55dd71d5 2022-09-19)                                                                                                                                   
+info: downloading component 'cargo'                                                                                                                                                                             
+info: downloading component 'clippy'                                                                                                                                                                            
+info: downloading component 'rust-docs'                                                                                                                                                                         
+info: downloading component 'rust-std'                                                                                                                                                                          
+info: downloading component 'rustc'                                                                                                                                                                             
+info: downloading component 'rustfmt'                                                                                                                                                                           
+info: installing component 'cargo'                                                                                                                                                                              
+info: installing component 'clippy'                                                                                                                                                                             
+info: installing component 'rust-docs'                                                                                                                                                                          
+ 18.8 MiB /  18.8 MiB (100 %)  12.2 MiB/s in  1s ETA:  0s                                                                                                                                                       
+info: installing component 'rust-std'                                                                                                                                                                           
+ 27.4 MiB /  27.4 MiB (100 %)  16.8 MiB/s in  1s ETA:  0s                                                                                                                                                       
+info: installing component 'rustc'                                                                                                                                                                              
+ 54.2 MiB /  54.2 MiB (100 %)  18.8 MiB/s in  2s ETA:  0s                                                                                                                                                       
+info: installing component 'rustfmt'                                                                                                                                                                            
+                                                                                                                                                                                                                
+  1.64.0-x86_64-unknown-linux-gnu installed - rustc 1.64.0 (a55dd71d5 2022-09-19)                                                                                                                               
+                                                                                                                                                                                                                
+info: checking for self-updates                                                                                                                                                                                 
+info: downloading self-update                                                                                                                                                                                   
+info: using existing install for '1.64.0-x86_64-unknown-linux-gnu'                                                                                                                                              
+info: default toolchain set to '1.64.0-x86_64-unknown-linux-gnu'                                                                                                                                                
+                                                                                                                                                                                                                
+  1.64.0-x86_64-unknown-linux-gnu unchanged - rustc 1.64.0 (a55dd71d5 2022-09-19)                                                                                                                               
+                                                                                                                                                                                                                
+info: downloading component 'rust-std' for 'x86_64-unknown-linux-musl'                                                                                                                                          
+info: installing component 'rust-std' for 'x86_64-unknown-linux-musl'                                                                                                                                           
+ 40.6 MiB /  40.6 MiB (100 %)  16.9 MiB/s in  2s ETA:  0s                                                                                                                                                       
+root@Portal-Dev:~#  
 ```
 </div>
 
@@ -60,35 +118,8 @@ Notice the username is now `root`, indicating we are now inside the container. I
 <div class="code-example" markdown="1">
 ```bash
 puffer@Puffer-Dev:~/secure-signer$ docker container ls
-CONTAINER ID   IMAGE                              COMMAND   CREATED         STATUS         PORTS     NAMES
-e2439f4ed4e6   occlum/occlum:latest-ubuntu20.04   "bash"    2 minutes ago   Up 2 minutes             secure_signer_container_dev
-```
-</div>
-
-
-### From the command line
-Alternatively, we can launch the container from the commandline. For development we use the `occlum/occlum:latest` container image. The following command will start running a development container with the name `secure_signer_container_dev`. The following command will mount the `~/secure-signer` repo as a volume, but edit this if you cloned `secure-signer` to a different directory.
-<div class="code-example" markdown="1">
-```bash
-puffer@Puffer-Dev:~/secure-signer$ docker run -itd --privileged -v ~/secure-signer:/root/secure-signer -v /dev/sgx_enclave:/dev/sgx/enclave --name secure_signer_container_dev -v /dev/sgx_provision:/dev/sgx/provision -v /var/run/aesmd:/var/run/aesmd --network="host" occlum/occlum:latest-ubuntu20.04
-f72d93ab0ae04e7ab77b60eb55fe32044e952b2ed3f949518f28591eb877bb12
-puffer@Puffer-Dev:~/secure-signer$ docker container ls
-CONTAINER ID   IMAGE                              COMMAND   CREATED          STATUS          PORTS     NAMES
-f72d93ab0ae0   occlum/occlum:latest-ubuntu20.04   "bash"    45 seconds ago   Up 44 seconds             secure_signer_container_dev
-puffer@Puffer-Dev:~/secure-signer$ docker exec -it secure_signer_container_dev bash
-root@Puffer-Dev:~#
-```
-</div>
-
-
-
-## Set correct Rust version
-Secure-Signer works with rustc version 1.64.0. Run the following commands from inside the container to update your rust toolchain:
-<div class="code-example" markdown="1">
-```bash
-rustup update 1.64.0  
-rustup default 1.64.0  
-rustup target add x86_64-unknown-linux-musl
+CONTAINER ID   IMAGE                                COMMAND       CREATED         STATUS         PORTS     NAMES
+2e19c8fc0b24   occlum/occlum:0.29.1-ubuntu20.04     "bash"        4 minutes ago   Up 4 minutes             secure_signer_container_dev
 ```
 </div>
 
