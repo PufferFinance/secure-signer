@@ -11,7 +11,7 @@ has_children: true
 By default, any data created within a Docker container is lost if the container is removed. Secure-Signer maintains our keys and slashing protection databases, so we want this data to persist should anything happen to the container. To do so, we will create a Docker volume called `Secure-Signer-Backup`.
 <div class="code-example" markdown="1">
 ```bash
-    docker volume create —-name Secure-Signer-Backup
+    docker volume create Secure-Signer-Backup
 ```
 </div>
 
@@ -42,7 +42,6 @@ We can verify the volume exists and inspect it with the following:
 The `pufferfinance/secure_signer:latest` container image can be found [here](https://hub.docker.com/r/pufferfinance/secure_signer). The following command will start running a secure_signer container with the name `secure_signer_container`. Notice we are mounting the volume `Secure-Signer-Backup` to the `/Secure-Signer` enclave directory so any changes to Secure-Signer persist if the container is removed: 
 <div class="code-example" markdown="1">
 ```bash
-mkdir secure-signer-backup
 docker run -itd --network host --mount type=volume,source=Secure-Signer-Backup,destination=/Secure-Signer -v /var/run/aesmd:/var/run/aesmd --device /dev/sgx/enclave --device /dev/sgx/provision --name secure_signer_container pufferfinance/secure_signer:latest 
 ```
 </div>
