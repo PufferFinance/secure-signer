@@ -2,8 +2,7 @@ openapi: 3.0.3
 info:
   title: 'Puffer Secure-Signer Api'
   description: 'Sign Eth2 Artifacts'
-  version: '@VERSION@'
-  #todo: find the correct licence for puffer-signer
+  version: '0.1'
   license:
     name: 'Apache 2.0'
     url: 'http://www.apache.org/licenses/LICENSE-2.0.html'
@@ -15,10 +14,10 @@ servers:
 paths:
   /api/v1/eth2/sign/{identifier}:
     $ref: './signing/paths/sign.yaml'
+  /api/v1/eth2/sign/deposit/{identifier}:
+    $ref: './signing/paths/deposit.yaml'
   /upcheck:
     $ref: './signing/paths/upcheck.yaml'
-  /eth/v1/remote-attestation/{identifier}:
-    $ref: './signing/paths/remote-attestation.yaml'
   /eth/v1/keygen/bls:
     $ref: './keygen/paths/bls_keygen.yaml'
   /eth/v1/keygen/secp256k1:
@@ -27,6 +26,6 @@ paths:
     $ref: './keymanager/paths/keystores.yaml'
 
 externalDocs:
-  description: 'Web3Signer User Documentation'
+  description: 'Secure-Signer User Documentation'
   #publicsh this on github pages
   # url: ''
