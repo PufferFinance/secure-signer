@@ -51,7 +51,7 @@ fn update_slash_protection_db(bls_pk_hex: &String, signing_data: &BLSSignMsg) ->
     let mut db: SlashingProtectionData = SlashingProtectionData::read(bls_pk_hex.as_str())?;
     let signing_root = signing_data.to_signing_root();
     match signing_data {
-        BLSSignMsg::BLOCK(m) => {
+        BLSSignMsg::BLOCK(m) | BLSSignMsg::block(m) => {
             let b = SignedBlockSlot {
                 slot: m.block.slot,
                 signing_root: Some(signing_root),
@@ -59,7 +59,7 @@ fn update_slash_protection_db(bls_pk_hex: &String, signing_data: &BLSSignMsg) ->
             db.new_block(b, ALLOW_GROWABLE_SLASH_PROTECTION_DB)?;
             db.write()
         }
-        BLSSignMsg::BLOCK_V2(m) => {
+        BLSSignMsg::BLOCK_V2(m) | BLSSignMsg::block_v2(m) => {
             let b = SignedBlockSlot {
                 slot: m.beacon_block.block_header.slot,
                 signing_root: Some(signing_root),
@@ -67,7 +67,7 @@ fn update_slash_protection_db(bls_pk_hex: &String, signing_data: &BLSSignMsg) ->
             db.new_block(b, ALLOW_GROWABLE_SLASH_PROTECTION_DB)?;
             db.write()
         }
-        BLSSignMsg::ATTESTATION(m) => {
+        BLSSignMsg::ATTESTATION(m) | BLSSignMsg::attestation(m) => {
             let a = SignedAttestationEpochs {
                 source_epoch: m.attestation.source.epoch,
                 target_epoch: m.attestation.target.epoch,
