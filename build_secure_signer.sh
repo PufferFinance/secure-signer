@@ -96,7 +96,7 @@ function build() {
     if [ -z "$LOCAL_DEV" ]; then
         new_ss_instance
         measure
-        # package
+        package
     fi
 }
 
