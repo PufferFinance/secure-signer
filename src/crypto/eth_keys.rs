@@ -59,7 +59,6 @@ pub fn eth_sk_from_bytes(sk: Vec<u8>) -> Result<EthSecretKey> {
 /// Write the ETH SECP256K1 secret key to a secure file using the hex encoded pk as filename
 fn save_eth_key(sk: EthSecretKey, pk: EthPublicKey) -> Result<EthPublicKey> {
     let pk_hex = eth_pk_to_hex(&pk);
-    dbg!("new enclave eth pk: 0x{}", &pk_hex);
 
     let sk_hex = eth_sk_to_hex(&sk);
 

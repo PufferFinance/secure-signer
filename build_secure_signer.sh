@@ -15,6 +15,7 @@ export executable="./target/release/client"
 export config="./conf/network_config.json"
 export measurement="./Secure-Signer/MRENCLAVE"
 export ss_port=9001
+export genesis_fork_version="0x00001020"
 
 # If LOCAL_DEV is not set assume compiling for Occlum
 if [ -z "$LOCAL_DEV" ]; then
@@ -77,9 +78,9 @@ function measure() {
 function run() {
     pushd ${image_path}
     if [ -z "$LOCAL_DEV" ]; then
-        occlum run /bin/${binary_name} ${ss_port}
+        occlum run /bin/${binary_name} ${ss_port} ${genesis_fork_version} 
     else
-        cargo run ${build_flags} --bin ${binary_name} ${ss_port}
+        cargo run ${build_flags} --bin ${binary_name} ${ss_port} ${genesis_fork_version}
     fi
     popd
 }
@@ -95,7 +96,7 @@ function build() {
     if [ -z "$LOCAL_DEV" ]; then
         new_ss_instance
         measure
-        package
+        # package
     fi
 }
 

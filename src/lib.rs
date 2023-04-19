@@ -9,6 +9,7 @@ pub mod crypto;
 pub mod io;
 pub mod api;
 
+use eth2::eth_types::Version;
 use warp::Filter;
 
 #[macro_export]
@@ -18,14 +19,12 @@ macro_rules! strip_0x_prefix {
     };
 }
 
-pub async fn run(port: u16) {
-
+pub async fn run(port: u16, genesis_fork_version: Version) {
     env_logger::init();
 
     let routes = 
 
-        // --------- Compatible with Web3Signer ---------
-        // https://consensys.github.io/web3signer/web3signer-eth2.html
+        // Returns 200 if the server is running
         api::upcheck_route()
 
         // Endpoint to securely generate and save a BLS sk 
@@ -37,9 +36,6 @@ pub async fn run(port: u16) {
         // Endpoint to list all pks of saved bls keys in the enclave
         .or(api::getter_routes::list_bls_keys_route())
 
-        // Endpoint to request a signature using BLS sk 
-        .or(api::signing_route::bls_sign_route())
-
         // Endpoint to securely generate and save an ETH sk 
         .or(api::eth_keygen_route::eth_keygen_route())
 
@@ -49,5 +45,14 @@ pub async fn run(port: u16) {
         // Endpoint to sign DepositData message for registering validator on beacon chain
         .or(api::deposit_route::validator_deposit_route());
 
-    warp::serve(routes).run(([127, 0, 0, 1], port)).await;
+    // Endpoint to request a signature using BLS sk 
+    // Wrapped in a log filter
+    let bls_sign_route_with_log = api::signing_route::bls_sign_route(genesis_fork_version)
+        .with(warp::log("bls_sign_route"));
+
+    // Combine the routes
+    let all_routes = routes.or(bls_sign_route_with_log);
+
+    // Start the server with the all_routes
+    warp::serve(all_routes).run(([127, 0, 0, 1], port)).await;
 }
