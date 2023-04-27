@@ -386,6 +386,7 @@ pub struct SignedVoluntaryExit {
 }
 
 #[derive(Debug, Deserialize, Serialize, Encode, Decode, TreeHash, Clone)]
+/// https://github.com/ethereum/builder-specs/blob/main/specs/bellatrix/builder.md#validatorregistrationv1
 /// used by Web3Signer type = "VALIDATOR_REGISTRATION"
 pub struct ValidatorRegistration {
     #[serde(deserialize_with = "from_hex_to_ssz_type")]
@@ -395,10 +396,10 @@ pub struct ValidatorRegistration {
     pub gas_limit: u64,
     #[serde(with = "quoted_u64")]
     pub timestamp: u64,
-    // #[serde(deserialize_with = "from_bls_pk_hex")]
-    // #[serde(serialize_with = "to_bls_pk_hex")]
-    #[serde(deserialize_with = "from_hex_to_ssz_type")]
-    #[serde(serialize_with = "to_hex_from_ssz_type")]
+    #[serde(
+        deserialize_with = "from_hex_to_ssz_type",
+        serialize_with = "to_hex_from_ssz_type"
+    )]
     pub pubkey: BLSPubkey,
 }
 

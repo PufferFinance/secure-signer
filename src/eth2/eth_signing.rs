@@ -60,15 +60,9 @@ pub fn compute_domain(
     fork_version: Option<Version>,
     genesis_validators_root: Option<Root>,
 ) -> Domain {
-    let fv = match fork_version {
-        Some(fv) => fv,
-        None => GENESIS_FORK_VERSION,
-    };
-
-    let gvr = match genesis_validators_root {
-        Some(gvr) => gvr,
-        None => [0_u8; 32], // all bytes zero by default
-    };
+    let fv = fork_version.unwrap_or(GENESIS_FORK_VERSION);
+    // let gvr = genesis_validators_root.unwrap_or([0_u8; 32]);
+    let gvr = genesis_validators_root.unwrap_or(Root::default());
     let fork_data_root = compute_fork_data_root(fv, gvr);
     let mut d = [0_u8; 32]; // domain_type + fork_data_root[:28]
     domain_type.iter().enumerate().for_each(|(i, v)| d[i] = *v);
@@ -125,35 +119,6 @@ pub fn get_deposit_signature(
     Ok(dr)
 }
 
-/// https://github.com/ethereum/builder-specs/blob/main/specs/builder.md#signing
-/// Modified to adhere to https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing
-pub fn get_validator_registration_signature(
-    pk_hex: String,
-    validator_registration: ValidatorRegistration,
-) -> Result<BLSSignature> {
-    // altair - works with Lighthouse Web3Signer test...
-    // let fork_version: Version = [128, 0, 0, 105];
-
-    // works with mev-boost test...
-    let fork_version: Version = [0_u8, 0_u8, 0_u8, 0_u8]; // 0x00000000
-
-    let domain = compute_domain(DOMAIN_APPLICATION_BUILDER, Some(fork_version), None);
-    secure_sign(pk_hex, validator_registration, domain)
-}
-
-// Define a new trait
-pub trait Signable {
-    fn to_signing_root(&self) -> Root
-    where
-        Self: Sized;
-}
-
-impl Signable for BLSSignMsg {
-    fn to_signing_root(&self) -> Root {
-        self.to_signing_root()
-    }
-}
-
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 #[allow(non_camel_case_types)]
@@ -201,7 +166,7 @@ impl BLSSignMsg {
         }
     }
 
-    pub fn to_signing_root(&self) -> Root {
+    pub fn to_signing_root(&self, _genesis_fork_version: Option<Version>) -> Root {
         match self {
             // https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/validator.md#signature
             BLSSignMsg::BLOCK(m) | BLSSignMsg::block(m) => {
@@ -300,11 +265,9 @@ impl BLSSignMsg {
                 );
                 compute_signing_root(m.contribution_and_proof.clone(), domain)
             }
-            // https://github.com/ethereum/builder-specs/blob/main/specs/builder.md#signing
+            // https://github.com/ethereum/builder-specs/blob/main/specs/bellatrix/builder.md#signing
             BLSSignMsg::VALIDATOR_REGISTRATION(m) | BLSSignMsg::validator_registration(m) => {
-                // works with mev-boost test...
-                let fork_version: Version = [0_u8, 0_u8, 0_u8, 0_u8]; // 0x00000000
-                let domain = compute_domain(DOMAIN_APPLICATION_BUILDER, Some(fork_version), None);
+                let domain = compute_domain(DOMAIN_APPLICATION_BUILDER, _genesis_fork_version, None);
                 compute_signing_root(m.validator_registration.clone(), domain)
             }
         }

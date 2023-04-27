@@ -1,9 +1,14 @@
 extern crate puffersecuresigner;
-use puffersecuresigner::run;
+use puffersecuresigner::{run, eth2::eth_types::Version, strip_0x_prefix};
 
 #[tokio::main]
 async fn main() {
     let port = std::env::args().nth(1).unwrap_or("3031".into()).parse::<u16>().expect("BAD PORT");
-    println!("Starting SGX Secure-Signer: localhost:{}", port);
-    run(port).await;
+    let genesis_fork_version_str: String = std::env::args().nth(2).unwrap_or("00000000".to_string());
+    let genesis_fork_version_str: String = strip_0x_prefix!(genesis_fork_version_str);
+    let mut genesis_fork_version = Version::default();
+    genesis_fork_version.copy_from_slice(&hex::decode(&genesis_fork_version_str).expect("Bad genesis_fork_version"));
+
+    println!("Starting SGX Secure-Signer: localhost:{}, using genesis_fork_version: {:?}", port, genesis_fork_version);
+    run(port, genesis_fork_version).await;
 }

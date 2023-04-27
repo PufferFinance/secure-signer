@@ -5,7 +5,7 @@ use super::read_secure_signer_port;
 use anyhow::{Context, Result};
 use puffersecuresigner::{
     api::{helpers::SignatureResponse, signing_route::bls_sign_route},
-    eth2::eth_signing::BLSSignMsg,
+    eth2::{eth_signing::BLSSignMsg, eth_types::GENESIS_FORK_VERSION},
 };
 use reqwest::{Client, Response, StatusCode};
 use serde_json;
@@ -14,7 +14,7 @@ pub async fn mock_secure_sign_route(
     bls_pk: &String,
     json_req: &String,
 ) -> warp::http::Response<bytes::Bytes> {
-    let filter = bls_sign_route();
+    let filter = bls_sign_route(GENESIS_FORK_VERSION);
 
     let uri = format!("/api/v1/eth2/sign/{}", bls_pk);
     dbg!(format!("mocking request to: {uri}"));
