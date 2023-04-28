@@ -1,10 +1,10 @@
 # Secure-Signer
-Secure-Signer is a remote signing tool for Ethereum PoS clients, with the following features:
+Secure-Signer is a remote signing tool for Ethereum PoS validators, with the following features:
 
 - Follows the [Web3Signer](https://consensys.github.io/web3signer/web3signer-eth2.html) specification
 - Compatible with existing Consensus clients
 - Designed to run on Intel SGX via the [Occlum LibOS](https://github.com/occlum/occlum)
-- Secure Slash protectection from common [slashable offenses](https://github.com/ethereum/consensus-specs/blob/master/specs/phase0/validator.md#how-to-avoid-slashing)
+- Provides protection from [slashable offenses](https://github.com/ethereum/consensus-specs/blob/master/specs/phase0/validator.md#how-to-avoid-slashing)
 
 Validator keys are safeguarded in SGX's encrypted memory and the hardware enforces that Secure-Signer can only sign non-slashable messages. This reduces validator risk from slashing either from accidents or if their system is compromised.
 
@@ -26,26 +26,29 @@ Validator keys are safeguarded in SGX's encrypted memory and the hardware enforc
 
 ## Roadmap
 - [x] Open source the alpha code
-- [ ] Formal verification specification
-- [ ] Convert modules into their own crates
+- [ ] Convert modules into their own open source crates
+- [ ] Standardize the remote-signing specs
+- [ ] Port to other LibOs's
+- [ ] Support non-SGX TEEs
 
 ### TODO
-- [ ] Code review and Audit
+- [ ] API endpoint to GET EIP-3076 SlashProtection database
+- [ ] Code review and audit
 - [ ] Support DCAP remote attestation
-- [ ] API endpoint to read current SlashProtection database
 
 ### Known Limitations / Issues
-- [ ] Limited to only 1 key at a time
-   - [ ] footgun: if you import an existing key, you expose yourself to slashing risk. 
+- Only one validator key can be imported at a time
+- **footgun**: if you import an existing validator key, you expose yourself to slashing risk either via stale SlashProtection database or if you run the same key across multiple clients. We recommend [generating fresh keys within Secure-Signer](https://pufferfinance.github.io/secure-signer/running/client#generating-a-validator-key-in-secure-signer) to mitigate this.
 
 
 --- 
-## Acknowledgement
 
-Secure Signer uses the following dependencies with the mentioned licenses, some code might have been insipired by their design decisions as well.
+## Acknowledgements
+Secure-Signer is funded via an [Ethereum Foundation grant](https://blog.ethereum.org/2023/02/22/allocation-update-q4-22).
+
+The following dependencies were used and some code might have been insipired by their design decisions as well:
 
 - [Occulum](https://github.com/occlum/occlum) LibOS - [BSD License](https://github.com/occlum/occlum/blob/master/LICENSE)
-
 
 
 ## License 
