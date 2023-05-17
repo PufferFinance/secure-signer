@@ -37,7 +37,7 @@ Validator keys are safeguarded in SGX's encrypted memory and the hardware enforc
 - [ ] Support DCAP remote attestation
 
 ### Known Limitations / Issues
-- Only one validator key can be imported at a time
+- Only one validator key can be imported per API call
 - **footgun**: if you import an existing validator key, you expose yourself to slashing risk either via stale SlashProtection database or if you run the same key across multiple clients. We recommend [generating fresh keys within Secure-Signer](https://pufferfinance.github.io/secure-signer/running/client#generating-a-validator-key-in-secure-signer) to mitigate this.
 
 
