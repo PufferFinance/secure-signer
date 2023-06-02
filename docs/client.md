@@ -40,9 +40,9 @@ Options:
   -i, --import
           Requests Secure-Signer to import a keystore [requires --mrenclave, --keystore-path, --password-path]
       --keystore-path <KEYSTORE_PATH>
-          The password to the keystore
+          The path to the keystore.JSON
       --password-path <PASSWORD_PATH>
-          The password to the keystore
+          The path to the password.txt
       --slash-protection-path <SLASH_PROTECTION_PATH>
           The path to EIP-3076 .JSON to import with the keystore
   -d, --deposit
