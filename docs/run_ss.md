@@ -66,11 +66,11 @@ root@Puffer-Dev:/Secure-Signer#
 </div>
 
 ### Run Secure-Signer
-The Secure-Signer enclave is built using the [Occlum LibOS](https://github.com/occlum/occlum). To start Secure-Signer we will use the `occlum run` command and point to the `secure-signer` binary stored within the Occlum enclave image and specify port `9003`.
+The Secure-Signer enclave is built using the [Occlum LibOS](https://github.com/occlum/occlum). To start Secure-Signer we will use the `occlum run` command and point to the `secure-signer` binary stored within the Occlum enclave image and specify port `9001`.
 <div class="code-example" markdown="1">
 ```bash
-root@Puffer-Dev:/Secure-Signer# occlum run /bin/secure-signer 9003                                                                     
-Starting SGX Secure-Signer: localhost:9003 
+root@Puffer-Dev:/Secure-Signer# occlum run /bin/secure-signer 9001                                                                     
+Starting SGX Secure-Signer: localhost:9001 
 ```
 </div>
 
@@ -80,8 +80,8 @@ The Secure-Signer HTTP server is now running!
 <div class="code-example" markdown="1">
 Alternatively, you can start Secure-Signer without attaching to the container by running the following:
 ```bash
-puffer@Puffer-Dev:~$ docker exec secure_signer_container /bin/bash -c "occlum run /bin/secure-signer 9003"
-Starting SGX Secure-Signer: localhost:9003 
+puffer@Puffer-Dev:~$ docker exec secure_signer_container /bin/bash -c "occlum run /bin/secure-signer 9001"
+Starting SGX Secure-Signer: localhost:9001 
 ```
 </div>
 
