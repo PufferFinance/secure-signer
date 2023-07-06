@@ -9,6 +9,7 @@ use puffersecuresigner::{
 use anyhow::{Context, Result};
 use reqwest::{Client, Response, StatusCode};
 use serde_json;
+use std::env;
 
 pub async fn mock_eth_keygen_route() -> warp::http::Response<bytes::Bytes> {
     let filter = eth_keygen_route();
@@ -75,19 +76,29 @@ async fn test_register_new_eth_key() {
 
 #[tokio::test]
 async fn test_eth_key_in_remote_attestation_evidence() {
-    let port = read_secure_signer_port();
-    let resp = register_new_eth_key(port).await;
-    dbg!(&resp.pk_hex);
+    match env::var("LOCAL_DEV") {
+        // Disable test if local dev is set.
+        Ok(_e) => {
 
-    // Verify the report is valid
-    resp.evidence.verify_intel_signing_certificate().unwrap();
+        },
 
-    // Verify the payload
-    let pk = eth_keys::eth_pk_from_hex(&resp.pk_hex).unwrap();
+        // Local dev is not set so use SGX.
+        Err(_e) => {
+            let port = read_secure_signer_port();
+            let resp = register_new_eth_key(port).await;
+            dbg!(&resp.pk_hex);
 
-    let got_payload: [u8; 64] = resp.evidence.get_report_data().unwrap();
-    assert_eq!(
-        hex::encode(&got_payload[0..ETH_COMPRESSED_PK_BYTES]),
-        hex::encode(pk.serialize_compressed())
-    );
+            // Verify the report is valid
+            resp.evidence.verify_intel_signing_certificate().unwrap();
+
+            // Verify the payload
+            let pk = eth_keys::eth_pk_from_hex(&resp.pk_hex).unwrap();
+
+            let got_payload: [u8; 64] = resp.evidence.get_report_data().unwrap();
+            assert_eq!(
+                hex::encode(&got_payload[0..ETH_COMPRESSED_PK_BYTES]),
+                hex::encode(pk.serialize_compressed())
+            );
+        },
+    }
 }

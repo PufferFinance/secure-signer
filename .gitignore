@@ -19,4 +19,11 @@ etc/
 keys/
 keystores/
 ss_out/
-Secure-Signer/
+Secure-Signer/*
+
+# Avoid adding consensus spec files to repo.
+tests/consensus-spec-tests/
+tests/*rc*.gz
+
+# Preferences
+.vscode/
