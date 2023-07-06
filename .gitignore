@@ -19,6 +19,11 @@ etc/
 keys/
 keystores/
 ss_out/
+Secure-Signer/*
+
+# Can't keep empty folders but need it for tests not to break.
+# So this file is kept here as a place holder.
+!Secure-Signer/.__occlum_status
 
 # Avoid adding consensus spec files to repo.
 tests/consensus-spec-tests/
