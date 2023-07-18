@@ -15,4 +15,4 @@ jobs:
       - uses: actions/checkout@v3
   
       - name: build and test on local container
-        run: bash LOCAL_DEV=true ../build_secure_signer.sh -t _testResults
+        run: bash ../build_secure_signer.sh $LOCAL_DEV=true -t _testResults
