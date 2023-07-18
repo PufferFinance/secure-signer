@@ -2,10 +2,10 @@ name: secure-signer CI
 
 on:
   push:
-    branches: [ feature/unit-test-ci ]
+    branches: [ main ]
     paths: .github/workflows/unit-test.yml
   pull_request:
-    branches: [ feature/unit-test-ci ]
+    branches: [ main ]
     paths: .github/workflows/unit-test.yml
     
 jobs:
