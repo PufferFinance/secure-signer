@@ -1,0 +1,16 @@
+name: secure-signer CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+    
+jobs:
+  test:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+  
+      - name: build and test on local container
+        run: bash LOCAL_DEV=true build_secure_signer.sh -t _testResults
