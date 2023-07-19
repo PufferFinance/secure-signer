@@ -40,5 +40,5 @@ jobs:
         shell: bash
   
       - name: 'Run unit tests'
-        run: build_secure_signer.sh $LOCAL_DEV=true -t
+        run: cargo test -- --test-threads 1 
         shell: bash
