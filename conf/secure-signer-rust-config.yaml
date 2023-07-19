@@ -4,4 +4,4 @@ targets:
   - target: /bin
     copy:
       - files:
-        - /root/secure-signer/target/x86_64-unknown-linux-musl/release/secure-signer
+        - ../target/x86_64-unknown-linux-musl/release/secure-signer
