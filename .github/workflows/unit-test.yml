@@ -25,7 +25,7 @@ jobs:
           make
         shell: bash
         
-      - name: 'Clean up'
+      - name: 'Clean up archives'
         run: |
           cd tests
           make clean-archives
