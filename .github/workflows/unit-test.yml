@@ -20,11 +20,11 @@ jobs:
         shell: bash
         
       - name: 'Install Openssl-dev'
-        run: apt install libssl-dev
+        run: sudo apt install libssl-dev
         shell: bash
         
       - name: 'Install pkg-config'
-        run: apt install pkg-config
+        run: sudo apt install pkg-config
         shell: bash
         
       - name: 'Make test'
