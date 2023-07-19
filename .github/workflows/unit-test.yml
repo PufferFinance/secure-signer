@@ -2,17 +2,39 @@ name: secure-signer CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ feature/unit-test-ci ]
     paths: .github/workflows/unit-test.yml
   pull_request:
-    branches: [ main ]
+    branches: [ feature/unit-test-ci ]
     paths: .github/workflows/unit-test.yml
     
 jobs:
   test:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3
+      - name: 'Checkout'
+        uses: actions/checkout@v3
+      
+      - name: 'Install rust'
+        run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+        shell: bash
+        
+      - name: 'Install Openssl-dev'
+        run: apt install libssl-dev
+        shell: bash
+        
+      - name: 'Install pkg-config'
+        run: apt install pkg-config
+        shell: bash
+        
+      - name: 'Make test'
+        run: /tests make
+        shell: bash
+        
+      - name: 'Clean up'
+        run: /tests make clean-archives
+        shell: bash
   
-      - name: build and test on local container
-        run: bash build_secure_signer.sh $LOCAL_DEV=true -t
+      - name: 'Run unit tests'
+        run: build_secure_signer.sh $LOCAL_DEV=true -t
+        shell: bash
