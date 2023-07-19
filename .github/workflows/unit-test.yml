@@ -19,14 +19,6 @@ jobs:
         run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain none -y
         shell: bash
         
-      - name: 'Install Openssl-dev'
-        run: sudo apt install libssl-dev
-        shell: bash
-        
-      - name: 'Install pkg-config'
-        run: sudo apt install pkg-config
-        shell: bash
-        
       - name: 'Make tests'
         run: |
           cd tests
