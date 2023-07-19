@@ -27,12 +27,16 @@ jobs:
         run: sudo apt install pkg-config
         shell: bash
         
-      - name: 'Make test'
-        run: /tests make
+      - name: 'Make tests'
+        run: |
+          cd tests
+          make
         shell: bash
         
       - name: 'Clean up'
-        run: /tests make clean-archives
+        run: |
+          cd tests
+          make clean-archives
         shell: bash
   
       - name: 'Run unit tests'
