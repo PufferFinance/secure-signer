@@ -1,0 +1,36 @@
+name: secure-signer CI
+
+on:
+  push:
+    branches: [ main ]
+    paths: .github/workflows/unit-test.yml
+  pull_request:
+    branches: [ main ]
+    paths: .github/workflows/unit-test.yml
+    
+jobs:
+  test:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: 'Checkout latest'
+        uses: actions/checkout@v3
+      
+      - name: 'Install rust'
+        run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain none -y
+        shell: bash
+        
+      - name: 'Make tests'
+        run: |
+          cd tests
+          make
+        shell: bash
+        
+      - name: 'Clean up archives'
+        run: |
+          cd tests
+          make clean-archives
+        shell: bash
+  
+      - name: 'Run unit-tests'
+        run: cargo test -- --test-threads 1 
+        shell: bash
