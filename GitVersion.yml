@@ -1,0 +1,23 @@
+mode: Mainline
+increment: Inherit
+update-build-number: true
+branches:
+  main:
+    regex: ^main$
+    is-mainline: true
+  release:
+    regex: .+release?[/-]
+    tag: useBranchName
+    increment: Major
+  feature:
+    regex: .+feature?[/-]
+    tag: useBranchName
+    increment: Minor
+  hotfix:
+    regex: .+(bugfix|hotfix(es)?)[/-]
+    tag: useBranchName
+    increment: Patch
+ignore: 
+  sha: []
+merge-message-formats: {}
+assembly-file-versioning-format: '{Major}.{Minor}.{Patch}.{env:GITHUB_RUN_NUMBER}'
