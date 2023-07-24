@@ -1,0 +1,33 @@
+name: "git versioning"
+on:
+  workflow_dispatch:
+  pull_request:
+  push: 
+    branches:
+     - main
+     - master
+ 
+env:
+  BUILD-NUMBER: ${{github.run_number}}
+
+jobs:
+  check-semantic-version:
+    runs-on: [ubuntu-latest]
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+ 
+    - name: Install GitVersion
+      uses: gittools/actions/gitversion/setup@v0
+      with:
+        versionSpec: '5.x'
+    - name: Determine Version
+      id:   gitversion
+      uses: gittools/actions/gitversion/execute@v0
+      with:
+        useConfigFile: true
+        configFilePath: GitVersion.yml
+        updateAssemblyInfo: true
+    - name: Semver
+      run: echo $GITVERSION_SEMVER
