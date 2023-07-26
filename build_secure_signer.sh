@@ -101,7 +101,7 @@ function build() {
 }
 
 function build_client() {
-	${cargo_bin} build --release --bin client 
+	${cargo_bin} build --release --bin client --features=clap
 }
 
 
