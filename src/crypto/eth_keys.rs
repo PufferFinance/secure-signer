@@ -2,10 +2,10 @@ use crate::constants::{ETH_COMPRESSED_PK_BYTES, ETH_SIGNATURE_BYTES};
 use crate::io::key_management::{read_eth_key, write_eth_key};
 use crate::strip_0x_prefix;
 
-use ecies::{PublicKey as EthPublicKey, SecretKey as EthSecretKey, utils::generate_keypair};
+use anyhow::{bail, Context, Result};
+use ecies::{utils::generate_keypair, PublicKey as EthPublicKey, SecretKey as EthSecretKey};
 use libsecp256k1::{Message, Signature};
 use sha3::{Digest, Keccak256};
-use anyhow::{bail, Context, Result};
 
 /// Wrapper around ecies utility function to generate SECP256K1 keypair
 pub fn new_eth_key() -> Result<(EthSecretKey, EthPublicKey)> {
@@ -92,7 +92,11 @@ pub fn sign_message(message: &[u8], secret_key: &EthSecretKey) -> Result<(Signat
 }
 
 /// Verify the signature over keccak256(message) using SECP256K1 secret key
-pub fn verify_message(message: &[u8], signature: &[u8; ETH_SIGNATURE_BYTES], public_key: &EthPublicKey) -> Result<bool> {
+pub fn verify_message(
+    message: &[u8],
+    signature: &[u8; ETH_SIGNATURE_BYTES],
+    public_key: &EthPublicKey,
+) -> Result<bool> {
     // Hash the message with Keccak256
     let mut hasher = Keccak256::new();
     hasher.update(message);
@@ -130,7 +134,10 @@ pub fn envelope_decrypt(secret_key: &EthSecretKey, encrypted_message: &[u8]) -> 
 /// Wrapper over `envelope_decrypt` that fetches the secret key corresponding to the
 /// provided `eth_pk_hex` from the saved secret key file and uses it to decrypt the
 /// encrypted message.
-pub fn envelope_decrypt_from_saved_sk(eth_pk_hex: &String, encrypted_message: &[u8]) -> Result<Vec<u8>> {
+pub fn envelope_decrypt_from_saved_sk(
+    eth_pk_hex: &String,
+    encrypted_message: &[u8],
+) -> Result<Vec<u8>> {
     // Fetch the secret key from file
     let secret_key = fetch_eth_key(&eth_pk_hex)?;
 
@@ -277,7 +284,8 @@ mod tests {
         let encrypted_message = envelope_encrypt(&public_key, &message[..]).unwrap();
 
         // Decrypt the encrypted message using the saved secret key
-        let decrypted_message = envelope_decrypt_from_saved_sk(&eth_pk_hex, &encrypted_message).unwrap();
+        let decrypted_message =
+            envelope_decrypt_from_saved_sk(&eth_pk_hex, &encrypted_message).unwrap();
 
         // The decrypted message should be the same as the original message
         assert_eq!(message.to_vec(), decrypted_message);

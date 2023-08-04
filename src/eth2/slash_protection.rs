@@ -1,12 +1,14 @@
 use crate::strip_0x_prefix;
 
 use super::eth_types::{
-    de_signing_root, se_signing_root, from_hex_to_ssz_type, to_hex_from_ssz_type, BLSPubkey, Epoch, Root, Slot,
+    de_signing_root, from_hex_to_ssz_type, se_signing_root, to_hex_from_ssz_type, BLSPubkey, Epoch,
+    Root, Slot,
 };
 use crate::constants::SLASHING_PROTECTION_DIR;
 
 use anyhow::{bail, Context, Result};
 use hex;
+use log::{debug, error};
 use serde::{Deserialize, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 use serde_utils::quoted_u64;
@@ -14,8 +16,6 @@ use ssz::Encode;
 use ssz_types::FixedVector;
 use std::fs;
 use std::path::PathBuf;
-use log::{debug, error};
-
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SlashingProtectionMetaData {
@@ -26,7 +26,10 @@ pub struct SlashingProtectionMetaData {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SlashingProtectionData {
-    #[serde(deserialize_with = "from_hex_to_ssz_type", serialize_with = "to_hex_from_ssz_type")]
+    #[serde(
+        deserialize_with = "from_hex_to_ssz_type",
+        serialize_with = "to_hex_from_ssz_type"
+    )]
     pub pubkey: BLSPubkey,
     pub signed_blocks: Vec<SignedBlockSlot>,
     pub signed_attestations: Vec<SignedAttestationEpochs>,
@@ -139,7 +142,8 @@ impl SlashingProtectionData {
         let pk_hex: String = strip_0x_prefix!(pk_hex);
         let file_path: PathBuf = [SLASHING_PROTECTION_DIR, &pk_hex].iter().collect();
         let json_vec = fs::read(file_path)?;
-        let json = serde_json::from_slice(&json_vec).with_context(|| "failed to read protection data")?;
+        let json =
+            serde_json::from_slice(&json_vec).with_context(|| "failed to read protection data")?;
         debug!("Reading Slash Protection DB:\n{:#?}", json);
         Ok(json)
     }

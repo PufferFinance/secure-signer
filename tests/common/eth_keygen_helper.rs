@@ -76,14 +76,9 @@ async fn test_register_new_eth_key() {
 
 #[tokio::test]
 async fn test_eth_key_in_remote_attestation_evidence() {
-    match env::var("LOCAL_DEV") {
-        // Disable test if local dev is set.
-        Ok(_e) => {
-
-        },
+    if env::var("SECURE_SIGNER_PORT").is_ok(){
 
         // Local dev is not set so use SGX.
-        Err(_e) => {
             let port = read_secure_signer_port();
             let resp = register_new_eth_key(port).await;
             dbg!(&resp.pk_hex);
@@ -99,6 +94,5 @@ async fn test_eth_key_in_remote_attestation_evidence() {
                 hex::encode(&got_payload[0..ETH_COMPRESSED_PK_BYTES]),
                 hex::encode(pk.serialize_compressed())
             );
-        },
     }
 }

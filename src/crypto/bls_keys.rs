@@ -3,8 +3,7 @@ use crate::io::key_management::{read_bls_key, write_bls_key};
 use crate::strip_0x_prefix;
 
 use blsttc::{
-    PublicKeySet, PublicKeyShare, SecretKeySet, SecretKeyShare, Signature,
-    SignatureShare,
+    PublicKeySet, PublicKeyShare, SecretKeySet, SecretKeyShare, Signature, SignatureShare,
 };
 
 use anyhow::{bail, Context, Result};
@@ -16,7 +15,7 @@ pub fn sanitize_bls_pk_hex(bls_pk_hex: &String) -> Result<String> {
     // The length expected to be double since hex-encoded
     if bls_pk.len() != 2 * BLS_PUB_KEY_BYTES {
         bail!("Invalid bls_pk_hex length")
-    }            
+    }
     Ok(bls_pk)
 }
 

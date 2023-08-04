@@ -1,13 +1,13 @@
 // #[macro_use]
 extern crate anyhow;
-extern crate libc;
 extern crate env_logger;
+extern crate libc;
 
-pub mod constants;
-pub mod eth2;
-pub mod crypto;
-pub mod io;
 pub mod api;
+pub mod constants;
+pub mod crypto;
+pub mod eth2;
+pub mod io;
 
 use eth2::eth_types::Version;
 use warp::Filter;
@@ -45,10 +45,10 @@ pub async fn run(port: u16, genesis_fork_version: Version) {
         // Endpoint to sign DepositData message for registering validator on beacon chain
         .or(api::deposit_route::validator_deposit_route());
 
-    // Endpoint to request a signature using BLS sk 
+    // Endpoint to request a signature using BLS sk
     // Wrapped in a log filter
-    let bls_sign_route_with_log = api::signing_route::bls_sign_route(genesis_fork_version)
-        .with(warp::log("bls_sign_route"));
+    let bls_sign_route_with_log =
+        api::signing_route::bls_sign_route(genesis_fork_version).with(warp::log("bls_sign_route"));
 
     // Combine the routes
     let all_routes = routes.or(bls_sign_route_with_log);

@@ -20,9 +20,7 @@ pub fn validator_deposit_route() -> impl Filter<Extract = impl Reply, Error = Re
 }
 
 /// Signs the DepositMessage inside the DepositRequest and returns a DepositResponse
-async fn sign_deposit_data(
-    req: DepositRequest,
-) -> Result<impl warp::Reply, warp::Rejection> {
+async fn sign_deposit_data(req: DepositRequest) -> Result<impl warp::Reply, warp::Rejection> {
     let bls_pk_hex = hex::encode(req.deposit.pubkey.as_ssz_bytes());
     // Sanitize the input bls_pk_hex
     let bls_pk_hex = match bls_keys::sanitize_bls_pk_hex(&bls_pk_hex) {
@@ -39,8 +37,7 @@ async fn sign_deposit_data(
         return Ok(error_response(
             &format!("This validator key does not exist"),
             StatusCode::PRECONDITION_FAILED,
-        ))
-
+        ));
     }
 
     info!("Deposit request for validator pubkey: {bls_pk_hex}");

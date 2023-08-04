@@ -2,7 +2,7 @@ use super::helpers::{error_response, success_response};
 use super::KeyGenResponse;
 use crate::eth2::slash_protection::SlashingProtectionData;
 use crate::{crypto::bls_keys, io::remote_attestation::AttestationEvidence};
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use blsttc::PublicKey;
 use log::info;
 use warp::{http::StatusCode, Filter, Rejection, Reply};

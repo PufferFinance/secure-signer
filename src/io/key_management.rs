@@ -127,9 +127,9 @@ pub fn list_eth_keys() -> Result<Vec<String>> {
 
 #[cfg(test)]
 mod test_key_management {
+    use super::*;
     use crate::constants::KEYS_DIR;
     use std::path::Path;
-    use super::*;
 
     // Helper function to read the content of a file
     fn read_file(file_path: &Path) -> Result<String> {

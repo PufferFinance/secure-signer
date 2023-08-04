@@ -23,7 +23,7 @@ pub async fn import_from_files(
     password_file: PathBuf,
     slash_protection_file: Option<PathBuf>,
     mrenclave: &String,
-    verify_ra_evidence: bool
+    verify_ra_evidence: bool,
 ) -> Result<KeyImportResponse> {
     // Read keystore file
     let keystore = read_to_string(keystore_file.clone())
@@ -52,12 +52,12 @@ pub async fn import_from_files(
             let enclave_eth_pk = resp.validate_eth_ra(mrenclave)?;
             let encrypting_pk_hex = eth_keys::eth_pk_to_hex(&enclave_eth_pk);
             (enclave_eth_pk, encrypting_pk_hex)
-        },
+        }
         false => {
             let enclave_eth_pk = eth_keys::eth_pk_from_hex(&resp.pk_hex)?;
             let encrypting_pk_hex = eth_keys::eth_pk_to_hex(&enclave_eth_pk);
             (enclave_eth_pk, encrypting_pk_hex)
-        } 
+        }
     };
 
     info!("Using enclave generated eth pk to encrypt password: {encrypting_pk_hex}");
@@ -118,7 +118,6 @@ async fn dummy_import() {
     let mut keystore_file = File::create(&keystore_path).unwrap();
     write!(keystore_file, "{}", keystore).unwrap();
 
-
     // Write file to /tmp/password
     let encoded_pw = vec![
         116, 101, 115, 116, 112, 97, 115, 115, 119, 111, 114, 100, 240, 159, 148, 145,
@@ -172,7 +171,7 @@ async fn dummy_import() {
         keystore_path.clone(),
         password_path.clone(),
         Some(slashing_protection_path.clone()),
-        mrenclave
+        mrenclave,
     )
     .await;
 

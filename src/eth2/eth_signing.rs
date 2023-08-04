@@ -2,10 +2,10 @@ use super::eth_types::*;
 use crate::crypto::bls_keys;
 
 use anyhow::Result;
+use log::info;
 use serde::{Deserialize, Serialize};
 use ssz::Encode;
 use tree_hash::TreeHash;
-use log::info;
 
 /// Return the signing root for the corresponding signing data.
 fn compute_signing_root<T: Encode + TreeHash>(ssz_object: T, domain: Domain) -> Root {
@@ -267,7 +267,8 @@ impl BLSSignMsg {
             }
             // https://github.com/ethereum/builder-specs/blob/main/specs/bellatrix/builder.md#signing
             BLSSignMsg::VALIDATOR_REGISTRATION(m) | BLSSignMsg::validator_registration(m) => {
-                let domain = compute_domain(DOMAIN_APPLICATION_BUILDER, _genesis_fork_version, None);
+                let domain =
+                    compute_domain(DOMAIN_APPLICATION_BUILDER, _genesis_fork_version, None);
                 compute_signing_root(m.validator_registration.clone(), domain)
             }
         }

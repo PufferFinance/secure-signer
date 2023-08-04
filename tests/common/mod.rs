@@ -7,8 +7,8 @@ pub mod bls_import_helper;
 pub mod bls_keygen_helper;
 pub mod eth_keygen_helper;
 pub mod eth_specs;
-pub mod signing_helper;
 pub mod getter_routes_helper;
+pub mod signing_helper;
 
 /// Reads the `SECURE_SIGNER_PORT` environment variable.
 /// If the return value is Some(port), it is expected that Secure-Aggregator is running on localhost:port

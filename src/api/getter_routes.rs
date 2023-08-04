@@ -2,9 +2,9 @@ use super::helpers::{error_response, success_response};
 use crate::io::key_management;
 
 use anyhow::Result;
+use log::info;
 use serde::{Deserialize, Serialize};
 use warp::{http::StatusCode, Filter};
-use log::info;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ListKeysResponseInner {
@@ -54,7 +54,8 @@ async fn list_bls_keys_service() -> Result<impl warp::Reply, warp::Rejection> {
 }
 
 /// Returns all hex-encoded BLS public keys, where the private keys are currently in the Enclave's custody
-pub fn list_bls_keys_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+pub fn list_bls_keys_route(
+) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::get()
         .and(warp::path("eth"))
         .and(warp::path("v1"))
@@ -80,7 +81,8 @@ async fn list_eth_keys_service() -> Result<impl warp::Reply, warp::Rejection> {
 }
 
 /// Returns all hex-encoded ETH public keys, where the private keys were generated and saved in the Enclave.
-pub fn list_eth_keys_route() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+pub fn list_eth_keys_route(
+) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::get()
         .and(warp::path("eth"))
         .and(warp::path("v1"))

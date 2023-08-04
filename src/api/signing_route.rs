@@ -12,7 +12,9 @@ use warp::{http::StatusCode, Filter, Rejection, Reply};
 
 /// BLS signs a valid Eth2 message if it is not slashable
 /// https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing
-pub fn bls_sign_route(genesis_fork_version: Version) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+pub fn bls_sign_route(
+    genesis_fork_version: Version,
+) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
     warp::post()
         .and(warp::path("api"))
         .and(warp::path("v1"))
@@ -150,7 +152,7 @@ async fn secure_sign_bls(
             return Ok(error_response(
                 &format!("Signing operation failed: {:?}", e),
                 StatusCode::INTERNAL_SERVER_ERROR,
-            ))
+            ));
         }
     }
 
@@ -165,7 +167,7 @@ async fn secure_sign_bls(
             return Ok(error_response(
                 &format!("Signing operation failed: {:?}", e),
                 StatusCode::INTERNAL_SERVER_ERROR,
-            ))
+            ));
         }
     }
 }
