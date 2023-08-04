@@ -54,7 +54,7 @@ impl KeyGenResponse {
         let mrenclave: String = strip_0x_prefix!(mrenclave);
         let got_mrenclave = self.evidence.get_mrenclave()?;
         if mrenclave != got_mrenclave {
-            bail!("Received MRENCLAVE {got_mrenclave} does not match expected {mrenclave}")
+            bail!("Received MRENCLAVE {mrenclave} does not match expected {got_mrenclave}")
         }
 
         // Get the expected public key from payload
@@ -78,7 +78,7 @@ impl KeyGenResponse {
         let mrenclave: String = strip_0x_prefix!(mrenclave);
         let got_mrenclave = self.evidence.get_mrenclave()?;
         if mrenclave != got_mrenclave {
-            bail!("Received MRENCLAVE {got_mrenclave} does not match expected {mrenclave}")
+            bail!("Received MRENCLAVE {mrenclave} does not match expected {got_mrenclave}")
         }
 
         // Verify the payload
