@@ -1,5 +1,9 @@
-use puffersecuresigner::api::getter_routes::{ListKeysResponse, list_eth_keys_route, list_bls_keys_route};
-use crate::common::{bls_keygen_helper::register_new_bls_key, eth_keygen_helper::register_new_eth_key};
+use crate::common::{
+    bls_keygen_helper::register_new_bls_key, eth_keygen_helper::register_new_eth_key,
+};
+use puffersecuresigner::api::getter_routes::{
+    list_bls_keys_route, list_eth_keys_route, ListKeysResponse,
+};
 
 use super::read_secure_signer_port;
 
@@ -22,10 +26,7 @@ pub async fn mock_list_eth_keys_route() -> warp::http::Response<bytes::Bytes> {
 pub async fn request_list_eth_keys_route(port: u16) -> Result<Response, reqwest::Error> {
     let client = Client::new();
     let url = format!("http://localhost:{}/eth/v1/keygen/secp256k1", port);
-    let response = client
-        .get(&url)
-        .send()
-        .await;
+    let response = client.get(&url).send().await;
 
     response
 }
@@ -34,7 +35,7 @@ pub async fn mock_list_bls_keys_route() -> warp::http::Response<bytes::Bytes> {
     let filter = list_bls_keys_route();
     let res = warp::test::request()
         .method("GET")
-        .path("eth/v1/keystores")
+        .path("/eth/v1/keystores")
         .reply(&filter)
         .await;
     res
@@ -43,10 +44,7 @@ pub async fn mock_list_bls_keys_route() -> warp::http::Response<bytes::Bytes> {
 pub async fn request_list_bls_keys_route(port: u16) -> Result<Response, reqwest::Error> {
     let client = Client::new();
     let url = format!("http://localhost:{}/eth/v1/keystores", port);
-    let response = client
-        .get(&url)
-        .send()
-        .await;
+    let response = client.get(&url).send().await;
 
     response
 }
@@ -98,20 +96,19 @@ pub async fn make_list_request(
                 let resp = mock_list_bls_keys_route().await;
                 dbg!(&resp);
                 let keys: Result<ListKeysResponse> = serde_json::from_slice(resp.body())
-                .with_context(|| "Failed to parse to ListKeysResponse");
+                    .with_context(|| "Failed to parse to ListKeysResponse");
                 (resp.status().into(), keys)
             }
             ListRequestKind::ETH => {
                 let resp = mock_list_eth_keys_route().await;
                 dbg!(&resp);
                 let keys: Result<ListKeysResponse> = serde_json::from_slice(resp.body())
-                .with_context(|| "Failed to parse to ListKeysResponse");
+                    .with_context(|| "Failed to parse to ListKeysResponse");
                 (resp.status().into(), keys)
             }
         },
     }
 }
-
 
 /// Verifies the supplied bls_pk_hex is one of the returned keys when querying the Secure-Signer's known bls keys
 pub async fn bls_key_exists(bls_pk_hex: &str, port: Option<u16>) -> bool {

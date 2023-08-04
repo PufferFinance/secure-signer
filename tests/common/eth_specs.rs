@@ -187,10 +187,10 @@ fn get_test_vec_sync_committee_message(ssz_file: &Path, root_file: &Path) -> Res
     let sync_committee_message =
         get_test_vec_container::<SyncCommitteeMessage>(ssz_file, root_file)?;
 
-        let req_wrapper = SyncCommitteeMessageRequestWrapper {
-            slot: sync_committee_message.slot,
-            beacon_block_root: sync_committee_message.beacon_block_root,
-        };
+    let req_wrapper = SyncCommitteeMessageRequestWrapper {
+        slot: sync_committee_message.slot,
+        beacon_block_root: sync_committee_message.beacon_block_root,
+    };
 
     let req = SyncCommitteeMessageRequest {
         fork_info: get_fork_info(),

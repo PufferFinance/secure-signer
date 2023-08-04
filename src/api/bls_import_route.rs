@@ -1,16 +1,16 @@
 use super::helpers::{error_response, success_response};
-use super::{KeyImportResponse, KeyImportRequest};
+use super::{KeyImportRequest, KeyImportResponse};
 use crate::constants::BLS_PRIV_KEY_BYTES;
 use crate::crypto::bls_keys;
-use crate::eth2::slash_protection::{SlashingProtectionData, SlashingProtectionDB};
 use crate::crypto::{eth_keys, keystore::import_keystore};
-use anyhow::{Result, bail, Context};
+use crate::eth2::slash_protection::{SlashingProtectionDB, SlashingProtectionData};
+use anyhow::{bail, Context, Result};
 use blsttc::SecretKeySet;
-use log::{info, error};
+use log::{error, info};
 use ssz::Encode;
 use warp::{http::StatusCode, Filter, Rejection, Reply};
 
-/// Imports a BLS private key to the Enclave. 
+/// Imports a BLS private key to the Enclave.
 /// https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Keymanager
 pub fn bls_key_import_route() -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
     warp::post()
@@ -22,8 +22,8 @@ pub fn bls_key_import_route() -> impl Filter<Extract = impl Reply, Error = Rejec
 }
 
 /// Decrypts a BLS keystore where the password was encrypted via ECDH with an SECP256K1 key
-/// safeguarded by the TEE, then saves the bls key to enclave memory. Expects the 
-/// ETH encrypting_pk_hex to be compressed (33 bytes) and hex-encoded. 
+/// safeguarded by the TEE, then saves the bls key to enclave memory. Expects the
+/// ETH encrypting_pk_hex to be compressed (33 bytes) and hex-encoded.
 pub fn decrypt_and_save_imported_bls_key(req: &KeyImportRequest) -> Result<String> {
     // Decrypt bls secret key from keystore json
     let eth_sk = eth_keys::fetch_eth_key(&req.encrypting_pk_hex)?;
@@ -35,7 +35,7 @@ pub fn decrypt_and_save_imported_bls_key(req: &KeyImportRequest) -> Result<Strin
 
     let sk = SecretKeySet::from_bytes(sk_bytes)?;
 
-    // Get the public key: 
+    // Get the public key:
     let pk = sk.public_keys().public_key();
     let pk_hex = pk.to_hex();
 
@@ -45,16 +45,17 @@ pub fn decrypt_and_save_imported_bls_key(req: &KeyImportRequest) -> Result<Strin
             // Generate fresh slashing protection
             let db = SlashingProtectionData::from_pk_hex(&pk_hex)?;
             db.write()?;
-        },
+        }
         Some(sp) => {
-            let db: SlashingProtectionDB = SlashingProtectionDB::from_str(sp).with_context(|| "Failed to deserialize SlashProtectionDB")?;
+            let db: SlashingProtectionDB = SlashingProtectionDB::from_str(sp)
+                .with_context(|| "Failed to deserialize SlashProtectionDB")?;
             // KNOWN LIMITATION: Only support one keystore
             match db.data.first() {
                 None => {
                     // Generate fresh slashing protection
                     let db = SlashingProtectionData::from_pk_hex(&pk_hex)?;
                     db.write()?;
-                }, 
+                }
                 Some(data) => {
                     // Verify the supplied slash protection matches the pk
                     if hex::encode(data.pubkey.as_ssz_bytes()) == pk_hex {
@@ -67,7 +68,7 @@ pub fn decrypt_and_save_imported_bls_key(req: &KeyImportRequest) -> Result<Strin
             }
         }
     }
-    
+
     // Save the BLS key to enclave memory
     bls_keys::save_bls_key(&sk)?;
     info!("Imported BLS keystore with pk: {pk_hex}");

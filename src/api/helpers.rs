@@ -1,15 +1,12 @@
-use serde::{Deserialize, Serialize};
 use anyhow::Result;
-use warp::{http::StatusCode, reply};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use warp::{http::StatusCode, reply};
 
 use crate::{eth2::eth_types::BLSSignature, strip_0x_prefix};
 
 pub fn success_response<T: Serialize>(payload: T) -> warp::reply::WithStatus<reply::Json> {
-    reply::with_status(
-        reply::json(&payload),
-        StatusCode::OK,
-    )
+    reply::with_status(reply::json(&payload), StatusCode::OK)
 }
 
 pub fn error_response(message: &str, status: StatusCode) -> warp::reply::WithStatus<reply::Json> {

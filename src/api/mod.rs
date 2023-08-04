@@ -1,18 +1,22 @@
+pub mod bls_import_route;
+pub mod bls_keygen_route;
+pub mod deposit_route;
+pub mod eth_keygen_route;
+pub mod getter_routes;
 pub mod helpers;
 pub mod signing_route;
-pub mod bls_keygen_route;
-pub mod eth_keygen_route;
-pub mod bls_import_route;
-pub mod deposit_route;
-pub mod getter_routes;
 
-use crate::{crypto::eth_keys, io::remote_attestation::AttestationEvidence, strip_0x_prefix, constants::{ETH_COMPRESSED_PK_BYTES, BLS_PUB_KEY_BYTES}};
+use crate::{
+    constants::{BLS_PUB_KEY_BYTES, ETH_COMPRESSED_PK_BYTES},
+    crypto::eth_keys,
+    io::remote_attestation::AttestationEvidence,
+    strip_0x_prefix,
+};
 use anyhow::{bail, Result};
-use serde::{Deserialize, Serialize};
-use ecies::PublicKey as EthPublicKey;
 use blsttc::PublicKey as BlsPublicKey;
-use warp::{Filter,Reply, Rejection};
-
+use ecies::PublicKey as EthPublicKey;
+use serde::{Deserialize, Serialize};
+use warp::{Filter, Rejection, Reply};
 
 /// Returns a 200 status code if server is alive
 pub fn upcheck_route() -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
@@ -31,14 +35,14 @@ impl KeyGenResponse {
     pub fn from_eth_key(pk: EthPublicKey, evidence: AttestationEvidence) -> Self {
         KeyGenResponse {
             pk_hex: format!("0x{}", eth_keys::eth_pk_to_hex(&pk)),
-            evidence
+            evidence,
         }
     }
 
     pub fn from_bls_key(pk: BlsPublicKey, evidence: AttestationEvidence) -> Self {
         KeyGenResponse {
             pk_hex: format!("0x{}", &pk.to_hex()),
-            evidence
+            evidence,
         }
     }
 
@@ -52,13 +56,13 @@ impl KeyGenResponse {
         if mrenclave != got_mrenclave {
             bail!("Received MRENCLAVE {got_mrenclave} does not match expected {mrenclave}")
         }
-    
+
         // Get the expected public key from payload
         let pk = eth_keys::eth_pk_from_hex(&self.pk_hex)?;
-    
+
         // Read the 64B payload from RA report
         let got_payload: [u8; 64] = self.evidence.get_report_data()?;
-    
+
         // Verify the first ETH_COMPRESSED_PK_BYTES of report contains the expected ETH comporessed public key
         if &got_payload[0..ETH_COMPRESSED_PK_BYTES] != pk.serialize_compressed() {
             bail!("Remote attestation payload does not match the expected")
@@ -76,14 +80,14 @@ impl KeyGenResponse {
         if mrenclave != got_mrenclave {
             bail!("Received MRENCLAVE {got_mrenclave} does not match expected {mrenclave}")
         }
-    
+
         // Verify the payload
         let pk_hex: String = strip_0x_prefix!(&self.pk_hex);
         let pk = BlsPublicKey::from_hex(&pk_hex).unwrap();
-    
+
         // Read the 64B payload from RA report
         let got_payload: [u8; 64] = self.evidence.get_report_data()?;
-    
+
         // Verify the first BLS_PUB_KEY_BYTES of report contains the expected BLS comporessed public key
         if &got_payload[0..BLS_PUB_KEY_BYTES] != pk.to_bytes() {
             bail!("Remote attestation payload does not match the expected")
@@ -91,8 +95,6 @@ impl KeyGenResponse {
         Ok(pk)
     }
 }
-
-
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct KeyImportRequest {

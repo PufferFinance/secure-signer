@@ -4,7 +4,7 @@ use crate::common::signing_helper::*;
 use puffersecuresigner::eth2::eth_signing::*;
 use puffersecuresigner::eth2::eth_types::*;
 use puffersecuresigner::strip_0x_prefix;
-                            
+
 fn aggregation_slot_request() -> BLSSignMsg {
     // Create an AggregationSlotRequest
     let req = mock_aggregation_slot_request();

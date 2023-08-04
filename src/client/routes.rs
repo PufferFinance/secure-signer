@@ -1,7 +1,13 @@
-use puffersecuresigner::{api::{KeyGenResponse, getter_routes::ListKeysResponse, helpers::SignatureResponse, KeyImportResponse}, eth2::eth_types::DepositResponse};
 use anyhow::{bail, Context, Result};
+use puffersecuresigner::{
+    api::{
+        getter_routes::ListKeysResponse, helpers::SignatureResponse, KeyGenResponse,
+        KeyImportResponse,
+    },
+    eth2::eth_types::DepositResponse,
+};
 use reqwest::{Client, Response, StatusCode};
-use serde::{de::DeserializeOwned};
+use serde::de::DeserializeOwned;
 use std::path::PathBuf;
 pub enum RouteType {
     Upcheck,
@@ -48,7 +54,7 @@ pub async fn get(url: &str) -> Result<Response, reqwest::Error> {
     client.get(url).send().await
 }
 
-pub async fn get_json<T: DeserializeOwned> (url: &str) -> Result<(StatusCode, Result<T>)> {
+pub async fn get_json<T: DeserializeOwned>(url: &str) -> Result<(StatusCode, Result<T>)> {
     let client = Client::new();
     match client.get(url).send().await {
         Ok(resp) => {
@@ -58,12 +64,15 @@ pub async fn get_json<T: DeserializeOwned> (url: &str) -> Result<(StatusCode, Re
                 .await
                 .with_context(|| format!("Failed to parse to T"));
             Ok((status, json_resp))
-        },
+        }
         Err(e) => bail!("get_json failed: {:?}", e),
     }
 }
 
-pub async fn post<T: DeserializeOwned> (url: &str, json: Option<&String>) -> Result<(StatusCode, Result<T>)> {
+pub async fn post<T: DeserializeOwned>(
+    url: &str,
+    json: Option<&String>,
+) -> Result<(StatusCode, Result<T>)> {
     let client = Client::new();
     let resp = match json {
         Some(json) => {
@@ -85,10 +94,9 @@ pub async fn post<T: DeserializeOwned> (url: &str, json: Option<&String>) -> Res
                 .await
                 .with_context(|| format!("Failed to parse to T"));
             Ok((status, json_resp))
-        },
+        }
         Err(e) => bail!("Post request failed: {:?}", e),
     }
-
 }
 
 pub async fn is_alive(port: u16) -> Result<()> {
@@ -130,7 +138,10 @@ pub async fn bls_key_import(port: u16, json: &String) -> Result<KeyImportRespons
     let url = build_req_url(port, RouteType::BlsKeyImport, None)?;
     let (status, resp) = post::<KeyImportResponse>(&url, Some(json)).await?;
     if status != 200 {
-        bail!("bls_key_import_route received {status} response: {:?}", resp)
+        bail!(
+            "bls_key_import_route received {status} response: {:?}",
+            resp
+        )
     }
     resp
 }
