@@ -8,7 +8,7 @@ use ssz::Encode;
 use tree_hash::TreeHash;
 
 /// Return the signing root for the corresponding signing data.
-fn compute_signing_root<T: Encode + TreeHash>(ssz_object: T, domain: Domain) -> Root {
+pub fn compute_signing_root<T: Encode + TreeHash>(ssz_object: T, domain: Domain) -> Root {
     let object_root = ssz_object.tree_hash_root().to_fixed_bytes();
     let sign_data = SigningData {
         object_root,

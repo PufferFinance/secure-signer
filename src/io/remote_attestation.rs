@@ -57,9 +57,10 @@ impl AttestationEvidence {
         report_data.clone_from_slice(&sized_data[..]);
 
         // sufficient sized buffers
-        let a = [1_u8; 5000].to_vec();
-        let b = [1_u8; 1000].to_vec();
-        let c = [1_u8; 10000].to_vec();
+        let a = Vec::with_capacity(5000);
+        // TODO: Vec with capacity
+        let b = Vec::with_capacity(1000);
+        let c = Vec::with_capacity(10000);
         let report = CString::new(a).with_context(|| "CString::new failed")?;
         let signature = CString::new(b).with_context(|| "CString::new failed")?;
         let signing_cert = CString::new(c).with_context(|| "CString::new failed")?;
