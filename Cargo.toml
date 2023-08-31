@@ -66,15 +66,15 @@ sgx = []
 
 [[bin]] # Bin to run the sgx-signer rpc
 name = "secure-signer"
-path = "src/secure-signer/bin/main.rs"
+path = "src/bin/secure-signer.rs"
 
 [[bin]] # Bin to run the sgx-guardian rpc
 name = "guardian"
-path = "src/guardian/bin/main.rs"
+path = "src/bin/guardian.rs"
 
 [[bin]] # Bin to run the sgx-validator rpc
 name = "validator"
-path = "src/validator/bin/main.rs"
+path = "src/bin/validator.rs"
 
 [[bin]] # Bin to run the client 
 name = "client"

@@ -47,8 +47,8 @@ fn attest_new_eth_key() -> Result<(AttestationEvidence, EthPublicKey)> {
     Ok((proof, pk))
 }
 
-fn attest_new_eth_key_with_blockhash(
-    blockhash: String,
+pub fn attest_new_eth_key_with_blockhash(
+    blockhash: &str,
 ) -> Result<(AttestationEvidence, EthPublicKey)> {
     // Generate a fresh SECP256K1 ETH keypair (saving ETH private key)
     let pk = eth_keys::eth_key_gen()?;
@@ -87,7 +87,7 @@ async fn eth_keygen_service_with_blockhash(
     request_data: KeygenWithBlockhashRequest,
 ) -> Result<impl Reply, Rejection> {
     info!("eth_key_gen_service()");
-    match attest_new_eth_key_with_blockhash(request_data.blockhash) {
+    match attest_new_eth_key_with_blockhash(&request_data.blockhash) {
         Ok((evidence, eth_pk)) => {
             let resp = KeyGenResponse::from_eth_key(eth_pk, evidence);
             Ok(success_response(&resp))

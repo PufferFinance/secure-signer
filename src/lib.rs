@@ -6,6 +6,7 @@ extern crate libc;
 pub mod api;
 pub mod constants;
 pub mod crypto;
+pub mod enclave;
 pub mod eth2;
 pub mod io;
 
