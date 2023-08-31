@@ -1,4 +1,4 @@
-use crate::constants::{ETH_COMPRESSED_PK_BYTES, ETH_SIGNATURE_BYTES};
+use crate::constants::{ETH_COMPRESSED_PK_BYTES, ETH_SIGNATURE_BYTES, ETH_UNCOMPRESSED_PK_BYTES};
 use crate::io::key_management::{read_eth_key, write_eth_key};
 use crate::strip_0x_prefix;
 
@@ -29,6 +29,11 @@ pub fn eth_pk_to_hex(pk: &EthPublicKey) -> String {
     strip_0x_prefix!(hex::encode(pk.serialize_compressed()))
 }
 
+/// Converts SECP256K1 key to uncompressed 65 bytes then hex-encodes
+pub fn eth_pk_to_hex_uncompressed(pk: &EthPublicKey) -> String {
+    strip_0x_prefix!(hex::encode(pk.serialize()))
+}
+
 /// Derives an ETH public key from a hex-string, expects the hex string to be in compressed 33B form
 pub fn eth_pk_from_hex(pk_hex: &String) -> Result<EthPublicKey> {
     let pk_hex: String = strip_0x_prefix!(pk_hex);
@@ -52,12 +57,34 @@ pub fn eth_pk_from_hex(pk_hex: &String) -> Result<EthPublicKey> {
 }
 
 /// Derives an ETH public key from a hex-string, expects the hex string to be in compressed 33B form
+pub fn eth_pk_from_hex_uncompressed(pk_hex: &String) -> Result<EthPublicKey> {
+    let pk_hex: String = strip_0x_prefix!(pk_hex);
+    let pk_bytes = hex::decode(&pk_hex)?;
+
+    if pk_bytes.len() != ETH_UNCOMPRESSED_PK_BYTES {
+        bail!("ETH pk should be in compressed 33B form")
+    }
+
+    let mut pk_uncompressed_bytes = [0_u8; ETH_UNCOMPRESSED_PK_BYTES];
+    pk_uncompressed_bytes.clone_from_slice(&pk_bytes);
+
+    match EthPublicKey::parse(&pk_uncompressed_bytes) {
+        Ok(pk) => Ok(pk),
+        Err(e) => bail!(
+            "failed to recover ETH pk from pk_hex: {}, error: {:?}",
+            pk_hex,
+            e
+        ),
+    }
+}
+
+/// Derives an ETH public key from a hex-string, expects the hex string to be in compressed 33B form
 pub fn eth_sk_from_bytes(sk: Vec<u8>) -> Result<EthSecretKey> {
     EthSecretKey::parse_slice(&sk).with_context(|| "couldn't parse sk bytes to eth sk type")
 }
 
 /// Write the ETH SECP256K1 secret key to a secure file using the hex encoded pk as filename
-fn save_eth_key(sk: EthSecretKey, pk: EthPublicKey) -> Result<EthPublicKey> {
+pub fn save_eth_key(sk: EthSecretKey, pk: EthPublicKey) -> Result<EthPublicKey> {
     let pk_hex = eth_pk_to_hex(&pk);
 
     let sk_hex = eth_sk_to_hex(&sk);

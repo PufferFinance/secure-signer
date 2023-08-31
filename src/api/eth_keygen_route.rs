@@ -14,6 +14,13 @@ pub struct KeygenWithBlockhashRequest {
     pub blockhash: String,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct KeygenWithBlockhashRequestDebug {
+    pub blockhash: String,
+    pub private_key_hex: String,
+    pub public_key_hex: String,
+}
+
 /// Generates a new ETH (SECP256K1) private key in Enclave. The ETH public key is returned
 /// Route added by Guardian
 pub fn eth_keygen_route_with_blockhash(
@@ -25,6 +32,19 @@ pub fn eth_keygen_route_with_blockhash(
         .and(warp::path("secp256k1"))
         .and(warp::body::json::<KeygenWithBlockhashRequest>())
         .and_then(eth_keygen_service_with_blockhash)
+}
+
+/// Generates a new ETH (SECP256K1) private key in Enclave. The ETH public key is returned
+/// Route added by Guardian
+pub fn eth_keygen_route_with_blockhash_debug(
+) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+    warp::post()
+        .and(warp::path("eth"))
+        .and(warp::path("v1"))
+        .and(warp::path("keygen_debug"))
+        .and(warp::path("secp256k1"))
+        .and(warp::body::json::<KeygenWithBlockhashRequestDebug>())
+        .and_then(eth_keygen_service_with_blockhash_debug)
 }
 
 /// Generates a new ETH (SECP256K1) private key in Enclave. The ETH public key is returned
@@ -56,7 +76,7 @@ pub fn attest_new_eth_key_with_blockhash(
     let blockhash = hex::decode(blockhash)?;
 
     let mut hasher = sha3::Keccak256::new();
-    hasher.update(&pk.serialize_compressed());
+    hasher.update(&pk.serialize());
     hasher.update(&blockhash);
     let digest_bytes = hasher.finalize();
 
@@ -99,4 +119,32 @@ async fn eth_keygen_service_with_blockhash(
             ));
         }
     }
+}
+
+/// Generates, saves, and performs remote attestation on a new ETH key. Returns a `KeyGenResponse` on success.
+async fn eth_keygen_service_with_blockhash_debug(
+    request_data: KeygenWithBlockhashRequestDebug,
+) -> Result<impl Reply, Rejection> {
+    info!("eth_key_gen_service_debug()");
+
+    let pk = crate::crypto::eth_keys::eth_pk_from_hex_uncompressed(&request_data.public_key_hex)
+        .unwrap();
+    let sk = crate::crypto::eth_keys::eth_sk_from_bytes(
+        hex::decode(request_data.private_key_hex).unwrap(),
+    )
+    .unwrap();
+
+    eth_keys::save_eth_key(sk, pk).unwrap();
+    let blockhash: String = strip_0x_prefix!(request_data.blockhash);
+    let blockhash = hex::decode(blockhash).unwrap();
+
+    let mut hasher = sha3::Keccak256::new();
+    hasher.update(&pk.serialize());
+    hasher.update(&blockhash);
+    let digest_bytes = hasher.finalize();
+
+    // Commit to the payload
+    let proof = AttestationEvidence::new(&digest_bytes).unwrap();
+    let resp = KeyGenResponse::from_eth_key(pk, proof);
+    Ok(success_response(&resp))
 }
