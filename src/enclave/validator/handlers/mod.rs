@@ -1,13 +1,12 @@
 use crate::{
     crypto::bls_keys::save_bls_key,
-    enclave::{calculate_withdraw_address, BLSKeygenPayload},
+    enclave::{get_withdrawal_address, BLSKeygenPayload},
     io::remote_attestation::AttestationEvidence,
 };
 use anyhow::Result;
 use blsttc::{PublicKeyShare, SecretKeyShare, SignatureShare};
 use bytes::Bytes;
 use ecies::PublicKey as EthPublicKey;
-use ethers::{abi::Address, utils::get_create2_address};
 use sha3::Digest;
 use ssz::Encode;
 use tree_hash::TreeHash;
@@ -72,20 +71,15 @@ pub fn attest_fresh_bls_key(
 
     let key_shares =
         crate::crypto::bls_keys::distribute_key_shares(&secret_key_set, amount_of_shares);
-    // # encrypt keyshares to each guardian
-    // enc_bls_sks = [encrypt(sk, pk) for sk,pk in zip(bls_sks, guardian_pks)]
     let recipent_keys: Vec<EncryptedRecipientKeys> = guardian_public_keys
         .iter()
         .zip(key_shares.into_iter())
         .map(
             |(guardian_public_key, (secret_key_share, public_key_share))| {
-                dbg!(&guardian_public_key);
-                // dbg!(&secret_key_share);
                 RecipientKeys {
                     guardian_public_key: guardian_public_key.clone(),
                     secret_key_share,
                     public_key_share,
-                    //TODO: Remove unwrap
                 }
                 .encrypt_to_recipient()
                 .unwrap()
@@ -103,19 +97,17 @@ pub fn attest_fresh_bls_key(
     save_bls_key(&secret_key_set).unwrap();
 
     // ## --- This will be needed later ---
-    let mut hasher = sha2::Sha256::new();
+    let mut hasher = sha3::Sha3_256::new();
     // change to pool
     hasher.update(validator_pubkey.to_bytes());
     // # compute deterministic EigenPod address
 
-    let withdrawal_credentials = calculate_withdraw_address(eigen_pod_data);
-    let mut withdrawal_credentials_32b = [0u8; 32];
-    withdrawal_credentials_32b[12..32].copy_from_slice(&withdrawal_credentials.0);
+    let withdrawal_credentials = crate::enclave::get_withdrawal_address(&eigen_pod_data);
 
     // # sign a DepositMessage to deposit 32 ETH to beacon deposit contract
     let deposit_message = crate::eth2::eth_types::DepositMessage {
         pubkey: hex::decode(validator_pubkey.to_hex())?.into(),
-        withdrawal_credentials: withdrawal_credentials_32b,
+        withdrawal_credentials,
         amount: 32,
     };
 
@@ -131,15 +123,11 @@ pub fn attest_fresh_bls_key(
     //DepositData(bls_pk, withdrawal_credentials, bond, p["signature"]).hash_tree_root()
     let deposit_data_root = crate::eth2::eth_types::DepositData {
         pubkey: hex::decode(validator_pubkey.to_hex())?.into(),
-        withdrawal_credentials: withdrawal_credentials_32b,
+        withdrawal_credentials: get_withdrawal_address(&eigen_pod_data),
         amount: 32,
         signature: <_>::from(signature.to_bytes().to_vec()),
     }
     .tree_hash_root();
-    // deposit_msg = sign_deposit(bls_pk, amount=32e18, withdrawal_credentials)
-    // signed_deposit = bls_sign(bls_sk, deposit_msg)
-    // deposit_data_root = DepositData(bls_pk, withdrawal_credentials, bond, signed_deposit).hash_tree_root()
-    // ## ---------------------------------
 
     // # do remote attestation
     let mut hasher = sha3::Keccak256::new();

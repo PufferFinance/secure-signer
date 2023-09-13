@@ -74,12 +74,10 @@ pub async fn make_list_request(
                 (status, keys)
             }
             ListRequestKind::ETH => {
-                dbg!("asdfasfasdf");
                 let resp = match request_list_eth_keys_route(p).await {
                     Ok(resp) => resp,
                     Err(_) => panic!("Failed request_list_eth_keys_route"),
                 };
-                dbg!(&resp);
 
                 let status = resp.status();
                 let keys: Result<ListKeysResponse> = resp

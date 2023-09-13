@@ -25,19 +25,10 @@ async fn main() {
     let routes = puffersecuresigner::api::upcheck_route()
         .or(puffersecuresigner::api::eth_keygen_route::eth_keygen_route())
         .or(puffersecuresigner::api::eth_keygen_route::eth_keygen_route_with_blockhash())
-        .or(puffersecuresigner::api::getter_routes::list_eth_keys_route())
+        .or(puffersecuresigner::api::getter_routes::list_eth_keys_route());
+
+    let routes = routes
         .or(puffersecuresigner::api::eth_keygen_route::eth_keygen_route_with_blockhash_debug());
 
     run(port, routes).await;
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test() {
-        let (sk, pk) = puffersecuresigner::crypto::eth_keys::new_eth_key().unwrap();
-        let pk_hex = puffersecuresigner::crypto::eth_keys::eth_pk_to_hex_uncompressed(&pk);
-        let sk_hex = puffersecuresigner::crypto::eth_keys::eth_sk_to_hex(&sk);
-        dbg!(pk_hex, sk_hex);
-    }
 }

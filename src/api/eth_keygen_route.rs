@@ -18,7 +18,6 @@ pub struct KeygenWithBlockhashRequest {
 pub struct KeygenWithBlockhashRequestDebug {
     pub blockhash: String,
     pub private_key_hex: String,
-    pub public_key_hex: String,
 }
 
 /// Generates a new ETH (SECP256K1) private key in Enclave. The ETH public key is returned
@@ -31,7 +30,7 @@ pub fn eth_keygen_route_with_blockhash(
         .and(warp::path("keygen"))
         .and(warp::path("secp256k1"))
         .and(warp::body::json::<KeygenWithBlockhashRequest>())
-        .and_then(eth_keygen_service_with_blockhash)
+        .and_then(crate::enclave::guardian::attest_fresh_eth_key::eth_keygen_service_with_blockhash)
 }
 
 /// Generates a new ETH (SECP256K1) private key in Enclave. The ETH public key is returned
@@ -77,11 +76,21 @@ pub fn attest_new_eth_key_with_blockhash(
 
     let mut hasher = sha3::Keccak256::new();
     hasher.update(&pk.serialize());
-    hasher.update(&blockhash);
-    let digest_bytes = hasher.finalize();
+    let pk_hash = hasher.finalize();
 
+    dbg!( pk_hash.len());
+    dbg!( blockhash.len());
+    dbg!(&pk_hash);
+    dbg!(&blockhash);
+
+    let payload = ethers::abi::encode_packed(&[
+        ethers::abi::Token::Bytes(pk_hash.to_vec()),
+        ethers::abi::Token::Bytes(blockhash),
+    ]).unwrap();
+    dbg!(payload.len());
+    info!("{:?}", payload);
     // Commit to the payload
-    let proof = AttestationEvidence::new(&digest_bytes)?;
+    let proof = AttestationEvidence::new(&payload)?;
     Ok((proof, pk))
 }
 
@@ -103,36 +112,17 @@ async fn eth_keygen_service() -> Result<impl Reply, Rejection> {
 }
 
 /// Generates, saves, and performs remote attestation on a new ETH key. Returns a `KeyGenResponse` on success.
-async fn eth_keygen_service_with_blockhash(
-    request_data: KeygenWithBlockhashRequest,
-) -> Result<impl Reply, Rejection> {
-    info!("eth_key_gen_service()");
-    match attest_new_eth_key_with_blockhash(&request_data.blockhash) {
-        Ok((evidence, eth_pk)) => {
-            let resp = KeyGenResponse::from_eth_key(eth_pk, evidence);
-            Ok(success_response(&resp))
-        }
-        Err(e) => {
-            return Ok(error_response(
-                &format!("eth_keygen_service failed: {:?}", e),
-                StatusCode::INTERNAL_SERVER_ERROR,
-            ));
-        }
-    }
-}
-
-/// Generates, saves, and performs remote attestation on a new ETH key. Returns a `KeyGenResponse` on success.
 async fn eth_keygen_service_with_blockhash_debug(
     request_data: KeygenWithBlockhashRequestDebug,
 ) -> Result<impl Reply, Rejection> {
     info!("eth_key_gen_service_debug()");
 
-    let pk = crate::crypto::eth_keys::eth_pk_from_hex_uncompressed(&request_data.public_key_hex)
-        .unwrap();
     let sk = crate::crypto::eth_keys::eth_sk_from_bytes(
         hex::decode(request_data.private_key_hex).unwrap(),
     )
     .unwrap();
+
+    let pk = ecies::PublicKey::from_secret_key(&sk);
 
     eth_keys::save_eth_key(sk, pk).unwrap();
     let blockhash: String = strip_0x_prefix!(request_data.blockhash);
@@ -140,11 +130,20 @@ async fn eth_keygen_service_with_blockhash_debug(
 
     let mut hasher = sha3::Keccak256::new();
     hasher.update(&pk.serialize());
-    hasher.update(&blockhash);
-    let digest_bytes = hasher.finalize();
+    let pk_hash = hasher.finalize();
+
+    info!("Blockhash: {}, pk: {}", blockhash.len(), pk_hash.len());
+
+    let payload = ethers::abi::encode_packed(&[
+        ethers::abi::Token::Bytes(pk_hash.to_vec()),
+        ethers::abi::Token::Bytes(blockhash),
+    ])
+    .unwrap();
+
+    info!("{:?} len {}", payload, payload.len());
 
     // Commit to the payload
-    let proof = AttestationEvidence::new(&digest_bytes).unwrap();
+    let proof = AttestationEvidence::new(&payload).unwrap();
     let resp = KeyGenResponse::from_eth_key(pk, proof);
     Ok(success_response(&resp))
 }

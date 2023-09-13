@@ -29,7 +29,7 @@ rand = "0.8.4"
 rand_chacha = "0.2"
 hex = "0.4.3"
 ecies = { version = "0.2.2", default-features = false, features = ["pure"] }
-openssl = "0.10.42"
+openssl = { version = "0.10.42", features = ["vendored"] }
 bytes = "1"
 sha3 = "0.10.6"
 
@@ -52,7 +52,6 @@ reqwest = { version = "0.11", features = ["json"] }
 # misc
 anyhow = "1.0.65"
 clap = { version = "4.1.1", features = ["derive"], optional = true }
-sha2 = "0.10.7"
 ethers = "2.0.8"
 
 

@@ -208,7 +208,7 @@ mod tests {
         let (secret_key, public_key) = new_eth_key().unwrap();
 
         // Create a message to sign
-        let message: &[u8; 32] = b"abcdefghijklmnopqrstuvwxyz123456";
+        let message: &crate::eth2::eth_types::Bytes32 = b"abcdefghijklmnopqrstuvwxyz123456";
         dbg!(hex::encode(&message));
 
         // Sign the message

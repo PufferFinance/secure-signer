@@ -1,6 +1,5 @@
 use anyhow::{anyhow, Result};
 use ecies::PublicKey as EthPublicKey;
-use ethers::abi::Address;
 use libsecp256k1::SecretKey as EthSecretKey;
 use sha3::Digest;
 use ssz_types::FixedVector;
@@ -31,14 +30,11 @@ pub fn generate_signature(
         Ok(true) => true,
     };
 
-    let withdrawal_credentials = crate::enclave::calculate_withdraw_address(eigen_pod_data);
-    // The leading byte is value one
-    let mut withdrawal_credentials_zero_padded = [0u8; 32];
-    withdrawal_credentials_zero_padded[12..32].copy_from_slice(&withdrawal_credentials[..]);
+    let withdrawal_credentials = crate::enclave::get_withdrawal_address(&eigen_pod_data);
 
     check_data_root(
         &validator_public_key_hex,
-        withdrawal_credentials_zero_padded,
+        withdrawal_credentials,
         &keygen_payload.signature,
         &keygen_payload.deposit_data_root,
     )?;
@@ -65,7 +61,7 @@ pub fn generate_signature(
 
 fn check_data_root(
     validator_public_key_hex: &str,
-    withdrawal_credentials_zero_padded: [u8; 32],
+    withdrawal_credentials_zero_padded: crate::eth2::eth_types::Bytes32,
     signature: &str,
     deposit_data_root: &ethers::types::TxHash,
 ) -> Result<()> {
@@ -127,7 +123,7 @@ fn calculate_signature(
     guardian_enclave_public_key: &EthPublicKey,
     validator_public_key_hex: &str,
     guardian_enclave_private_key: &EthSecretKey,
-    withdrawal_credentials: &Address,
+    withdrawal_credentials: &crate::eth2::eth_types::Bytes32,
     signature: String,
     deposit_data_root: ethers::types::TxHash,
 ) -> Result<(libsecp256k1::Signature, libsecp256k1::Message)> {
