@@ -1,5 +1,4 @@
 use crate::common;
-use crate::common::bls_import_helper::import_bls_key_with_slash_protection;
 use crate::common::bls_keygen_helper::register_new_bls_key;
 use crate::common::{eth_specs, signing_helper::*};
 use puffersecuresigner::eth2::eth_signing::*;
@@ -55,7 +54,9 @@ pub async fn test_aggregate_route_fails_from_invalid_pk_hex() {
 
     let req = attestation_req(START_SRC_EPOCH, START_TGT_EPOCH);
     let bls_pk_hex = "0xdeadbeef".to_string();
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    let (_resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+        .await
+        .unwrap();
     assert_eq!(status, 400);
 }
 
@@ -64,7 +65,9 @@ pub async fn test_aggregate_attestation_happy_path() {
     let port = common::read_secure_signer_port();
     let req = attestation_req(START_SRC_EPOCH, START_TGT_EPOCH);
     let bls_pk_hex = register_new_bls_key(port).await.pk_hex;
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    let (_resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+        .await
+        .unwrap();
     assert_eq!(status, 200);
 }
 
@@ -74,9 +77,12 @@ pub async fn test_aggregate_attestation_happy_path_test_vec() {
     let exp_sig = Some("80f9bc73528e2025e8514c89ba468dbe48e8154795c5822fc59c7c3f8982a29a9c5456c87ccdb86765b2759802749fa411c0c52ed542b717a590f77cddafd774d17e94de720f0c21b12d10c969b5141ebad17cffd4af5addec4f8882a200ebf1".to_string());
     let req = attestation_req(START_SRC_EPOCH, START_TGT_EPOCH);
     let bls_pk_hex = common::setup_dummy_keypair();
-    let (status, resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    let (resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+        .await
+        .unwrap();
     assert_eq!(status, 200);
-    let got_sig: String = strip_0x_prefix!(resp.as_ref().unwrap().signature);
+    let sig = resp.unwrap().signature;
+    let got_sig: String = strip_0x_prefix!(sig);
     assert_eq!(exp_sig.unwrap(), got_sig);
 }
 
@@ -85,12 +91,16 @@ pub async fn test_slash_protection_allows_non_slashable_attestation() {
     let port = common::read_secure_signer_port();
     let req = attestation_req(START_SRC_EPOCH, START_TGT_EPOCH);
     let bls_pk_hex = register_new_bls_key(port).await.pk_hex;
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    let (_resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+        .await
+        .unwrap();
     assert_eq!(status, 200);
 
     // valid ATTESTATION request (non-decreasing source + increasing target)
     let req = attestation_req(START_SRC_EPOCH, START_TGT_EPOCH + 1);
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    let (_resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+        .await
+        .unwrap();
     assert_eq!(status, 200);
 }
 
@@ -99,12 +109,16 @@ pub async fn test_slash_protection_prevents_decreasing_source() {
     let port = common::read_secure_signer_port();
     let req = attestation_req(START_SRC_EPOCH, START_TGT_EPOCH);
     let bls_pk_hex = register_new_bls_key(port).await.pk_hex;
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    let (_resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+        .await
+        .unwrap();
     assert_eq!(status, 200);
 
     // mock data for ATTESTATION request (attempt a slashable offense - decreasing source)
     let req = attestation_req(0, START_TGT_EPOCH + 1);
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    let (_resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+        .await
+        .unwrap();
     assert_eq!(status, 412);
 }
 
@@ -113,12 +127,16 @@ pub async fn test_slash_protection_prevents_same_target() {
     let port = common::read_secure_signer_port();
     let req = attestation_req(START_SRC_EPOCH, START_TGT_EPOCH);
     let bls_pk_hex = register_new_bls_key(port).await.pk_hex;
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    let (_resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+        .await
+        .unwrap();
     assert_eq!(status, 200);
 
     // mock data for ATTESTATION request (attempt a slashable offense - non-increasing target)
     let req = attestation_req(START_SRC_EPOCH, START_TGT_EPOCH);
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    let (_resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+        .await
+        .unwrap();
     assert_eq!(status, 412);
 }
 
@@ -127,48 +145,25 @@ pub async fn test_slash_protection_prevents_decreasing_target() {
     let port = common::read_secure_signer_port();
     let req = attestation_req(START_SRC_EPOCH, START_TGT_EPOCH);
     let bls_pk_hex = register_new_bls_key(port).await.pk_hex;
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    let (_resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+        .await
+        .unwrap();
     assert_eq!(status, 200);
 
     // mock data for ATTESTATION request (attempt a slashable offense - non-increasing target)
     let req = attestation_req(START_SRC_EPOCH, START_TGT_EPOCH - 1);
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    let (_resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+        .await
+        .unwrap();
     assert_eq!(status, 412);
-}
-
-#[tokio::test]
-pub async fn test_bls_import_with_slash_prevention() {
-    // let port = common::read_secure_signer_port();
-    let port = None;
-    // Init slash protection initialized to START_SRC_EPOCH, START_TGT_EPOCH
-    let bls_pk_hex =
-        import_bls_key_with_slash_protection(1, START_SRC_EPOCH, START_TGT_EPOCH, port).await;
-
-    // mock data for ATTESTATION request (attempt a slashable offense - decreasing source)
-    let req = attestation_req(START_SRC_EPOCH - 1, START_TGT_EPOCH + 1);
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
-    assert_eq!(status, 412);
-
-    // mock data for ATTESTATION request (attempt a slashable offense - non-increasing target)
-    let req = attestation_req(START_SRC_EPOCH, START_TGT_EPOCH);
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
-    assert_eq!(status, 412);
-
-    // mock data for ATTESTATION request - should be 200
-    let req = attestation_req(START_SRC_EPOCH, START_TGT_EPOCH + 1);
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
-    assert_eq!(status, 200);
-
-    // Sanity check
-    let req = attestation_req(START_SRC_EPOCH + 100, START_TGT_EPOCH + 100);
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
-    assert_eq!(status, 200);
 }
 
 async fn perf_test(n: u64, bls_pk_hex: &String, port: Option<u16>) {
     for i in 1..n {
         let req = attestation_req(i, i);
-        let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+        let (_resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+            .await
+            .unwrap();
         assert_eq!(status, 200);
     }
 }
@@ -204,7 +199,9 @@ async fn test_attestation_eth2_specs() {
             }
         }
 
-        let (status, _resp) = make_signing_route_request(msg, &bls_pk_hex, port).await;
+        let (_resp, status) = make_signing_route_request(msg, &bls_pk_hex, port)
+            .await
+            .unwrap();
 
         if slashable {
             assert_eq!(status, 412);

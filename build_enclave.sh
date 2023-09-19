@@ -59,7 +59,7 @@ function build_component() {
         ./build_epid_ra.sh
     fi
 
-    ${cargo_bin} build ${build_flags} --bin ${binary_name}
+    ${cargo_bin} build ${build_flags} -F sgx --bin ${binary_name}
 }
 
 function new_instance() {
@@ -78,6 +78,7 @@ function new_instance() {
         cp /etc/resolv.conf ./image/etc
         cp /etc/hosts ./image/etc
 
+        # TODO: play with those values -> get it to work, then minimize 
         new_json="$(jq '.resource_limits.user_space_size = "1024MB" |
                         .resource_limits.kernel_space_heap_size="512MB" |
                         .process.default_heap_size = "512MB" |
@@ -98,6 +99,7 @@ function run_component() {
 
     pushd ${image_path}
         if [ -z "$LOCAL_DEV" ]; then
+            # TODO: find a flag to specify tracing/ possibly LOG_LEVEL=DEBUG
             occlum run /bin/${binary_name} ${port} ${genesis_fork_version}
         else
             cargo run ${build_flags} --bin ${binary_name} ${port} ${genesis_fork_version}

@@ -37,7 +37,9 @@ async fn test_aggregate_route_fails_from_invalid_pk_hex() {
     let port = common::read_secure_signer_port();
     let req = deposit_request();
     let bls_pk_hex = "0xdeadbeef".to_string();
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    let (_resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+        .await
+        .unwrap();
     assert_eq!(status, 400);
 }
 
@@ -46,7 +48,9 @@ async fn test_aggregate_deposit_happy_path() {
     let port = common::read_secure_signer_port();
     let req = deposit_request();
     let bls_pk_hex = register_new_bls_key(port).await.pk_hex;
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    let (_resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+        .await
+        .unwrap();
     assert_eq!(status, 200);
 }
 
@@ -56,9 +60,12 @@ async fn test_aggregate_deposit_happy_path_test_vec() {
     let exp_sig = Some("82cc787865c0fb7147fe7350dd5a71f5d92c6a1771eb951826f6b339a319e1904a2310d5d3cbc5e2d0e5f35f2bfe6da5164c33114663222d4238a43d495876dae873dc6af338c4af4f6dbe1ae181331581bdcd353509a2356977b6625c9ab0e5".to_string());
     let req = deposit_request();
     let bls_pk_hex = common::setup_dummy_keypair();
-    let (status, resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    let (resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+        .await
+        .unwrap();
     assert_eq!(status, 200);
-    let got_sig: String = strip_0x_prefix!(resp.as_ref().unwrap().signature);
+    let sig = resp.unwrap().signature;
+    let got_sig: String = strip_0x_prefix!(sig);
     assert_eq!(exp_sig.unwrap(), got_sig);
 }
 
@@ -69,11 +76,15 @@ async fn test_sync_committee_message_eth2_specs() {
     let port = common::read_secure_signer_port();
     let req = deposit_request();
     let bls_pk_hex = register_new_bls_key(port).await.pk_hex;
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    let (_resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+        .await
+        .unwrap();
     assert_eq!(status, 200);
     let msgs = eth_specs::get_all_test_vecs("DepositMessage").unwrap();
     for msg in msgs.into_iter() {
-        let (status, _resp) = make_signing_route_request(msg, &bls_pk_hex, port).await;
+        let (_resp, status) = make_signing_route_request(msg, &bls_pk_hex, port)
+            .await
+            .unwrap();
         assert_eq!(status, 200);
     }
 }

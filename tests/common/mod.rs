@@ -3,7 +3,6 @@ use puffersecuresigner::crypto::bls_keys;
 use puffersecuresigner::eth2::slash_protection::SlashingProtectionData;
 use puffersecuresigner::strip_0x_prefix;
 
-pub mod bls_import_helper;
 pub mod bls_keygen_helper;
 pub mod eth_keygen_helper;
 pub mod eth_specs;

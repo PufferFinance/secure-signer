@@ -1,8 +1,10 @@
 extern crate puffersecuresigner;
-use puffersecuresigner::{eth2::eth_types::Version, run, strip_0x_prefix};
+use puffersecuresigner::{eth2::eth_types::Version, strip_0x_prefix};
 
 #[tokio::main]
 async fn main() {
+    tracing_subscriber::fmt::init();
+
     let port = std::env::args()
         .nth(1)
         .unwrap_or("3031".into())
@@ -16,11 +18,28 @@ async fn main() {
         &hex::decode(&genesis_fork_version_str).expect("Bad genesis_fork_version"),
     );
 
-    println!(
+    log::info!(
         "Starting SGX Validator: localhost:{}, using genesis_fork_version: {:?}",
-        port, genesis_fork_version
+        port,
+        genesis_fork_version
     );
 
-    let routes = puffersecuresigner::api::upcheck_route();
-    run(port, routes).await;
+    let app = axum::Router::new()
+        // Endpoint to check health
+        .route(
+            "/health",
+            axum::routing::get(puffersecuresigner::enclave::shared::handlers::health::handler),
+        )
+        .route(
+            "/bls/v1/keygen",
+            axum::routing::post(
+                puffersecuresigner::enclave::validator::handlers::attest_fresh_bls_key::handler,
+            ),
+        );
+
+    let addr = std::net::SocketAddr::from(([0, 0, 0, 0], port));
+
+    _ = axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await;
 }

@@ -2,23 +2,24 @@ use super::read_secure_signer_port;
 
 use anyhow::{Context, Result};
 use blsttc::PublicKey;
-use puffersecuresigner::{
-    api::{bls_keygen_route::bls_keygen_route, KeyGenResponse},
-    constants::BLS_PUB_KEY_BYTES,
-    strip_0x_prefix,
-};
+use puffersecuresigner::{constants::BLS_PUB_KEY_BYTES, strip_0x_prefix};
 use reqwest::{Client, Response, StatusCode};
 use serde_json;
 use std::env;
 
-pub async fn mock_bls_keygen_route() -> warp::http::Response<bytes::Bytes> {
-    let filter = bls_keygen_route();
-    let res = warp::test::request()
-        .method("POST")
-        .path("/eth/v1/keygen/bls")
-        .reply(&filter)
-        .await;
-    res
+pub async fn mock_bls_keygen_route() -> Result<axum_test::TestResponse> {
+    let test_app = axum::Router::new()
+        .route(
+            "/eth/v1/keygen/bls",
+            axum::routing::post(
+                puffersecuresigner::enclave::secure_signer::handlers::bls_keygen::handler,
+            ),
+        )
+        .into_make_service();
+
+    let server = axum_test::TestServer::new(test_app)?;
+
+    Ok(server.post("/eth/v1/keygen/bls").await)
 }
 
 pub async fn request_bls_keygen_route(port: u16) -> Result<Response, reqwest::Error> {
@@ -33,44 +34,47 @@ pub async fn request_bls_keygen_route(port: u16) -> Result<Response, reqwest::Er
     response
 }
 
-pub async fn make_bls_keygen_request(port: Option<u16>) -> (StatusCode, Result<KeyGenResponse>) {
+pub async fn make_bls_keygen_request(
+    port: Option<u16>,
+) -> Result<(
+    puffersecuresigner::enclave::types::KeyGenResponse,
+    StatusCode,
+)> {
     match port {
         // Make the actual http req to a running Secure-Aggregator instance
         Some(p) => {
-            let resp = match request_bls_keygen_route(p).await {
-                Ok(resp) => resp,
-                Err(_) => panic!("Failed request_eth_keygen_route"),
-            };
+            let resp = request_bls_keygen_route(p).await?;
             dbg!(&resp);
             let status = resp.status();
-            let sig: Result<KeyGenResponse> = resp
+            let sig: puffersecuresigner::enclave::types::KeyGenResponse = resp
                 .json()
                 .await
-                .with_context(|| format!("Failed to parse to KeyGenResponse"));
-            (status, sig)
+                .with_context(|| format!("Failed to parse to KeyGenResponse"))?;
+            Ok((sig, status))
         }
         // Mock an http request
         None => {
-            let resp = mock_bls_keygen_route().await;
-            dbg!(&resp);
-            let sig: Result<KeyGenResponse> = serde_json::from_slice(resp.body())
-                .with_context(|| "Failed to parse to KeyGenResponse");
-            (resp.status().into(), sig)
+            let resp = mock_bls_keygen_route().await?;
+            let sig: puffersecuresigner::enclave::types::KeyGenResponse =
+                serde_json::from_slice(resp.as_bytes())
+                    .with_context(|| "Failed to parse to KeyGenResponse")?;
+            Ok((sig, resp.status_code().into()))
         }
     }
 }
 
-pub async fn register_new_bls_key(port: Option<u16>) -> KeyGenResponse {
-    let (status, resp) = make_bls_keygen_request(port).await;
-    assert_eq!(status, 200);
-    resp.unwrap()
+pub async fn register_new_bls_key(
+    port: Option<u16>,
+) -> puffersecuresigner::enclave::types::KeyGenResponse {
+    let (resp, status) = make_bls_keygen_request(port).await.unwrap();
+    assert_eq!(status, 201);
+    resp
 }
 
 #[tokio::test]
 async fn test_register_new_bls_key() {
     let port = read_secure_signer_port();
-    let resp = register_new_bls_key(port).await;
-    dbg!(resp.pk_hex);
+    let _ = register_new_bls_key(port).await;
 }
 
 #[tokio::test]

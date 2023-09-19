@@ -44,7 +44,9 @@ num-bigint = "0.4"
 
 # server deps
 tokio = { version = "1", features = ["full"] }
-warp = "0.3"
+axum = { version = "0.6.20", features = ["macros"] }
+tracing-subscriber = "0.3.17"
+axum-test = "12.3.0"
 
 # client deps
 reqwest = { version = "0.11", features = ["json"] }

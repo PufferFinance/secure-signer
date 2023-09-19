@@ -58,7 +58,9 @@ pub async fn test_aggregate_route_fails_from_invalid_pk_hex() {
     let port = common::read_secure_signer_port();
     let req = aggregate_and_proof_request();
     let bls_pk_hex = "0xdeadbeef".to_string();
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    let (_resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+        .await
+        .unwrap();
     assert_eq!(status, 400);
 }
 
@@ -67,7 +69,9 @@ pub async fn test_aggregate_aggregate_and_proof_happy_path() {
     let port = common::read_secure_signer_port();
     let req = aggregate_and_proof_request();
     let bls_pk_hex = register_new_bls_key(port).await.pk_hex;
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    let (_resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+        .await
+        .unwrap();
     assert_eq!(status, 200);
 }
 
@@ -77,9 +81,12 @@ pub async fn test_aggregate_aggregate_and_proof_happy_path_test_vec() {
     let exp_sig = Some("81e56af6c3b9f0ce1c7fd3545a3d689fc2edd2c9dd5451ea5f345cc57d74de76ed940e373fdccc76150e643edc57bdb0145ad3770d9207164484f86f746fb26f889833106e3e17cd49572eb7938a9e4502bba99c3234f32695f73ef3ed18bb51".to_string());
     let req = aggregate_and_proof_request();
     let bls_pk_hex = common::setup_dummy_keypair();
-    let (status, resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    let (resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+        .await
+        .unwrap();
     assert_eq!(status, 200);
-    let got_sig: String = strip_0x_prefix!(resp.as_ref().unwrap().signature);
+    let sig = resp.unwrap().signature;
+    let got_sig: String = strip_0x_prefix!(sig);
     assert_eq!(exp_sig.unwrap(), got_sig);
 }
 
@@ -90,12 +97,16 @@ async fn test_aggregate_and_proof_eth2_specs() {
     let port = common::read_secure_signer_port();
     let req = aggregate_and_proof_request();
     let bls_pk_hex = register_new_bls_key(port).await.pk_hex;
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    let (_resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+        .await
+        .unwrap();
     assert_eq!(status, 200);
 
     let msgs = eth_specs::get_all_test_vecs("AggregateAndProof").unwrap();
     for msg in msgs.into_iter() {
-        let (status, _resp) = make_signing_route_request(msg, &bls_pk_hex, port).await;
+        let (_resp, status) = make_signing_route_request(msg, &bls_pk_hex, port)
+            .await
+            .unwrap();
         assert_eq!(status, 200);
     }
 }

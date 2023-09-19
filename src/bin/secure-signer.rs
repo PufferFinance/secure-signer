@@ -1,9 +1,10 @@
 extern crate puffersecuresigner;
-use puffersecuresigner::{eth2::eth_types::Version, run, strip_0x_prefix};
-use warp::Filter;
+use puffersecuresigner::{eth2::eth_types::Version, strip_0x_prefix};
 
 #[tokio::main]
 async fn main() {
+    tracing_subscriber::fmt::init();
+
     let port = std::env::args()
         .nth(1)
         .unwrap_or("3031".into())
@@ -22,29 +23,63 @@ async fn main() {
         port, genesis_fork_version
     );
 
-    // Upcheck route returns 200 if the server is running
-    let routes = puffersecuresigner::api::upcheck_route()
-        // Endpoint to securely generate and save a BLS sk
-        .or(puffersecuresigner::api::bls_keygen_route::bls_keygen_route())
-        // Endpoint to securely import an eip-2335 BLS keystore and eip-3076 slash protection db
-        .or(puffersecuresigner::api::bls_import_route::bls_key_import_route())
-        // Endpoint to list all pks of saved bls keys in the enclave
-        .or(puffersecuresigner::api::getter_routes::list_bls_keys_route())
+    let app_state = puffersecuresigner::enclave::secure_signer::handlers::AppState {
+        genesis_fork_version,
+    };
+
+    let app = axum::Router::new()
+        // Endpoint to check health
+        .route(
+            "/health",
+            axum::routing::get(puffersecuresigner::enclave::shared::handlers::health::handler),
+        )
         // Endpoint to securely generate and save an ETH sk
-        .or(puffersecuresigner::api::eth_keygen_route::eth_keygen_route())
+        .route(
+            "/eth/v1/keygen/secp256k1",
+            axum::routing::post(
+                puffersecuresigner::enclave::secure_signer::handlers::eth_keygen::handler,
+            ),
+        )
+        // Endpoint to securely generate and save a BLS sk
+        .route(
+            "/eth/v1/keygen/bls",
+            axum::routing::post(
+                puffersecuresigner::enclave::secure_signer::handlers::bls_keygen::handler,
+            ),
+        )
         // Endpoint to list the pks of all the generated ETH keys
-        .or(puffersecuresigner::api::getter_routes::list_eth_keys_route())
+        .route(
+            "/eth/v1/keygen/secp256k1",
+            axum::routing::get(
+                puffersecuresigner::enclave::shared::handlers::list_eth_keys::handler,
+            ),
+        )
+        // Endpoint to list all pks of saved bls keys in the enclave
+        .route(
+            "/eth/v1/keystores",
+            axum::routing::get(
+                puffersecuresigner::enclave::shared::handlers::list_bls_keys::handler,
+            ),
+        )
         // Endpoint to sign DepositData message for registering validator on beacon chain
-        .or(puffersecuresigner::api::deposit_route::validator_deposit_route());
+        .route(
+            "/api/v1/eth2/deposit",
+            axum::routing::post(
+                puffersecuresigner::enclave::secure_signer::handlers::validator_deposit::handler,
+            ),
+        )
+        // Endpoint to request a signature using BLS sk
+        .route(
+            "/api/v1/eth2/sign/:bls_pk_hex",
+            axum::routing::post(
+                puffersecuresigner::enclave::secure_signer::handlers::secure_sign_bls::handler,
+            ),
+        )
+        .with_state(app_state);
 
-    // Endpoint to request a signature using BLS sk
-    // Wrapped in a log filter
-    let bls_sign_route_with_log =
-        puffersecuresigner::api::signing_route::bls_sign_route(genesis_fork_version)
-            .with(warp::log("bls_sign_route"));
+    let addr = std::net::SocketAddr::from(([0, 0, 0, 0], port));
 
-    // Combine the routes
-    let all_routes = routes.or(bls_sign_route_with_log);
-
-    run(port, all_routes).await;
+    _ = axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await;
 }

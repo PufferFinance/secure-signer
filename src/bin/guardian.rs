@@ -1,9 +1,10 @@
 extern crate puffersecuresigner;
-use puffersecuresigner::{eth2::eth_types::Version, run, strip_0x_prefix};
-use warp::Filter;
+use puffersecuresigner::{eth2::eth_types::Version, strip_0x_prefix};
 
 #[tokio::main]
 async fn main() {
+    tracing_subscriber::fmt::init();
+
     let port = std::env::args()
         .nth(1)
         .unwrap_or("3031".into())
@@ -22,13 +23,28 @@ async fn main() {
         port, genesis_fork_version
     );
 
-    let routes = puffersecuresigner::api::upcheck_route()
-        .or(puffersecuresigner::api::eth_keygen_route::eth_keygen_route())
-        .or(puffersecuresigner::api::eth_keygen_route::eth_keygen_route_with_blockhash())
-        .or(puffersecuresigner::api::getter_routes::list_eth_keys_route());
+    let app = axum::Router::new()
+        // Endpoint to check health
+        .route(
+            "/health",
+            axum::routing::get(puffersecuresigner::enclave::shared::handlers::health::handler),
+        )
+        .route(
+            "/eth/v1/keygen",
+            axum::routing::post(
+                puffersecuresigner::enclave::guardian::handlers::attest_fresh_eth_key_with_blockhash::handler,
+            ),
+        )
+        .route(
+            "/eth/v1/validate_custody",
+            axum::routing::post(
+                puffersecuresigner::enclave::guardian::handlers::validate_custody::handler,
+            ),
+        );
 
-    let routes = routes
-        .or(puffersecuresigner::api::eth_keygen_route::eth_keygen_route_with_blockhash_debug());
+    let addr = std::net::SocketAddr::from(([0, 0, 0, 0], port));
 
-    run(port, routes).await;
+    _ = axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await;
 }
