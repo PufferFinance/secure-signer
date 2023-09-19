@@ -1,19 +1,52 @@
 use anyhow::{anyhow, Result};
+use axum::response::IntoResponse;
+use axum::Json;
 use ecies::PublicKey as EthPublicKey;
 use libsecp256k1::SecretKey as EthSecretKey;
+use log::{error, info};
 use sha3::Digest;
 use ssz_types::FixedVector;
 use tree_hash::TreeHash;
 
-use crate::enclave::BLSKeygenPayload;
+pub async fn handler(
+    Json(req): Json<crate::enclave::types::ValidateCustodyRequest>,
+) -> axum::response::Response {
+    info!("validate_custody()");
+    let crate::enclave::types::ValidateCustodyRequest {
+        keygen_payload,
+        guardian_index,
+        guardian_enclave_public_key,
+        eigen_pod_data,
+    } = req;
+
+    match generate_signature(
+        keygen_payload,
+        guardian_index,
+        guardian_enclave_public_key,
+        eigen_pod_data,
+    ) {
+        Ok(signature) => {
+            let resp = crate::enclave::types::ValidateCustodyResponse { signature };
+            (axum::http::status::StatusCode::OK, Json(resp)).into_response()
+        }
+
+        Err(e) => {
+            error!("{:?}", e);
+            (
+                axum::http::status::StatusCode::INTERNAL_SERVER_ERROR,
+                format!("{}", e),
+            )
+                .into_response()
+        }
+    }
+}
 
 pub fn generate_signature(
-    keygen_payload: BLSKeygenPayload,
-    // we can iterate over the guardian public keys to find the index (?)
+    keygen_payload: crate::enclave::types::BlsKeygenPayload,
     guardian_index: usize,
     guardian_enclave_public_key: EthPublicKey,
-    eigen_pod_data: crate::enclave::EigenPodData,
-) -> Result<(libsecp256k1::Signature, libsecp256k1::Message, bool)> {
+    eigen_pod_data: crate::enclave::types::EigenPodData,
+) -> Result<libsecp256k1::Signature> {
     let validator_public_key_hex = keygen_payload.bls_pub_key.clone();
     let Ok(guardian_enclave_private_key) = crate::crypto::eth_keys::fetch_eth_key(
         &crate::crypto::eth_keys::eth_pk_to_hex(&guardian_enclave_public_key),
@@ -30,7 +63,7 @@ pub fn generate_signature(
         Ok(true) => true,
     };
 
-    let withdrawal_credentials = crate::enclave::get_withdrawal_address(&eigen_pod_data);
+    let withdrawal_credentials = crate::enclave::get_withdrawal_address(&eigen_pod_data)?;
 
     check_data_root(
         &validator_public_key_hex,
@@ -46,17 +79,18 @@ pub fn generate_signature(
     // # 4. the validator build a valid depositDataRoot
 
     // # sign final message
-    let (signature, message) = calculate_signature(
+    let (signature, _) = calculate_signature(
         &guardian_enclave_public_key,
         &validator_public_key_hex,
         &guardian_enclave_private_key,
         &withdrawal_credentials,
         keygen_payload.signature,
         keygen_payload.deposit_data_root,
+        has_custody,
     )?;
 
     // We only need the signature
-    Ok((signature, message, has_custody))
+    Ok(signature)
 }
 
 fn check_data_root(
@@ -81,7 +115,7 @@ fn check_data_root(
 
 fn verify_custody(
     guardian_enclave_secret_key: EthSecretKey,
-    keygen_payload: &BLSKeygenPayload,
+    keygen_payload: &crate::enclave::types::BlsKeygenPayload,
     guardian_index: usize,
 ) -> Result<bool> {
     // Load key
@@ -91,7 +125,6 @@ fn verify_custody(
         .unwrap();
 
     let secret_key_shard_bytes = hex::decode(validator_secret_key_shard)?;
-    dbg!(&secret_key_shard_bytes);
 
     let secret_key_shard = dbg!(crate::crypto::eth_keys::envelope_decrypt(
         &guardian_enclave_secret_key,
@@ -126,6 +159,7 @@ fn calculate_signature(
     withdrawal_credentials: &crate::eth2::eth_types::Bytes32,
     signature: String,
     deposit_data_root: ethers::types::TxHash,
+    has_custody: bool,
 ) -> Result<(libsecp256k1::Signature, libsecp256k1::Message)> {
     let signature: Vec<u8> = hex::decode(signature)?;
 
@@ -139,6 +173,7 @@ fn calculate_signature(
     hasher.update(withdrawal_credentials);
     hasher.update(signature.to_vec());
     hasher.update(deposit_data_root.as_bytes());
+    hasher.update(vec![has_custody as u8]);
     let msg_to_be_signed = hasher.finalize();
 
     crate::crypto::eth_keys::sign_message(&msg_to_be_signed, &enclave_secret_key)
