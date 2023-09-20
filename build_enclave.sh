@@ -59,7 +59,7 @@ function build_component() {
         ./build_epid_ra.sh
     fi
 
-    ${cargo_bin} build ${build_flags} -F sgx --bin ${binary_name}
+    OPENSSL_DIR="/usr/local/occlum/x86_64-linux-musl/lib" ${cargo_bin} build ${build_flags} -F sgx --bin ${binary_name}
 }
 
 function new_instance() {
