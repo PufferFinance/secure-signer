@@ -1,6 +1,5 @@
 use crate::{
-    crypto::bls_keys::save_bls_key, enclave::get_withdrawal_address,
-    io::remote_attestation::AttestationEvidence, strip_0x_prefix,
+    crypto::bls_keys::save_bls_key, io::remote_attestation::AttestationEvidence, strip_0x_prefix,
 };
 use anyhow::Result;
 use blsttc::{PublicKeyShare, SecretKeyShare, SignatureShare};
@@ -10,62 +9,6 @@ use sha3::Digest;
 use ssz::Encode;
 use tree_hash::TreeHash;
 pub mod handlers;
-
-#[derive(serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AttestFreshEthKeyPayload {
-    eigen_pod_data: super::types::EigenPodData,
-    blockhash: String,
-    #[serde(
-        serialize_with = "serialize_as_hex",
-        deserialize_with = "deserialize_from_hex"
-    )]
-    guardian_pubkeys: Vec<EthPublicKey>,
-    threshold: usize,
-}
-
-fn serialize_as_hex<S>(pubkeys: &[EthPublicKey], serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    let hex_strings: Vec<String> = pubkeys
-        .iter()
-        .map(|pubkey| hex::encode(&pubkey.serialize()))
-        .collect();
-
-    serializer.serialize_str(&hex_strings.join(","))
-}
-fn deserialize_from_hex<'de, D>(deserializer: D) -> Result<Vec<EthPublicKey>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    struct HexVisitor;
-
-    impl<'de> serde::de::Visitor<'de> for HexVisitor {
-        type Value = Vec<EthPublicKey>;
-
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str("a sequence of hex strings")
-        }
-
-        fn visit_seq<V>(self, mut seq: V) -> Result<Self::Value, V::Error>
-        where
-            V: serde::de::SeqAccess<'de>,
-        {
-            let mut pubkeys = Vec::new();
-            while let Some(hex_string) = seq.next_element::<String>()? {
-                let hex_string: String = strip_0x_prefix!(hex_string);
-                let bytes = hex::decode(&hex_string).map_err(serde::de::Error::custom)?;
-                let pubkey =
-                    EthPublicKey::parse_slice(&bytes, None).map_err(serde::de::Error::custom)?;
-                pubkeys.push(pubkey);
-            }
-            Ok(pubkeys)
-        }
-    }
-
-    deserializer.deserialize_seq(HexVisitor)
-}
 
 #[derive(Clone, Debug)]
 pub struct RecipientKeys {
@@ -113,7 +56,7 @@ impl RecipientKeys {
 
 pub fn attest_fresh_bls_key(
     block_hash: String,
-    eigen_pod_data: super::types::EigenPodData,
+    withdrawal_credentials: [u8; 32],
     guardian_public_keys: Vec<EthPublicKey>,
     threshold: usize,
     fork_version: [u8; 4],
@@ -152,9 +95,7 @@ pub fn attest_fresh_bls_key(
     let validator_private_key = secret_key_set.secret_key();
 
     // # save validator private key to enclave
-    save_bls_key(&secret_key_set).unwrap();
-
-    let withdrawal_credentials = crate::enclave::get_withdrawal_address(&eigen_pod_data)?;
+    save_bls_key(&secret_key_set)?;
 
     // # sign a DepositMessage to deposit 32 ETH to beacon deposit contract
     let deposit_message = crate::eth2::eth_types::DepositMessage {
@@ -172,10 +113,9 @@ pub fn attest_fresh_bls_key(
     let root = crate::eth2::eth_signing::compute_signing_root(deposit_message, domain);
     let signature = validator_private_key.sign(root);
 
-    //DepositData(bls_pk, withdrawal_credentials, bond, p["signature"]).hash_tree_root()
     let deposit_data_root = crate::eth2::eth_types::DepositData {
         pubkey: hex::decode(validator_pubkey.to_hex())?.into(),
-        withdrawal_credentials: get_withdrawal_address(&eigen_pod_data)?,
+        withdrawal_credentials,
         amount: 32,
         signature: <_>::from(signature.to_bytes().to_vec()),
     }

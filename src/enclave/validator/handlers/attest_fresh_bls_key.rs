@@ -3,15 +3,13 @@ use log::{error, info};
 
 use crate::eth2::eth_types::GENESIS_FORK_VERSION;
 
-use crate::enclave::validator::AttestFreshEthKeyPayload;
-
 pub async fn handler(
-    Json(keygen_payload): Json<AttestFreshEthKeyPayload>,
+    Json(keygen_payload): Json<crate::enclave::types::AttestFreshEthKeyPayload>,
 ) -> axum::response::Response {
     info!("attest_fresh_bls_key()");
     match crate::enclave::validator::attest_fresh_bls_key(
         keygen_payload.blockhash,
-        keygen_payload.eigen_pod_data,
+        keygen_payload.withdrawal_credentials,
         keygen_payload.guardian_pubkeys,
         keygen_payload.threshold,
         GENESIS_FORK_VERSION,

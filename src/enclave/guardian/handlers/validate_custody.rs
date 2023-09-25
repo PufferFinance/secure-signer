@@ -16,14 +16,14 @@ pub async fn handler(
         keygen_payload,
         guardian_index,
         guardian_enclave_public_key,
-        eigen_pod_data,
+        withdrawal_credentials,
     } = req;
 
     match generate_signature(
         keygen_payload,
         guardian_index,
         guardian_enclave_public_key,
-        eigen_pod_data,
+        withdrawal_credentials,
     ) {
         Ok(signature) => {
             let resp = crate::enclave::types::ValidateCustodyResponse { signature };
@@ -45,7 +45,7 @@ pub fn generate_signature(
     keygen_payload: crate::enclave::types::BlsKeygenPayload,
     guardian_index: usize,
     guardian_enclave_public_key: EthPublicKey,
-    eigen_pod_data: crate::enclave::types::EigenPodData,
+    withdrawal_credentials: [u8; 32],
 ) -> Result<libsecp256k1::Signature> {
     let validator_public_key_hex = keygen_payload.bls_pub_key.clone();
     let Ok(guardian_enclave_private_key) = crate::crypto::eth_keys::fetch_eth_key(
@@ -62,8 +62,6 @@ pub fn generate_signature(
         Err(_) | Ok(false) => false,
         Ok(true) => true,
     };
-
-    let withdrawal_credentials = crate::enclave::get_withdrawal_address(&eigen_pod_data)?;
 
     check_data_root(
         &validator_public_key_hex,
