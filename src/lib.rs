@@ -7,6 +7,7 @@ pub mod constants;
 pub mod crypto;
 pub mod enclave;
 // TODO: Check lighthouse if we can replace
+pub mod client;
 pub mod eth2;
 pub mod io;
 

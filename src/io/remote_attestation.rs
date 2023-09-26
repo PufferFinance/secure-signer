@@ -33,7 +33,7 @@ pub fn do_epid_ra(
 ) {
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq)]
 pub struct AttestationEvidence {
     pub raw_report: String,
     pub signed_report: String,

@@ -6,7 +6,7 @@ use ecies::PublicKey as EthPublicKey;
 use ethers::types::TxHash;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct KeyGenResponse {
     pub pk_hex: String,
     pub evidence: AttestationEvidence,
@@ -78,12 +78,12 @@ impl KeyGenResponse {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ListKeysResponseInner {
     pub pubkey: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ListKeysResponse {
     pub data: Vec<ListKeysResponseInner>,
 }

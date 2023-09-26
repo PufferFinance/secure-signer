@@ -55,6 +55,7 @@ reqwest = { version = "0.11", features = ["json"] }
 anyhow = "1.0.65"
 clap = { version = "4.1.1", features = ["derive"], optional = true }
 ethers = "2.0.8"
+async-trait = "0.1.73"
 
 
 [dev-dependencies]

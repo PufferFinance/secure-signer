@@ -1,270 +1,161 @@
-mod bls_import;
-mod deposit;
-mod routes;
-mod withdraw;
+use anyhow::anyhow;
+use axum::async_trait;
 
-use anyhow::{Context, Result};
-use clap::Parser;
-use log::info;
-use puffersecuresigner::eth2::eth_types::ForkInfo;
-use serde::{Deserialize, Serialize};
+mod methods;
+mod secure_signer;
+mod tests;
 
-use std::{
-    fs::{self, File},
-    io::BufWriter,
-    path::PathBuf,
-};
+#[async_trait]
+pub trait Method {
+    type Response;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct NetworkConfig {
-    pub network_name: String,
-    pub deposit_cli_version: String,
-    pub fork_info: ForkInfo,
+    async fn handle<'a>(self, client: &'a Client) -> anyhow::Result<Self::Response>;
 }
 
-impl NetworkConfig {
-    fn new(path: &String) -> Self {
-        let s = fs::read_to_string(path).expect("bad network config");
-        serde_json::from_str(&s).expect("bad deserialize config")
+#[async_trait]
+impl Method for ValidatorMethod {
+    type Response = ValidatorResponse;
+
+    async fn handle<'a>(self, client: &'a Client) -> anyhow::Result<Self::Response> {
+        todo!()
     }
 }
 
-/// Secure-Signer Client Interface
-#[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
-struct Args {
-    /// The port that Secure-Signer is exposing
-    #[arg(short, long, default_value_t = 9001)]
-    port: u16,
+#[async_trait]
+impl Method for GuardianMethod {
+    type Response = GuardianResponse;
 
-    /// The path to the directory to save Secure-Signer outputs
-    #[arg(short, long, default_value = "./ss_out")]
-    outdir: String,
-
-    /// Requests Secure-Signer to generate BLS key perform remote attestation [requires --mrenclave]
-    #[arg(short, long)]
-    bls_keygen: bool,
-
-    /// Requests Secure-Signer to list all of its keys
-    #[arg(short, long)]
-    list: bool,
-
-    /// Requests Secure-Signer to import a keystore [requires --mrenclave, --keystore-path, --password-path]
-    #[arg(short, long)]
-    import: bool,
-
-    /// The password to the keystore
-    #[arg(long)]
-    keystore_path: Option<PathBuf>,
-
-    /// The password to the keystore
-    #[arg(long)]
-    password_path: Option<PathBuf>,
-
-    /// The path to EIP-3076 .JSON to import with the keystore
-    #[arg(long)]
-    slash_protection_path: Option<PathBuf>,
-
-    /// Request Secure-Signer to generate a DepositData [requires validator-pk-hex, --execution-addr]
-    #[arg(short, long)]
-    deposit: bool,
-
-    /// Skips checking remote attestation, allowing the client to interface with a non-SGX-enabled Secure-Signer instance
-    #[arg(long)]
-    debug: bool,
-
-    /// The validator public key in hex
-    #[arg(short, long)]
-    validator_pk_hex: Option<String>,
-
-    /// The ETH address for withdrawals
-    #[arg(short, long)]
-    execution_addr: Option<String>,
-
-    /// The expected MRENCLAVE value
-    #[arg(long)]
-    mrenclave: Option<String>,
-
-    /// The path to the JSON network config file
-    #[arg(short, long, default_value = "./conf/network_config.json")]
-    config: String,
-
-    /// Requests Secure-Signer to sign a VoluntaryExitMesssage [requires --validator-pk-hex, --epoch, --validator-index]
-    #[arg(short, long)]
-    withdraw: bool,
-
-    #[arg(long)]
-    epoch: Option<u64>,
-
-    #[arg(long)]
-    validator_index: Option<u64>,
-}
-
-impl Args {
-    pub fn out_dir() -> PathBuf {
-        let args = Args::parse();
-        PathBuf::from(&args.outdir)
-    }
-
-    pub fn init_out_dir() {
-        let dir = Args::out_dir();
-        fs::create_dir_all(dir).expect("Failed to create {dir}");
-    }
-
-    pub fn config() -> NetworkConfig {
-        NetworkConfig::new(&Args::parse().config)
-    }
-
-    pub fn port() -> u16 {
-        Args::parse().port
-    }
-
-    pub fn do_list() -> bool {
-        Args::parse().list
-    }
-
-    pub fn do_keygen() -> bool {
-        Args::parse().bls_keygen
-    }
-
-    pub fn do_import() -> bool {
-        Args::parse().import
-    }
-
-    pub fn do_deposit() -> bool {
-        Args::parse().deposit
-    }
-
-    pub fn do_withdrawal() -> bool {
-        Args::parse().withdraw
-    }
-
-    pub fn get_keygen_args() -> (String, bool) {
-        let args = Args::parse();
-        let verify_ra_evidence = !args.debug;
-        (
-            args.mrenclave.expect("--mrenclave expected"),
-            verify_ra_evidence,
-        )
-    }
-
-    pub fn get_import_args() -> (PathBuf, PathBuf, Option<PathBuf>, String, bool) {
-        let args = Args::parse();
-        let keystore_path = args.keystore_path.expect("--keystore-path expected");
-        let password_path = args.password_path.expect("--password-path expected");
-        let slashing_db_path = args.slash_protection_path;
-        let mrenclave = args.mrenclave.expect("--mrenclave expected");
-        let verify_ra_evidence = !args.debug;
-        (
-            keystore_path,
-            password_path,
-            slashing_db_path,
-            mrenclave,
-            verify_ra_evidence,
-        )
-    }
-
-    pub fn get_deposit_args() -> (String, String) {
-        let args = Args::parse();
-        let validator_pk_hex = args.validator_pk_hex.expect("--validator_pk_hex expected");
-        let execution_addr = args
-            .execution_addr
-            .expect("ETH address (hex) required for withdrawal credentials");
-        (validator_pk_hex, execution_addr)
-    }
-
-    pub fn get_withdraw_args() -> (String, u64, u64) {
-        let args = Args::parse();
-        let validator_pk_hex = args.validator_pk_hex.expect("--validator_pk_hex expected");
-        let validator_index: u64 = args.validator_index.expect("--validator-index expected");
-        let epoch: u64 = args.epoch.expect("--epoch expected");
-        (validator_pk_hex, validator_index, epoch)
-    }
-
-    pub fn write_to_file<T: Serialize>(fname: &str, data: T) -> Result<()> {
-        let p = Args::out_dir().join(fname);
-        info!("Writing data to {:?}", p);
-        let file = File::create(&p)?;
-        let writer = BufWriter::new(file);
-        serde_json::to_writer_pretty(writer, &data)
-            .with_context(|| format!("Failed to write to {:?}", p))
+    async fn handle<'a>(self, client: &'a Client) -> anyhow::Result<Self::Response> {
+        todo!()
     }
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    Args::init_out_dir();
-    let port = Args::port();
+#[derive(Debug)]
+pub enum ValidatorMethod {
+    Health,
+    AttestFreshBlsKey(ValidatorFreshBlshKeyData),
+    ListKeys,
+}
 
-    assert!(
-        routes::is_alive(port).await.is_ok(),
-        "Failed to reach Secure-Signer on port: {port}"
-    );
-    println!("- Connected to Secure-Signer on port {}", port);
+#[derive(Debug)]
+pub enum SecureSignerMethod {
+    Health,
+    GenerateEthKey,
+    GenerateBlsKey,
+    ListEthKeys,
+    ListBlsKeys,
+}
 
-    if Args::do_keygen() {
-        let resp = routes::bls_keygen(port).await.unwrap();
-        let (mrenclave, verify_ra_evidence) = Args::get_keygen_args();
-        if verify_ra_evidence {
-            resp.validate_bls_ra(&mrenclave)?;
+#[derive(Debug)]
+pub enum GuardianMethod {
+    Health,
+    ValidateCustody(ValidateCustodyData),
+    AttestFreshEthKey(Blockhash),
+    ListKeys,
+}
+
+#[derive(Debug)]
+pub enum ValidatorResponse {
+    Health,
+    AttestFreshBlsKey(ValidatorFreshBlshKeyData),
+    ListKeys,
+}
+
+#[derive(Debug)]
+pub enum SecureSignerResponse {
+    Health,
+    GenerateEthKey,
+    GenerateBlsKey,
+    ListEthKeys,
+    ListBlsKeys,
+}
+
+#[derive(Debug)]
+pub enum GuardianResponse {
+    Health,
+    ValidateCustody(ValidateCustodyData),
+    AttestFreshEthKey(Blockhash),
+    ListKeys,
+}
+
+pub struct Client {
+    http_client: reqwest::Client,
+    network_config: NetworkConfig,
+    validator_url: String,
+    secure_signer_url: String,
+    guardian_url: String,
+}
+
+fn default_client_guardian_url() -> String {
+    "http://localhost:9002".to_string()
+}
+fn default_client_validator_url() -> String {
+    "http://localhost:9003".to_string()
+}
+fn default_client_secure_signer_url() -> String {
+    "http://localhost:9001".to_string()
+}
+
+impl Client {
+    pub async fn call<M: Method>(self, method: M) -> anyhow::Result<M::Response> {
+        method.handle(&self).await
+    }
+}
+
+pub struct ClientBuilder {
+    network_config: Option<NetworkConfig>,
+    validator_url: Option<String>,
+    secure_signer_url: Option<String>,
+    guardian_url: Option<String>,
+}
+
+impl ClientBuilder {
+    pub fn new() -> Self {
+        ClientBuilder {
+            network_config: None,
+            validator_url: None,
+            secure_signer_url: None,
+            guardian_url: None,
         }
-        info!("{:?}", resp);
-        Args::write_to_file("keygen_response", resp)?;
     }
 
-    if Args::do_import() {
-        let (keystore_path, password_path, slashing_db_path, mrenclave, verify_ra_evidence) =
-            Args::get_import_args();
-        let resp = bls_import::import_from_files(
-            port,
-            keystore_path,
-            password_path,
-            slashing_db_path,
-            &mrenclave,
-            verify_ra_evidence,
-        )
-        .await?;
-        info!("{:?}", resp);
-        Args::write_to_file("import_response", resp)?;
+    pub fn build(self) -> Client {
+        Client {
+            http_client: reqwest::Client::new(),
+            network_config: self.network_config.unwrap_or(NetworkConfig::default()),
+            validator_url: self.validator_url.unwrap_or(default_client_validator_url()),
+            secure_signer_url: self
+                .secure_signer_url
+                .unwrap_or(default_client_secure_signer_url()),
+            guardian_url: self.guardian_url.unwrap_or(default_client_guardian_url()),
+        }
     }
 
-    if Args::do_deposit() {
-        let (validator_pk_hex, execution_addr) = Args::get_deposit_args();
-        let resp = deposit::get_deposit_signature(
-            port,
-            &validator_pk_hex,
-            &execution_addr,
-            Args::config().fork_info.fork.current_version,
-        )
-        .await?;
-        let deposit_data_json = deposit::deposit_data_payload(resp, Args::config())?;
-        info!("{:#?}", deposit_data_json);
-        Args::write_to_file("deposit_data.json", deposit_data_json)?;
+    pub fn network_config(mut self, config: NetworkConfig) -> ClientBuilder {
+        self.network_config = Some(config);
+        self
     }
 
-    if Args::do_withdrawal() {
-        let (validator_pk_hex, validator_index, epoch) = Args::get_withdraw_args();
-        let vem = withdraw::exit_validator(
-            port,
-            &validator_pk_hex,
-            epoch,
-            validator_index,
-            Args::config(),
-        )
-        .await?;
-        info!("{:#?}", vem);
-        Args::write_to_file("voluntary_exit_message.json", vem)?;
+    pub fn validator_url(mut self, url: String) -> ClientBuilder {
+        self.validator_url = Some(url);
+        self
     }
-
-    if Args::do_list() {
-        let eth_keys = routes::list_eth_keys(port).await?;
-        info!("{:?}", eth_keys);
-        Args::write_to_file("list_eth_keys", eth_keys)?;
-
-        let bls_keys = routes::list_bls_keys(port).await?;
-        info!("{:?}", bls_keys);
-        Args::write_to_file("list_bls_keys", bls_keys)?;
+    pub fn guardian_url(mut self, url: String) -> ClientBuilder {
+        self.guardian_url = Some(url);
+        self
     }
-
-    Ok(())
+    pub fn secure_signer_url(mut self, url: String) -> ClientBuilder {
+        self.secure_signer_url = Some(url);
+        self
+    }
 }
+
+#[derive(Debug)]
+pub struct ValidatorFreshBlshKeyData {}
+
+#[derive(Debug)]
+pub struct ValidateCustodyData {}
+
+#[derive(Default)]
+pub struct NetworkConfig {}
+type Blockhash = String;

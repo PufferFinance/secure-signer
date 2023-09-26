@@ -123,10 +123,9 @@ echo "Build and containerize enclave."
     -b build from cached dependencies
     -s Use Secure-Signer service (default port 9001)
     -g Use Guardian service (default port 9002)
+    -g Use Valdator service (default port 9003)
     -x Run service on port set by -p (or default to the service)
     -d Build and package the Docker Container Image (assumes "occlum package" has been run)
-    -m Measure Secure-Signer's MRENCLAVE and MRSIGNER (assumes this is run in SGX env)
-    -t Run all unit tests
     -a Compile client app
     -h <usage> usage help
 EOM
