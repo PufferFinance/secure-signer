@@ -40,7 +40,15 @@ async fn main() {
             axum::routing::post(
                 puffersecuresigner::enclave::guardian::handlers::validate_custody::handler,
             ),
-        );
+        )
+         // Endpoint to list the pks of all the generated ETH keys
+        .route(
+            "/eth/v1/keygen/secp256k1",
+            axum::routing::get(
+                puffersecuresigner::enclave::shared::handlers::list_eth_keys::handler,
+            ),
+        )
+        ;
 
     let addr = std::net::SocketAddr::from(([0, 0, 0, 0], port));
 

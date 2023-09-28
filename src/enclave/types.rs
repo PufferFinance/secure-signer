@@ -4,6 +4,7 @@ use anyhow::{bail, Result};
 use blsttc::PublicKey as BlsPublicKey;
 use ecies::PublicKey as EthPublicKey;
 use ethers::types::TxHash;
+use serde::ser::SerializeSeq;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -131,6 +132,7 @@ impl SignatureResponse {
 #[serde(rename_all = "camelCase")]
 pub struct ValidateCustodyRequest {
     pub keygen_payload: BlsKeygenPayload,
+    // TODO: This can be found out from which part ends up being decrypted
     pub guardian_index: usize,
     pub guardian_enclave_public_key: EthPublicKey,
     pub withdrawal_credentials: [u8; 32],
@@ -185,7 +187,6 @@ pub struct BlsKeygenPayload {
     pub intel_x509: String,
 }
 
-//TODO: Doc this
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EigenPodData {
@@ -197,9 +198,9 @@ pub struct EigenPodData {
     pub pod_account_owners: Vec<ethers::types::Address>,
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct AttestFreshEthKeyPayload {
+pub struct AttestFreshBlsKeyPayload {
     pub blockhash: String,
     #[serde(
         serialize_with = "serialize_pubkeys_hex",
@@ -223,7 +224,11 @@ where
         .map(|pubkey| hex::encode(&pubkey.serialize()))
         .collect();
 
-    serializer.serialize_str(&hex_strings.join(","))
+    let mut seq = serializer.serialize_seq(Some(hex_strings.len()))?;
+    for hex_string in hex_strings {
+        seq.serialize_element(&hex_string)?;
+    }
+    seq.end()
 }
 fn deserialize_pubkeys_from_hex<'de, D>(deserializer: D) -> Result<Vec<EthPublicKey>, D::Error>
 where

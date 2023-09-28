@@ -35,6 +35,12 @@ async fn main() {
             axum::routing::post(
                 puffersecuresigner::enclave::validator::handlers::attest_fresh_bls_key::handler,
             ),
+        )
+        .route(
+            "/eth/v1/keystores",
+            axum::routing::get(
+                puffersecuresigner::enclave::shared::handlers::list_bls_keys::handler,
+            ),
         );
 
     let addr = std::net::SocketAddr::from(([0, 0, 0, 0], port));

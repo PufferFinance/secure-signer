@@ -57,7 +57,7 @@ impl AttestationEvidence {
         report_data.clone_from_slice(&sized_data[..]);
 
         // sufficient sized buffers
-        //TODO: vec with capacity
+        //TODO: vec with capacity; Currently using vec with capacity leads to failure in attestation
         let a = [1_u8; 5000].to_vec();
         let b = [1_u8; 1000].to_vec();
         let c = [1_u8; 10000].to_vec();

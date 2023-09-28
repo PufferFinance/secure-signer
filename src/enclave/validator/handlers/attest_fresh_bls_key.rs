@@ -4,7 +4,7 @@ use log::{error, info};
 use crate::eth2::eth_types::GENESIS_FORK_VERSION;
 
 pub async fn handler(
-    Json(keygen_payload): Json<crate::enclave::types::AttestFreshEthKeyPayload>,
+    Json(keygen_payload): Json<crate::enclave::types::AttestFreshBlsKeyPayload>,
 ) -> axum::response::Response {
     info!("attest_fresh_bls_key()");
     match crate::enclave::validator::attest_fresh_bls_key(

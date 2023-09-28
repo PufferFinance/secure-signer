@@ -6,4 +6,3 @@ fn build_client() -> super::Client {
     let builder = super::ClientBuilder::new();
     builder.build()
 }
-

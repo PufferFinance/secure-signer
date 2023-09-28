@@ -1,87 +1,70 @@
-use anyhow::anyhow;
-use async_trait::async_trait;
+use std::sync::Arc;
 
-#[derive(Debug)]
-pub enum SecureSignerMethod {
-    Health,
-    GenerateEthKey,
-    GenerateBlsKey,
-    ListEthKeys,
-    ListBlsKeys,
+pub struct SecureSignerClient {
+    pub url: String,
+    pub client: Arc<reqwest::Client>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum SecureSignerResponse {
-    Health(reqwest::StatusCode),
-    GenerateEthKey(crate::enclave::types::KeyGenResponse),
-    GenerateBlsKey(crate::enclave::types::KeyGenResponse),
-    ListEthKeys(crate::enclave::types::ListKeysResponse),
-    ListBlsKeys(crate::enclave::types::ListKeysResponse),
-}
+impl SecureSignerClient {
+    pub async fn health(&self) -> bool {
+        let Ok(resp) = self.client.get(format!("{}/health", self.url)).send().await else {
+            return false;
+        };
+        resp.status() == reqwest::StatusCode::OK
+    }
 
-struct T {}
-impl T {
-    const TEST: &'static str = "asd";
-}
+    pub async fn list_eth_keys(&self) -> anyhow::Result<crate::enclave::types::ListKeysResponse> {
+        Ok(self
+            .client
+            .get(format!("{}/eth/v1/keygen/secp256k1", self.url))
+            .send()
+            .await?
+            .json()
+            .await?)
+    }
 
-#[async_trait]
-impl super::Method for SecureSignerMethod {
-    type Response = SecureSignerResponse;
+    pub async fn list_bls_keys(&self) -> anyhow::Result<crate::enclave::types::ListKeysResponse> {
+        Ok(self
+            .client
+            .get(format!("{}/eth/v1/keystores", self.url))
+            .send()
+            .await?
+            .json()
+            .await?)
+    }
 
-    async fn handle<'a>(self, client: &'a super::Client) -> anyhow::Result<Self::Response> {
-        let url = &client.secure_signer_url;
-        match self {
-            SecureSignerMethod::Health => {
-                let status = client
-                    .http_client
-                    .get(format!("{}/health", url))
-                    .send()
-                    .await?
-                    .status();
-                Ok(SecureSignerResponse::Health(status))
-            }
-            SecureSignerMethod::ListEthKeys => {
-                let resp: crate::enclave::types::ListKeysResponse = client
-                    .http_client
-                    .get(format!("{}/eth/v1/keygen/secp256k1", url))
-                    .send()
-                    .await?
-                    .json()
-                    .await?;
-                Ok(SecureSignerResponse::ListEthKeys(resp))
-            }
-            SecureSignerMethod::ListBlsKeys => {
-                let resp: crate::enclave::types::ListKeysResponse = client
-                    .http_client
-                    .get(format!("{}/eth/v1/keystores", url))
-                    .send()
-                    .await?
-                    .json()
-                    .await?;
-                Ok(SecureSignerResponse::ListBlsKeys(resp))
-            }
-            SecureSignerMethod::GenerateEthKey => {
-                let resp: crate::enclave::types::KeyGenResponse = client
-                    .http_client
-                    .post(format!("{}/eth/v1/keygen/secp256k1", url))
-                    .send()
-                    .await?
-                    .json()
-                    .await?;
-                Ok(SecureSignerResponse::GenerateEthKey(resp))
-            }
-            SecureSignerMethod::GenerateBlsKey => {
-                let resp: crate::enclave::types::KeyGenResponse = client
-                    .http_client
-                    .post(format!("{}/eth/v1/keygen/secp256k1", url))
-                    .send()
-                    .await?
-                    .json()
-                    .await?;
-                Ok(SecureSignerResponse::GenerateBlsKey(resp))
-            }
-            //TODO: Remove this
-            _ => Err(anyhow!("Failed to recognize the method")),
-        }
+    pub async fn generate_eth_key(&self) -> anyhow::Result<crate::enclave::types::KeyGenResponse> {
+        Ok(self
+            .client
+            .post(format!("{}/eth/v1/keygen/secp256k1", self.url))
+            .send()
+            .await?
+            .json()
+            .await?)
+    }
+
+    pub async fn generate_bls_key(&self) -> anyhow::Result<crate::enclave::types::KeyGenResponse> {
+        Ok(self
+            .client
+            .post(format!("{}/eth/v1/keygen/bls", self.url))
+            .send()
+            .await?
+            .json()
+            .await?)
+    }
+
+    pub async fn secure_sign_bls(
+        &self,
+        public_key_hex: &str,
+        signing_data: crate::eth2::eth_signing::BLSSignMsg,
+    ) -> anyhow::Result<crate::enclave::types::SignatureResponse> {
+        Ok(self
+            .client
+            .post(format!("{}/api/v1/eth2/sign/{public_key_hex}", self.url))
+            .json(&signing_data)
+            .send()
+            .await?
+            .json()
+            .await?)
     }
 }
