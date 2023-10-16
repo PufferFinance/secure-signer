@@ -1,3 +1,4 @@
+use anyhow::bail;
 use sha3::Digest;
 pub mod handlers;
 
@@ -17,10 +18,15 @@ pub fn attest_new_eth_key_with_blockhash(
     let blockhash: String = crate::strip_0x_prefix!(blockhash);
     let blockhash = hex::decode(blockhash)?;
 
+    if blockhash.len() != 32 {
+        bail!("Bad blockhash")
+    }
+
     let mut hasher = sha3::Keccak256::new();
     hasher.update(&pk.serialize());
     let pk_hash = hasher.finalize();
 
+    // Concatenate the two 32 Bytes
     let payload = ethers::abi::encode_packed(&[
         ethers::abi::Token::Bytes(pk_hash.to_vec()),
         ethers::abi::Token::Bytes(blockhash),
