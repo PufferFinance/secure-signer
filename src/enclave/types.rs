@@ -15,8 +15,9 @@ pub struct KeyGenResponse {
 
 impl KeyGenResponse {
     pub fn from_eth_key(pk: EthPublicKey, evidence: AttestationEvidence) -> Self {
+        let pk: String = strip_0x_prefix!(hex::encode(pk.serialize())); // uncompressed
         KeyGenResponse {
-            pk_hex: format!("0x{}", eth_keys::eth_pk_to_hex(&pk)),
+            pk_hex: format!("0x{}", pk),
             evidence,
         }
     }
