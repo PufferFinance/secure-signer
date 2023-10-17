@@ -8,7 +8,6 @@ pub async fn handler(
 ) -> axum::response::Response {
     info!("attest_fresh_bls_key()");
     match crate::enclave::validator::attest_fresh_bls_key(
-        keygen_payload.blockhash,
         keygen_payload.withdrawal_credentials,
         keygen_payload.guardian_pubkeys,
         keygen_payload.threshold,

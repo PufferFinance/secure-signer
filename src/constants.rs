@@ -11,3 +11,6 @@ pub const ETH_UNCOMPRESSED_PK_BYTES: usize = 65;
 pub const ETH_SIGNATURE_BYTES: usize = 64;
 
 pub const ALLOW_GROWABLE_SLASH_PROTECTION_DB: bool = false;
+
+
+pub const FULL_DEPOSIT_AMOUNT: u64 = 32000000000;

@@ -202,7 +202,6 @@ pub struct EigenPodData {
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct AttestFreshBlsKeyPayload {
-    pub blockhash: String,
     #[serde(
         serialize_with = "serialize_pubkeys_hex",
         deserialize_with = "deserialize_pubkeys_from_hex"
