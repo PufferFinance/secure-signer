@@ -1,16 +1,12 @@
 use crate::{
     crypto::bls_keys::save_bls_key, eth2::eth_types::DepositResponse,
-    io::remote_attestation::AttestationEvidence, strip_0x_prefix,
+    io::remote_attestation::AttestationEvidence,
 };
 use anyhow::Result;
-use blsttc::{
-    PublicKey, PublicKeySet, PublicKeyShare, SecretKeySet, SecretKeyShare, SignatureShare,
-};
-use bytes::Bytes;
+use blsttc::{PublicKeySet, PublicKeyShare, SecretKeyShare, SignatureShare};
 use ecies::PublicKey as EthPublicKey;
 use sha3::Digest;
 use ssz::Encode;
-use tree_hash::TreeHash;
 pub mod handlers;
 
 #[derive(Clone, Debug)]
@@ -71,28 +67,20 @@ pub fn attest_fresh_bls_key(
     let key_shares = crate::crypto::bls_keys::distribute_key_shares(&secret_key_set, n);
 
     // Encrypt the shares to using guardian pubkeys
-    let recipent_keys: Vec<EncryptedRecipientKeys> = guardian_public_keys
-        .iter()
-        .zip(key_shares.into_iter())
-        .map(
-            |(guardian_public_key, (secret_key_share, public_key_share))| {
-                RecipientKeys {
-                    guardian_public_key: guardian_public_key.clone(),
-                    secret_key_share,
-                    public_key_share,
-                }
-                .encrypt_to_recipient()
-                .unwrap() // todo
-            },
-        )
-        .collect();
+    let mut recipient_keys: Vec<EncryptedRecipientKeys> = Vec::new();
+    for (g_pk, (sk_share, pk_share)) in guardian_public_keys.into_iter().zip(key_shares.into_iter())
+    {
+        let k = RecipientKeys {
+            guardian_public_key: g_pk,
+            secret_key_share: sk_share,
+            public_key_share: pk_share,
+        }
+        .encrypt_to_recipient()?;
+        recipient_keys.push(k);
+    }
 
     // get validator aggregate public key
     let validator_pubkey = secret_key_set.public_keys().public_key();
-
-    // get validator aggregate private key
-    let validator_private_key = secret_key_set.secret_key();
-    let pk_hex = validator_pubkey.to_hex();
 
     // save validator private key to enclave
     save_bls_key(&secret_key_set)?;
@@ -104,53 +92,40 @@ pub fn attest_fresh_bls_key(
         amount: crate::constants::FULL_DEPOSIT_AMOUNT,
     };
 
-    let deposit_resp =
-        crate::eth2::eth_signing::get_deposit_signature(pk_hex, deposit_message, fork_version)?;
-
-    dbg!(&deposit_resp);
-
-    let deposit_data_root = hex::decode(deposit_resp.deposit_data_root)?;
+    let deposit_resp = crate::eth2::eth_signing::get_deposit_signature(
+        validator_pubkey.to_hex(),
+        deposit_message,
+        fork_version,
+    )?;
 
     // build remote attestation payload
-    // let mut hasher = sha3::Keccak256::new();
-    // hasher.update(validator_pubkey.to_bytes());
-    // hasher.update(secret_key_set.public_keys().to_bytes());
-    // hasher.update(threshold.as_ssz_bytes());
-    // let encoded: Bytes = ethers::abi::encode(
-    //     &guardian_public_keys
-    //         .into_iter()
-    //         .map(|x| ethers::abi::Token::Bytes(x.serialize().to_vec()))
-    //         .collect::<Vec<ethers::abi::Token>>(),
-    // )
-    // .into();
-    // hasher.update(encoded);
-    // let digest_bytes = hasher.finalize();
+    let payload = build_validator_remote_attestation_payload(
+        secret_key_set.public_keys().clone(),
+        deposit_resp.clone(),
+        recipient_keys.clone(),
+    )?;
 
     // do remote attestation
-    // let evidence = AttestationEvidence::new(&digest_bytes)?;
+    let evidence = AttestationEvidence::new(&payload)?;
 
-    // Ok(super::types::BlsKeygenPayload {
-    //     bls_pub_key: validator_pubkey.to_hex(),
-    //     signature: hex::encode(signature.to_bytes()),
-    //     deposit_data_root,
-    //     bls_enc_priv_key_shares: recipent_keys
-    //         .iter()
-    //         .map(|encrypted_key| encrypted_key.encrypted_secret_key_share_hex.clone())
-    //         .collect(),
-    //     bls_pub_key_shares: recipent_keys
-    //         .iter()
-    //         .map(|encrypted_key| hex::encode(encrypted_key.public_key_share.to_bytes()))
-    //         .collect(),
-    //     intel_report: evidence.raw_report,
-    //     intel_sig: evidence.signed_report,
-    //     intel_x509: evidence.signing_cert,
-    // })
-    unimplemented!()
+    dbg!(Ok(super::types::BlsKeygenPayload {
+        bls_pub_key_set: hex::encode(secret_key_set.public_keys().to_bytes()),
+        bls_pub_key: validator_pubkey.to_hex(),
+        signature: deposit_resp.signature,
+        deposit_data_root: deposit_resp.deposit_data_root,
+        bls_enc_priv_key_shares: recipient_keys
+            .into_iter()
+            .map(|encrypted_key| encrypted_key.encrypted_secret_key_share_hex)
+            .collect(),
+        intel_report: evidence.raw_report,
+        intel_sig: evidence.signed_report,
+        intel_x509: evidence.signing_cert,
+    }))
 }
 
 pub fn build_validator_remote_attestation_payload(
     validator_pk_set: PublicKeySet,
-    deposit: DepositResponse, // todo clean up
+    deposit: DepositResponse,
     shares: Vec<EncryptedRecipientKeys>,
 ) -> Result<Vec<u8>> {
     let mut hasher = sha3::Keccak256::new();
@@ -192,7 +167,6 @@ mod tests {
     use crate::eth2::eth_types::Version;
 
     use super::*;
-    use blsttc::PublicKeySet;
     use ecies::{PublicKey as EthPublicKey, SecretKey as EthSecretKey};
 
     #[test]
@@ -213,7 +187,7 @@ mod tests {
         let secret_key_set = crate::crypto::bls_keys::new_bls_key(threshold - 1);
         let validator_pk_set = secret_key_set.public_keys();
         let validator_pk = validator_pk_set.public_key();
-        let validator_private_key = secret_key_set.secret_key();
+        // let validator_private_key = secret_key_set.secret_key();
         let pk_hex: String = validator_pk_set.public_key().to_hex();
 
         // Shard the key into `n` keyshares
@@ -233,7 +207,7 @@ mod tests {
                         public_key_share,
                     }
                     .encrypt_to_recipient()
-                    .unwrap() // todo
+                    .unwrap()
                 },
             )
             .collect();
@@ -257,8 +231,6 @@ mod tests {
 
         dbg!(&deposit_resp);
 
-        let deposit_data_root = hex::decode(&deposit_resp.deposit_data_root).unwrap();
-
         let payload = build_validator_remote_attestation_payload(
             validator_pk_set.clone(),
             deposit_resp.clone(),
@@ -277,7 +249,6 @@ mod tests {
         let msg = b"hello puffer";
         for i in 0..n {
             let eth_sk = g_sks[i];
-            let eth_pk = recipent_keys[i].guardian_public_key.clone();
             let pk_share = recipent_keys[i].public_key_share.clone();
             let enc_sk_bytes =
                 hex::decode(recipent_keys[i].clone().encrypted_secret_key_share_hex).unwrap();
@@ -331,33 +302,5 @@ mod tests {
             crate::crypto::bls_keys::aggregate_signature_shares(&validator_pk_set, &sig_shares)
                 .unwrap();
         assert!(validator_pk.verify(&rec_sig, msg));
-
-        // verify aggregating signatures works with threshold
-        sig_shares[n - 1] = sk_shares[0].sign(b"asfasfa");
-        // sig_shares[n-1] = sk_shares[0].sign(&msg);
-        // sig_shares[n-2] = sk_shares[0].sign(&msg);
-        dbg!(&sig_shares);
-        let rec_sig =
-            crate::crypto::bls_keys::aggregate_signature_shares(&validator_pk_set, &sig_shares)
-                .unwrap();
-        assert!(validator_pk.verify(&rec_sig, msg));
-
-        // recreate DepositMessage correct
-        let deposit_message = crate::eth2::eth_types::DepositMessage {
-            pubkey: validator_pk.to_bytes().to_vec().into(),
-            withdrawal_credentials,
-            amount: crate::constants::FULL_DEPOSIT_AMOUNT,
-        };
-        // let signature: FixedVector<u8, _> = hex::decode(signature)?.into();
-        // let deposit_data = crate::eth2::eth_types::DepositData {
-        //     pubkey: hex::decode(validator_public_key_hex.clone())?.into(),
-        //     withdrawal_credentials: withdrawal_credentials_zero_padded,
-        //     amount: 32,
-        //     signature: signature.clone(),
-        // };
-
-        // if deposit_data.tree_hash_root().to_fixed_bytes() != deposit_data_root.to_fixed_bytes() {
-        //     return Err(anyhow!("The deposit data root does not match"));
-        // };
     }
 }

@@ -178,11 +178,12 @@ where
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct BlsKeygenPayload {
+    pub bls_pub_key_set: String,
     pub bls_pub_key: String,
     pub signature: String,
-    pub deposit_data_root: TxHash,
+    pub deposit_data_root: String,
     pub bls_enc_priv_key_shares: Vec<String>,
-    pub bls_pub_key_shares: Vec<String>,
+    // pub bls_pub_key_shares: Vec<String>,
     pub intel_sig: String,
     pub intel_report: String,
     pub intel_x509: String,

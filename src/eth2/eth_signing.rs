@@ -2,6 +2,7 @@ use super::eth_types::*;
 use crate::crypto::bls_keys;
 
 use anyhow::Result;
+use blsttc::SecretKeySet;
 use log::info;
 use serde::{Deserialize, Serialize};
 use ssz::Encode;

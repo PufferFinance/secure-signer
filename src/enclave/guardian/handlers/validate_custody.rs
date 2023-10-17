@@ -63,12 +63,14 @@ pub fn generate_signature(
         Ok(true) => true,
     };
 
-    check_data_root(
-        &validator_public_key_hex,
-        withdrawal_credentials,
-        &keygen_payload.signature,
-        &keygen_payload.deposit_data_root,
-    )?;
+    unimplemented!()
+
+    // check_data_root(
+    //     &validator_public_key_hex,
+    //     withdrawal_credentials,
+    //     &keygen_payload.signature,
+    //     &keygen_payload.deposit_data_root,
+    // )?;
 
     // # at this point we have verified:
     // # 1. if this enclave got custody of a private keyshare
@@ -77,18 +79,18 @@ pub fn generate_signature(
     // # 4. the validator build a valid depositDataRoot
 
     // # sign final message
-    let (signature, _) = calculate_signature(
-        &guardian_enclave_public_key,
-        &validator_public_key_hex,
-        &guardian_enclave_private_key,
-        &withdrawal_credentials,
-        keygen_payload.signature,
-        keygen_payload.deposit_data_root,
-        has_custody,
-    )?;
+    // let (signature, _) = calculate_signature(
+    //     &guardian_enclave_public_key,
+    //     &validator_public_key_hex,
+    //     &guardian_enclave_private_key,
+    //     &withdrawal_credentials,
+    //     keygen_payload.signature,
+    //     keygen_payload.deposit_data_root,
+    //     has_custody,
+    // )?;
 
-    // We only need the signature
-    Ok(signature)
+    // // We only need the signature
+    // Ok(signature)
 }
 
 fn check_data_root(
@@ -137,17 +139,19 @@ fn verify_custody(
     let msg_to_be_signed = hasher.finalize();
     let signature = secret_key_shard.sign(&msg_to_be_signed);
 
-    let validator_public_key_shard = keygen_payload
-        .bls_pub_key_shares
-        .get(guardian_index)
-        .unwrap();
+    unimplemented!()
 
-    let public_key_shard_bytes = hex::decode(validator_public_key_shard)?;
+    // let validator_public_key_shard = keygen_payload
+    //     .bls_pub_key_shares
+    //     .get(guardian_index)
+    //     .unwrap();
 
-    let public_key_share =
-        blsttc::PublicKeyShare::from_bytes(public_key_shard_bytes[..].try_into().unwrap())?;
+    // let public_key_shard_bytes = hex::decode(validator_public_key_shard)?;
 
-    Ok(public_key_share.verify(&signature, &msg_to_be_signed))
+    // let public_key_share =
+    //     blsttc::PublicKeyShare::from_bytes(public_key_shard_bytes[..].try_into().unwrap())?;
+
+    // Ok(public_key_share.verify(&signature, &msg_to_be_signed))
 }
 
 fn calculate_signature(
