@@ -36,7 +36,7 @@ async fn main() {
             ),
         )
         .route(
-            "/eth/v1/validate_custody",
+            "/eth/v1/validate-custody",
             axum::routing::post(
                 puffersecuresigner::enclave::guardian::handlers::validate_custody::handler,
             ),

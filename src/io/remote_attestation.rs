@@ -223,6 +223,15 @@ impl AttestationEvidence {
         let body = report.deserialize_quote_body()?;
         Ok(body.MRENCLAVE)
     }
+
+    pub fn get_mrsigner(&self) -> Result<String> {
+        let report: AttestationReport = serde_json::from_slice(self.raw_report.as_bytes())
+            .with_context(|| {
+                "Couldn't get AttestationReport from AttestationEvidence.raw_report"
+            })?;
+        let body = report.deserialize_quote_body()?;
+        Ok(body.MRSIGNER)
+    }
 }
 
 #[allow(non_snake_case)]
@@ -315,6 +324,8 @@ mod tests {
     fn test_verify_bls_report() -> Result<()> {
         let exp_mre: String =
             "4db2b7e0ca5fecaaf37973fa19e55e8c973ad11ed0f663ee51027e499185ad72".into();
+        let exp_mrs: String =
+            "83d719e77deaca1470f6baf62a4d774303c899db69020f9c70ee1dfc08c7ce9e".into();
         let exp_bls_pk: String = "8e2a741e80fee324a0915b40aec28701d5bf48964dcbc5d41f726f1181fc24b4decbce05a4994d6dec6cd97f73fc8367".into();
 
         let evidence = fetch_dummy_bls_evidence();
@@ -323,6 +334,7 @@ mod tests {
             serde_json::from_slice(evidence.raw_report.as_bytes()).unwrap();
         let _body = report.deserialize_quote_body()?;
         assert_eq!(exp_mre, evidence.get_mrenclave()?);
+        assert_eq!(exp_mrs, evidence.get_mrsigner()?);
         let got_pk = evidence.get_bls_pk()?.to_hex();
         assert_eq!(exp_bls_pk, got_pk);
         Ok(())
@@ -332,6 +344,8 @@ mod tests {
     fn test_verify_eth_report() -> Result<()> {
         let exp_mre: String =
             "4db2b7e0ca5fecaaf37973fa19e55e8c973ad11ed0f663ee51027e499185ad72".into();
+        let exp_mrs: String =
+            "83d719e77deaca1470f6baf62a4d774303c899db69020f9c70ee1dfc08c7ce9e".into();
         let exp_eth_pk: String =
             "027ca56a6b4fe0cd6a635508378b7db6cfabdc93b1e5099c41d63e15c33d40a8ed".into();
 
@@ -341,6 +355,7 @@ mod tests {
             serde_json::from_slice(evidence.raw_report.as_bytes()).unwrap();
         let _body = report.deserialize_quote_body()?;
         assert_eq!(exp_mre, evidence.get_mrenclave()?);
+        assert_eq!(exp_mrs, evidence.get_mrsigner()?);
         let _got_pk = eth_keys::eth_pk_to_hex(&evidence.get_eth_pk()?);
         let got_pk = hex::encode(evidence.get_eth_pk()?.serialize_compressed());
         assert_eq!(exp_eth_pk, got_pk);

@@ -1,5 +1,3 @@
-use crate::enclave::types::KeyGenResponse;
-
 #[tokio::test]
 async fn call_health_with_success() {
     let client = super::build_client();
@@ -11,7 +9,7 @@ async fn call_attest_fresh_eth_with_success() {
     let client = super::build_client();
 
     // This will panic if the call fails in any way
-    let _resp: KeyGenResponse = client
+    let _resp: crate::enclave::types::KeyGenResponse = client
         .guardian
         .attest_fresh_eth_key("0x0000000000000000000000000000000000000000000000000000000000000000")
         .await

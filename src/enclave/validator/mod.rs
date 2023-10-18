@@ -134,48 +134,9 @@ pub fn attest_fresh_bls_key(
             .map(|k| crate::crypto::eth_keys::eth_pk_to_hex_uncompressed(&k.guardian_public_key))
             .collect(),
         withdrawal_credentials: hex::encode(withdrawal_credentials),
+        fork_version: fork_version,
     }))
 }
-
-// pub fn build_validator_remote_attestation_payload(
-//     validator_pk_set: PublicKeySet,
-//     signature: &crate::eth2::eth_types::BLSSignature,
-//     deposit_data_root: &crate::eth2::eth_types::Root,
-//     enc_sk_shares: Vec<String>,
-//     guardian_pks: Vec<EthPublicKey>,
-// ) -> Result<Vec<u8>> {
-//     let mut hasher = sha3::Keccak256::new();
-
-//     // blsPubKeySet
-//     hasher.update(validator_pk_set.to_bytes());
-
-//     // blsPubKey
-//     hasher.update(validator_pk_set.public_key().to_bytes());
-
-//     // signature
-//     hasher.update(signature.as_ssz_bytes());
-
-//     // depositDataRoot
-//     hasher.update(deposit_data_root);
-
-//     for (i, (sk_share, g_pk)) in enc_sk_shares.iter().zip(guardian_pks.iter()).enumerate() {
-//         // blsEncPrivKeyShares
-//         hasher.update(hex::decode(&sk_share)?);
-
-//         // blsPubKeyShares
-//         hasher.update(&validator_pk_set.public_key_share(i).to_bytes());
-
-//         // guardianPubKeys
-//         hasher.update(&g_pk.serialize());
-//     }
-
-//     // threshold
-//     hasher.update(validator_pk_set.threshold().as_ssz_bytes());
-
-//     let digest: [u8; 32] = hasher.finalize().into();
-
-//     Ok(digest.to_vec())
-// }
 
 #[cfg(test)]
 mod tests {

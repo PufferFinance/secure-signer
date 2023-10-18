@@ -135,18 +135,19 @@ impl SignatureResponse {
 pub struct ValidateCustodyRequest {
     pub keygen_payload: BlsKeygenPayload,
     pub guardian_enclave_public_key: EthPublicKey,
-    pub withdrawal_credentials: [u8; 32],
     pub mrenclave: String,
+    pub mrsigner: String,
+    pub verify_remote_attestation: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ValidateCustodyResponse {
-    #[serde(
-        serialize_with = "serialize_signature_as_hex",
-        deserialize_with = "deserialize_signature_from_hex"
-    )]
-    pub signature: libsecp256k1::Signature,
+    pub enclave_signature: String,
+    pub bls_pub_key: String,
+    pub withdrawal_credentials: String,
+    pub deposit_signature: String,
+    pub deposit_data_root: String,
 }
 
 fn serialize_signature_as_hex<S>(
@@ -188,6 +189,7 @@ pub struct BlsKeygenPayload {
     pub intel_x509: String,
     pub guardian_eth_pub_keys: Vec<String>,
     pub withdrawal_credentials: String,
+    pub fork_version: crate::eth2::eth_types::Version
 }
 
 impl BlsKeygenPayload {
@@ -218,7 +220,6 @@ impl BlsKeygenPayload {
 
     pub fn deposit_message_root(
         &self,
-        version: crate::eth2::eth_types::Version,
     ) -> Result<crate::eth2::eth_types::Root> {
         let pk_set = self.public_key_set()?;
         let withdrawal_credentials = self.withdrawal_credentials()?;
@@ -231,7 +232,7 @@ impl BlsKeygenPayload {
         };
         let domain = crate::eth2::eth_signing::compute_domain(
             crate::eth2::eth_types::DOMAIN_DEPOSIT,
-            Some(version),
+            Some(self.fork_version.clone()),
             None,
         );
         Ok(crate::eth2::eth_signing::compute_signing_root(
