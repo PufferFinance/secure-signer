@@ -1,11 +1,12 @@
 use crate::io::remote_attestation::AttestationEvidence;
 use crate::{crypto::eth_keys, strip_0x_prefix};
 use anyhow::{bail, Result};
-use blsttc::PublicKey as BlsPublicKey;
-use ecies::PublicKey as EthPublicKey;
+use blsttc::{PublicKey as BlsPublicKey, PublicKeySet};
+use ecies::{PublicKey as EthPublicKey, SecretKey as EthSecretKey};
 use ethers::types::TxHash;
 use serde::ser::SerializeSeq;
 use serde::{Deserialize, Serialize};
+use tree_hash::TreeHash;
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct KeyGenResponse {
@@ -135,6 +136,7 @@ pub struct ValidateCustodyRequest {
     pub keygen_payload: BlsKeygenPayload,
     pub guardian_enclave_public_key: EthPublicKey,
     pub withdrawal_credentials: [u8; 32],
+    pub mrenclave: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -185,6 +187,86 @@ pub struct BlsKeygenPayload {
     pub intel_report: String,
     pub intel_x509: String,
     pub guardian_eth_pub_keys: Vec<String>,
+    pub withdrawal_credentials: String,
+}
+
+impl BlsKeygenPayload {
+    pub fn public_key_set(&self) -> Result<PublicKeySet> {
+        let sanitized: String = crate::strip_0x_prefix!(&self.bls_pub_key_set);
+        Ok(PublicKeySet::from_bytes(hex::decode(sanitized)?)?)
+    }
+
+    pub fn withdrawal_credentials(&self) -> Result<[u8; 32]> {
+        let sanitized: String = crate::strip_0x_prefix!(&self.withdrawal_credentials);
+        let mut wc: [u8; crate::constants::WITHDRAWAL_CREDENTIALS_BYTES] =
+            [0; crate::constants::WITHDRAWAL_CREDENTIALS_BYTES];
+        let wc_bytes = hex::decode(&sanitized)?;
+        if wc_bytes.len() != crate::constants::WITHDRAWAL_CREDENTIALS_BYTES {
+            bail!("Invalid  withdrawal_credentials")
+        }
+        wc.copy_from_slice(&wc_bytes);
+        Ok(wc)
+    }
+
+    pub fn signature(&self) -> Result<blsttc::Signature> {
+        let sanitized: String = crate::strip_0x_prefix!(&self.signature);
+        let mut sig_bytes: [u8; crate::constants::BLS_SIG_BYTES] =
+            [0; crate::constants::BLS_SIG_BYTES];
+        sig_bytes.copy_from_slice(&hex::decode(&sanitized)?);
+        Ok(blsttc::Signature::from_bytes(sig_bytes)?)
+    }
+
+    pub fn deposit_message_root(
+        &self,
+        version: crate::eth2::eth_types::Version,
+    ) -> Result<crate::eth2::eth_types::Root> {
+        let pk_set = self.public_key_set()?;
+        let withdrawal_credentials = self.withdrawal_credentials()?;
+        dbg!(hex::encode(&pk_set.public_key().to_bytes().to_vec()));
+        dbg!(hex::encode(&withdrawal_credentials));
+        let deposit_message = crate::eth2::eth_types::DepositMessage {
+            pubkey: pk_set.public_key().to_bytes().to_vec().into(),
+            withdrawal_credentials: withdrawal_credentials.clone(),
+            amount: crate::constants::FULL_DEPOSIT_AMOUNT,
+        };
+        let domain = crate::eth2::eth_signing::compute_domain(
+            crate::eth2::eth_types::DOMAIN_DEPOSIT,
+            Some(version),
+            None,
+        );
+        Ok(crate::eth2::eth_signing::compute_signing_root(
+            deposit_message.clone(),
+            domain,
+        ))
+    }
+
+    pub fn deposit_data_root(&self) -> Result<crate::eth2::eth_types::Root> {
+        let pk_set = self.public_key_set()?;
+        let deposit_data = crate::eth2::eth_types::DepositData {
+            pubkey: pk_set.public_key().to_bytes().to_vec().into(),
+            withdrawal_credentials: self.withdrawal_credentials()?,
+            amount: crate::constants::FULL_DEPOSIT_AMOUNT,
+            signature: self.signature()?.to_bytes().to_vec().into(),
+        };
+        Ok(deposit_data.tree_hash_root().to_fixed_bytes())
+    }
+
+    pub fn verify_public_keys_match(&self) -> Result<bool> {
+        let pk_set = self.public_key_set()?;
+        let exp_pk_hex: String = crate::strip_0x_prefix!(&self.bls_pub_key);
+        Ok(pk_set.public_key().to_hex() == exp_pk_hex)
+    }
+
+    pub fn decrypt_sk_share(&self, share_index: usize, guardian_enclave_sk: &EthSecretKey) -> Result<blsttc::SecretKeyShare> {
+        let sanitized_enc_sk_share: String = match self.bls_enc_priv_key_shares.get(share_index) {
+            Some(s) => crate::strip_0x_prefix!(s),
+            None => bail!("bad share_index to read from bls_enc_priv_key_shares")
+        };
+        let enc_sk_bytes = hex::decode(&sanitized_enc_sk_share)?;
+        let sk_bytes =
+            crate::crypto::eth_keys::envelope_decrypt(&guardian_enclave_sk, &enc_sk_bytes)?;
+        Ok(blsttc::SecretKeyShare::from_bytes(sk_bytes[..].try_into()?)?)
+    }
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]

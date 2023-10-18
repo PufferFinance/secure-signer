@@ -91,7 +91,7 @@ pub fn attest_fresh_bls_key(
     // sign DepositMessage to deposit 32 ETH to beacon deposit contract
     let (signature, deposit_data_root) = crate::eth2::eth_signing::sign_full_deposit(
         &secret_key_set,
-        withdrawal_credentials,
+        withdrawal_credentials.clone(),
         fork_version,
     )?;
 
@@ -132,7 +132,8 @@ pub fn attest_fresh_bls_key(
         guardian_eth_pub_keys: recipient_keys
             .iter()
             .map(|k| crate::crypto::eth_keys::eth_pk_to_hex_uncompressed(&k.guardian_public_key))
-            .collect()
+            .collect(),
+        withdrawal_credentials: hex::encode(withdrawal_credentials),
     }))
 }
 

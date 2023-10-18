@@ -17,12 +17,14 @@ pub async fn handler(
         keygen_payload,
         guardian_enclave_public_key,
         withdrawal_credentials,
+        mrenclave,
     } = req;
 
     match generate_guardian_signature(
         keygen_payload,
         guardian_enclave_public_key,
         withdrawal_credentials,
+        mrenclave,
     ) {
         Ok(signature) => {
             let resp = crate::enclave::types::ValidateCustodyResponse { signature };
@@ -44,6 +46,7 @@ pub fn generate_guardian_signature(
     keygen_payload: crate::enclave::types::BlsKeygenPayload,
     guardian_enclave_pk: EthPublicKey,
     withdrawal_credentials: [u8; 32],
+    mrenclave: String,
 ) -> Result<libsecp256k1::Signature> {
     // Read their enclave's eth secret key
     let Ok(guardian_enclave_sk) = crate::crypto::eth_keys::fetch_eth_key(
@@ -53,6 +56,7 @@ pub fn generate_guardian_signature(
     };
 
     // verify the remote attestation evidence
+    verify_remote_attestation_evidence(&keygen_payload, &mrenclave)?;
 
     // verify the deposit message is valid
 
@@ -97,13 +101,13 @@ pub fn generate_guardian_signature(
 }
 
 pub fn verify_remote_attestation_evidence(
-    keygen_payload: crate::enclave::types::BlsKeygenPayload,
+    keygen_payload: &crate::enclave::types::BlsKeygenPayload,
     mrenclave: &String,
-) -> Result<bool> {
+) -> Result<()> {
     let e = crate::io::remote_attestation::AttestationEvidence {
-        raw_report: keygen_payload.intel_report,
-        signed_report: keygen_payload.intel_sig,
-        signing_cert: keygen_payload.intel_x509,
+        raw_report: keygen_payload.intel_report.clone(),
+        signed_report: keygen_payload.intel_sig.clone(),
+        signing_cert: keygen_payload.intel_x509.clone(),
     };
 
     // Verify the evidence was signed from intel x509s
@@ -117,12 +121,12 @@ pub fn verify_remote_attestation_evidence(
 
     let rec_payload = e.get_report_data()?;
     let mut dd_root: [u8; 32] = [0; 32];
-    dd_root.copy_from_slice(&hex::decode(keygen_payload.deposit_data_root)?);
+    dd_root.copy_from_slice(&hex::decode(&keygen_payload.deposit_data_root)?);
     let payload = crate::enclave::build_validator_remote_attestation_payload(
         pk_set,
-        &hex::decode(keygen_payload.signature)?.into(),
+        &hex::decode(&keygen_payload.signature)?.into(),
         &dd_root,
-        keygen_payload.bls_enc_priv_key_shares,
+        keygen_payload.bls_enc_priv_key_shares.clone(),
         keygen_payload
             .guardian_eth_pub_keys
             .iter()
@@ -133,26 +137,27 @@ pub fn verify_remote_attestation_evidence(
     if hex::encode(rec_payload) != hex::encode(payload) {
         bail!("Invalid Remote Attestation commitments");
     }
-    Ok(true)
+    Ok(())
 }
 
-fn check_data_root(
-    validator_public_key_hex: &str,
-    withdrawal_credentials_zero_padded: crate::eth2::eth_types::Bytes32,
-    signature: &str,
-    deposit_data_root: &ethers::types::TxHash,
+pub fn verify_deposit_message(
+    keygen_payload: &crate::enclave::types::BlsKeygenPayload,
+    version: crate::eth2::eth_types::Version
 ) -> Result<()> {
-    let signature: FixedVector<u8, _> = hex::decode(signature)?.into();
-    let deposit_data = crate::eth2::eth_types::DepositData {
-        pubkey: hex::decode(validator_public_key_hex.clone())?.into(),
-        withdrawal_credentials: withdrawal_credentials_zero_padded,
-        amount: 32,
-        signature: signature.clone(),
-    };
+    let pk_set = keygen_payload.public_key_set()?;
 
-    if deposit_data.tree_hash_root().to_fixed_bytes() != deposit_data_root.to_fixed_bytes() {
-        return Err(anyhow!("The deposit data root does not match"));
-    };
+    // Verify correct DepositMessage was signed
+    if !pk_set.public_key().verify(&keygen_payload.signature()?, keygen_payload.deposit_message_root(version)?) {
+        bail!("DepositMessage signature invalid")
+    }
+
+    // Verify derived DepositDataRoot matches expected
+    let deposit_data_root: [u8; 32] = keygen_payload.deposit_data_root()?;
+    let expected: String = crate::strip_0x_prefix!(keygen_payload.deposit_data_root);
+    if expected != hex::encode(deposit_data_root) {
+        bail!("DepositDataRoot invalid")
+    }
+
     Ok(())
 }
 
@@ -160,42 +165,33 @@ fn verify_custody(
     guardian_enclave_sk: EthSecretKey,
     keygen_payload: &crate::enclave::types::BlsKeygenPayload,
 ) -> Result<blsttc::SecretKeyShare> {
-    let pk_set = PublicKeySet::from_bytes(hex::decode(&keygen_payload.bls_pub_key_set)?)?;
-    let exp_pk_hex: String = crate::strip_0x_prefix!(keygen_payload.bls_pub_key);
-    if pk_set.public_key().to_hex() != exp_pk_hex {
-        bail!("Supplied bls_pub_key does not match dervied from bls_pub_key_set")
+
+    // Check the derived public key matches the BlsKeygenPayload.bls_pub_key
+    if !keygen_payload.verify_public_keys_match()? {
+        bail!("Supplied bls_pub_key cannot be derived from bls_pub_key_set")
     }
 
     // Attempt to decrypt keyshares until a match is found
-    for (i, enc_sk_hex) in keygen_payload.bls_enc_priv_key_shares.iter().enumerate() {
-        dbg!(&enc_sk_hex);
-        let enc_sk_bytes = hex::decode(&enc_sk_hex)?;
-        let sk_bytes =
-            crate::crypto::eth_keys::envelope_decrypt(&guardian_enclave_sk, &enc_sk_bytes);
-        if sk_bytes.is_err() {
+    for i in 0..keygen_payload.bls_enc_priv_key_shares.len() {
+        let sk_share = keygen_payload.decrypt_sk_share(i, &guardian_enclave_sk);
+
+        // making it hear implies it is Ok()
+        if sk_share.is_err() {
             continue;
         }
 
-        // making it hear implies it is Ok()
-        let sk_bytes = sk_bytes.unwrap();
-
-        let sk_share = blsttc::SecretKeyShare::from_bytes(sk_bytes[..].try_into()?)?;
-
-        dbg!(hex::encode(sk_share.to_bytes()));
-        dbg!(hex::encode(sk_share.public_key_share().to_bytes()));
-
         // Check if a valid sk_share was decrypted
+        let pk_set = keygen_payload.public_key_set()?;
+        let sk_share = sk_share?;
         if hex::encode(pk_set.public_key_share(i).to_bytes())
             == hex::encode(sk_share.public_key_share().to_bytes())
         {
             dbg!("match on iteration {:?}", i);
-            dbg!(&sk_share);
-            // save it
             return Ok(sk_share);
         }
     }
 
-    bail!("custody check failed")
+    bail!("verify_custody failed")
 }
 
 fn calculate_signature(
@@ -231,7 +227,12 @@ mod tests {
     use crate::enclave::types::BlsKeygenPayload;
     use ecies::{PublicKey as EthPublicKey, SecretKey as EthSecretKey};
 
-    fn setup() -> (BlsKeygenPayload, Vec<EthSecretKey>, String, String) {
+    fn setup() -> (
+        BlsKeygenPayload,
+        Vec<EthSecretKey>,
+        String,
+        String,
+    ) {
         let p = BlsKeygenPayload {
             bls_pub_key_set: "b927f246ed54236ce810f1296e9ee85574c4a59d7472aa50f9674d8ba8eb0d8b697065e22f86cad69f8526ee343fa4819390e8251a3b097db2d8916219069f38bb28f5c7371b84fbe3fbb9ed0e323fb3c5375f9efde1e139ad869e40621098b08f5bb3edce5981b4a238af666d1bda4dcccb0ab51f709db89f00358003315fabe55df8549e4d7a53d63a936789839664".to_owned(),
             bls_pub_key: "b927f246ed54236ce810f1296e9ee85574c4a59d7472aa50f9674d8ba8eb0d8b697065e22f86cad69f8526ee343fa481".to_owned(),
@@ -252,6 +253,7 @@ mod tests {
                 "049f1eff88203c2f1c25faedf674964ab292bac4c7fa2eb0aba8951d6974e83e5e5ff5fbe208a21a0d9900039d9fcad1bac6ae5c26aceca4e91be91f65a179f338".to_owned(),
                 "04ac358dc89c2938747c21a65ff0fde8bd372ec5d7528ab0588837a25a125b4d2e8d068548727bb4e6e62d3033186e5245057b80f3882a3ac7887e03aae5770c0f".to_owned(),
             ],
+            withdrawal_credentials: "0101010101010101010101010101010101010101010101010101010101010101".to_owned()
         };
 
         let guardian_eth_sks = vec![
@@ -289,7 +291,12 @@ mod tests {
             "a72cb1ba9aa3806a22df60cbcb16a09dbaae8aae79f89c93390eb2ebe6137cd0".to_owned();
         let mrsigner =
             "83d719e77deaca1470f6baf62a4d774303c899db69020f9c70ee1dfc08c7ce9e".to_owned();
-        (p, guardian_eth_sks, mrenclave, mrsigner)
+        (
+            p,
+            guardian_eth_sks,
+            mrenclave,
+            mrsigner,
+        )
     }
 
     #[test]
@@ -327,8 +334,8 @@ mod tests {
         let rec_payload = e.get_report_data().unwrap();
         let payload = crate::enclave::build_validator_remote_attestation_payload(
             pk_set.clone(),
-            &hex::decode(resp.signature).unwrap().into(),
-            &hex::decode(resp.deposit_data_root)
+            &hex::decode(&resp.signature).unwrap().into(),
+            &hex::decode(&resp.deposit_data_root)
                 .unwrap()
                 .try_into()
                 .unwrap(),
@@ -343,6 +350,46 @@ mod tests {
         .unwrap();
 
         assert_eq!(hex::encode(rec_payload), hex::encode(payload));
+        let mut wc: [u8; crate::constants::WITHDRAWAL_CREDENTIALS_BYTES] =
+        [0; crate::constants::WITHDRAWAL_CREDENTIALS_BYTES];
+        let wc_bytes = hex::decode(&resp.withdrawal_credentials).unwrap();
+        wc.copy_from_slice(&wc_bytes);
+
+        // Recreate deposit message
+        let deposit_message = crate::eth2::eth_types::DepositMessage {
+            pubkey: pk_set.public_key().to_bytes().to_vec().into(),
+            withdrawal_credentials: wc.clone(),
+            amount: crate::constants::FULL_DEPOSIT_AMOUNT,
+        };
+        let domain = crate::eth2::eth_signing::compute_domain(
+            crate::eth2::eth_types::DOMAIN_DEPOSIT,
+            Some(crate::eth2::eth_types::Version::default()),
+            None,
+        );
+        let root: crate::eth2::eth_types::Root =
+            crate::eth2::eth_signing::compute_signing_root(deposit_message.clone(), domain);
+
+        let mut sig_bytes: [u8; crate::constants::BLS_SIG_BYTES] =
+            [0; crate::constants::BLS_SIG_BYTES];
+        sig_bytes.copy_from_slice(&hex::decode(&resp.signature).unwrap());
+        let sig = blsttc::Signature::from_bytes(sig_bytes).unwrap();
+        assert!(pk_set.public_key().verify(&sig, root));
+
+        dbg!(hex::encode(&sig.to_bytes()));
+        dbg!(hex::encode(&root));
+        dbg!(hex::encode(&wc.clone()));
+
+        // Recreate deposit data root
+        let deposit_data = crate::eth2::eth_types::DepositData {
+            pubkey: pk_set.public_key().to_bytes().to_vec().into(),
+            withdrawal_credentials: wc,
+            amount: crate::constants::FULL_DEPOSIT_AMOUNT,
+            signature: sig.to_bytes().to_vec().into(),
+        };
+
+        let deposit_data_root = deposit_data.tree_hash_root().to_fixed_bytes();
+
+        assert_eq!(hex::encode(deposit_data_root), resp.deposit_data_root);
     }
 
     #[test]
@@ -365,6 +412,51 @@ mod tests {
     fn test_verify_remote_attestation_evidence_with_success() {
         let (resp, g_sks, mre, mrs) = setup();
 
-        assert!(verify_remote_attestation_evidence(resp, &mre).unwrap())
+        verify_remote_attestation_evidence(&resp, &mre).unwrap();
+    }
+
+    // #[test]
+    // fn test_verify_deposit_signature() {
+    //     let (resp, g_sks, mre, mrs) = setup();
+    //     let pk_set = PublicKeySet::from_bytes(hex::decode(&resp.bls_pub_key_set).unwrap()).unwrap();
+
+    //     // Recreate deposit message
+    //     let deposit_message = crate::eth2::eth_types::DepositMessage {
+    //         pubkey: pk_set.public_key().to_bytes().to_vec().into(),
+    //         withdrawal_credentials: wc,
+    //         amount: crate::constants::FULL_DEPOSIT_AMOUNT,
+    //     };
+    //     let domain = crate::eth2::eth_signing::compute_domain(
+    //         crate::eth2::eth_types::DOMAIN_DEPOSIT,
+    //         Some(crate::eth2::eth_types::Version::default()),
+    //         None,
+    //     );
+    //     let root: crate::eth2::eth_types::Root =
+    //         crate::eth2::eth_signing::compute_signing_root(deposit_message.clone(), domain);
+
+    //     let mut sig_bytes: [u8; crate::constants::BLS_SIG_BYTES] =
+    //         [0; crate::constants::BLS_SIG_BYTES];
+    //     sig_bytes.copy_from_slice(&hex::decode(&resp.signature).unwrap());
+    //     let sig = blsttc::Signature::from_bytes(sig_bytes).unwrap();
+    //     assert!(pk_set.public_key().verify(&sig, root));
+
+    //     // Recreate deposit data root
+    //     let deposit_data = crate::eth2::eth_types::DepositData {
+    //         pubkey: pk_set.public_key().to_bytes().to_vec().into(),
+    //         withdrawal_credentials: _wc,
+    //         amount: crate::constants::FULL_DEPOSIT_AMOUNT,
+    //         signature: sig.to_bytes().to_vec().into(),
+    //     };
+
+    //     let deposit_data_root = deposit_data.tree_hash_root().to_fixed_bytes();
+
+    //     assert_eq!(hex::encode(deposit_data_root), resp.deposit_data_root);
+    // }
+
+    #[test]
+    fn test_verify_deposit_message() {
+        let (resp, g_sks, mre, mrs) = setup();
+        let version: crate::eth2::eth_types::Version = [0, 0, 16, 32];
+        verify_deposit_message(&resp, crate::eth2::eth_types::Version::default()).unwrap();
     }
 }
