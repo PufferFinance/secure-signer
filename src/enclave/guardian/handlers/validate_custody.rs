@@ -142,12 +142,15 @@ pub fn verify_remote_attestation_evidence(
 
 pub fn verify_deposit_message(
     keygen_payload: &crate::enclave::types::BlsKeygenPayload,
-    version: crate::eth2::eth_types::Version
+    version: crate::eth2::eth_types::Version,
 ) -> Result<()> {
     let pk_set = keygen_payload.public_key_set()?;
 
     // Verify correct DepositMessage was signed
-    if !pk_set.public_key().verify(&keygen_payload.signature()?, keygen_payload.deposit_message_root(version)?) {
+    if !pk_set.public_key().verify(
+        &keygen_payload.signature()?,
+        keygen_payload.deposit_message_root(version)?,
+    ) {
         bail!("DepositMessage signature invalid")
     }
 
@@ -165,7 +168,6 @@ fn verify_custody(
     guardian_enclave_sk: EthSecretKey,
     keygen_payload: &crate::enclave::types::BlsKeygenPayload,
 ) -> Result<blsttc::SecretKeyShare> {
-
     // Check the derived public key matches the BlsKeygenPayload.bls_pub_key
     if !keygen_payload.verify_public_keys_match()? {
         bail!("Supplied bls_pub_key cannot be derived from bls_pub_key_set")
@@ -227,12 +229,7 @@ mod tests {
     use crate::enclave::types::BlsKeygenPayload;
     use ecies::{PublicKey as EthPublicKey, SecretKey as EthSecretKey};
 
-    fn setup() -> (
-        BlsKeygenPayload,
-        Vec<EthSecretKey>,
-        String,
-        String,
-    ) {
+    fn setup() -> (BlsKeygenPayload, Vec<EthSecretKey>, String, String) {
         let p = BlsKeygenPayload {
             bls_pub_key_set: "b927f246ed54236ce810f1296e9ee85574c4a59d7472aa50f9674d8ba8eb0d8b697065e22f86cad69f8526ee343fa4819390e8251a3b097db2d8916219069f38bb28f5c7371b84fbe3fbb9ed0e323fb3c5375f9efde1e139ad869e40621098b08f5bb3edce5981b4a238af666d1bda4dcccb0ab51f709db89f00358003315fabe55df8549e4d7a53d63a936789839664".to_owned(),
             bls_pub_key: "b927f246ed54236ce810f1296e9ee85574c4a59d7472aa50f9674d8ba8eb0d8b697065e22f86cad69f8526ee343fa481".to_owned(),
@@ -291,12 +288,7 @@ mod tests {
             "a72cb1ba9aa3806a22df60cbcb16a09dbaae8aae79f89c93390eb2ebe6137cd0".to_owned();
         let mrsigner =
             "83d719e77deaca1470f6baf62a4d774303c899db69020f9c70ee1dfc08c7ce9e".to_owned();
-        (
-            p,
-            guardian_eth_sks,
-            mrenclave,
-            mrsigner,
-        )
+        (p, guardian_eth_sks, mrenclave, mrsigner)
     }
 
     #[test]
@@ -351,7 +343,7 @@ mod tests {
 
         assert_eq!(hex::encode(rec_payload), hex::encode(payload));
         let mut wc: [u8; crate::constants::WITHDRAWAL_CREDENTIALS_BYTES] =
-        [0; crate::constants::WITHDRAWAL_CREDENTIALS_BYTES];
+            [0; crate::constants::WITHDRAWAL_CREDENTIALS_BYTES];
         let wc_bytes = hex::decode(&resp.withdrawal_credentials).unwrap();
         wc.copy_from_slice(&wc_bytes);
 

@@ -12,6 +12,5 @@ pub const ETH_SIGNATURE_BYTES: usize = 64;
 
 pub const ALLOW_GROWABLE_SLASH_PROTECTION_DB: bool = false;
 
-
 pub const FULL_DEPOSIT_AMOUNT: u64 = 32000000000;
 pub const WITHDRAWAL_CREDENTIALS_BYTES: usize = 32;
