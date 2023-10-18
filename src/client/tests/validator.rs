@@ -16,6 +16,7 @@ async fn call_attest_fresh_bls_key_with_success() {
         ],
         withdrawal_credentials: [0; 32],
         threshold: 3,
+        do_remote_attestation: true,
     };
     client
         .validator
@@ -33,13 +34,15 @@ fn hex_to_pubkey(key: &str) -> libsecp256k1::PublicKey {
 
 #[tokio::test]
 async fn call_attest_fresh_bls_key_and_decrypt() {
-    let n: usize = 8;
+    let n: usize = 4;
 
     // Setup Guardians
     let mut g_pks: Vec<ecies::PublicKey> = Vec::new();
     let mut g_sks: Vec<ecies::SecretKey> = Vec::new();
     for _ in 0..n {
         let (sk, pk) = crate::crypto::eth_keys::new_eth_key().unwrap();
+        dbg!(hex::encode(sk.serialize()));
+        dbg!(hex::encode(pk.serialize()));
         g_pks.push(pk);
         g_sks.push(sk);
     }
@@ -48,7 +51,8 @@ async fn call_attest_fresh_bls_key_and_decrypt() {
     let payload = crate::enclave::types::AttestFreshBlsKeyPayload {
         guardian_pubkeys: g_pks,
         withdrawal_credentials: [1; 32],
-        threshold: 7,
+        threshold: 3,
+        do_remote_attestation: true,
     };
 
     let resp: crate::enclave::types::BlsKeygenPayload = client
@@ -73,4 +77,6 @@ async fn call_attest_fresh_bls_key_and_decrypt() {
             hex::encode(sk_share.public_key_share().to_bytes()),
         );
     }
+
+    assert!(false);
 }

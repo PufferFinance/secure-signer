@@ -133,8 +133,6 @@ impl SignatureResponse {
 #[serde(rename_all = "camelCase")]
 pub struct ValidateCustodyRequest {
     pub keygen_payload: BlsKeygenPayload,
-    // TODO: This can be found out from which part ends up being decrypted
-    pub guardian_index: usize,
     pub guardian_enclave_public_key: EthPublicKey,
     pub withdrawal_credentials: [u8; 32],
 }
@@ -183,10 +181,10 @@ pub struct BlsKeygenPayload {
     pub signature: String,
     pub deposit_data_root: String,
     pub bls_enc_priv_key_shares: Vec<String>,
-    // pub bls_pub_key_shares: Vec<String>,
     pub intel_sig: String,
     pub intel_report: String,
     pub intel_x509: String,
+    pub guardian_eth_pub_keys: Vec<String>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -214,6 +212,7 @@ pub struct AttestFreshBlsKeyPayload {
     )]
     pub withdrawal_credentials: [u8; 32],
     pub threshold: usize,
+    pub do_remote_attestation: bool,
 }
 
 fn serialize_pubkeys_hex<S>(pubkeys: &[EthPublicKey], serializer: S) -> Result<S::Ok, S::Error>

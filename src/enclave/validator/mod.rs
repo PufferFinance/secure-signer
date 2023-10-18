@@ -1,7 +1,4 @@
-use crate::{
-    crypto::bls_keys::save_bls_key, eth2::eth_types::DepositResponse,
-    io::remote_attestation::AttestationEvidence,
-};
+use crate::{crypto::bls_keys::save_bls_key, io::remote_attestation::AttestationEvidence};
 use anyhow::Result;
 use blsttc::{PublicKeySet, PublicKeyShare, SecretKeyShare, SignatureShare};
 use ecies::PublicKey as EthPublicKey;
@@ -51,6 +48,11 @@ impl RecipientKeys {
     ) -> bool {
         self.public_key_share.verify(signature, message)
     }
+
+    //     pub fn guardian_public_keys(&self) -> &Vec<PublicKeyShare> {
+    //         self.guardian_public_keys().iter()
+    // j
+    //     }
 }
 
 pub fn attest_fresh_bls_key(
@@ -58,6 +60,7 @@ pub fn attest_fresh_bls_key(
     guardian_public_keys: Vec<EthPublicKey>,
     threshold: usize,
     fork_version: [u8; 4],
+    do_remote_attestation: bool,
 ) -> Result<super::types::BlsKeygenPayload> {
     // Generate a SecretKeySet where t + 1 signature shares can be combined into a full signature. attest_fresh_bls_key() function assumes `threshold = t + 1`, so we must pass new_bls_key(t=threshold - 1)
     let secret_key_set = crate::crypto::bls_keys::new_bls_key(threshold - 1);
@@ -86,86 +89,95 @@ pub fn attest_fresh_bls_key(
     save_bls_key(&secret_key_set)?;
 
     // sign DepositMessage to deposit 32 ETH to beacon deposit contract
-    let deposit_message = crate::eth2::eth_types::DepositMessage {
-        pubkey: validator_pubkey.to_bytes().to_vec().into(),
+    let (signature, deposit_data_root) = crate::eth2::eth_signing::sign_full_deposit(
+        &secret_key_set,
         withdrawal_credentials,
-        amount: crate::constants::FULL_DEPOSIT_AMOUNT,
-    };
-
-    let deposit_resp = crate::eth2::eth_signing::get_deposit_signature(
-        validator_pubkey.to_hex(),
-        deposit_message,
         fork_version,
     )?;
 
     // build remote attestation payload
-    let payload = build_validator_remote_attestation_payload(
+    let payload = crate::enclave::build_validator_remote_attestation_payload(
         secret_key_set.public_keys().clone(),
-        deposit_resp.clone(),
-        recipient_keys.clone(),
+        &signature,
+        &deposit_data_root,
+        recipient_keys
+            .iter()
+            .map(|k| k.encrypted_secret_key_share_hex.clone())
+            .collect(),
+        recipient_keys
+            .iter()
+            .map(|k| k.guardian_public_key.clone())
+            .collect(),
     )?;
 
     // do remote attestation
-    let evidence = AttestationEvidence::new(&payload)?;
+    let evidence = if do_remote_attestation {
+        AttestationEvidence::new(&payload)?
+    } else {
+        AttestationEvidence::default()
+    };
 
     dbg!(Ok(super::types::BlsKeygenPayload {
         bls_pub_key_set: hex::encode(secret_key_set.public_keys().to_bytes()),
         bls_pub_key: validator_pubkey.to_hex(),
-        signature: deposit_resp.signature,
-        deposit_data_root: deposit_resp.deposit_data_root,
+        signature: hex::encode(&signature[..]),
+        deposit_data_root: hex::encode(deposit_data_root),
         bls_enc_priv_key_shares: recipient_keys
-            .into_iter()
-            .map(|encrypted_key| encrypted_key.encrypted_secret_key_share_hex)
+            .iter()
+            .map(|encrypted_key| encrypted_key.encrypted_secret_key_share_hex.clone())
             .collect(),
         intel_report: evidence.raw_report,
         intel_sig: evidence.signed_report,
         intel_x509: evidence.signing_cert,
+        guardian_eth_pub_keys: recipient_keys
+            .iter()
+            .map(|k| crate::crypto::eth_keys::eth_pk_to_hex_uncompressed(&k.guardian_public_key))
+            .collect()
     }))
 }
 
-pub fn build_validator_remote_attestation_payload(
-    validator_pk_set: PublicKeySet,
-    deposit: DepositResponse,
-    shares: Vec<EncryptedRecipientKeys>,
-) -> Result<Vec<u8>> {
-    let mut hasher = sha3::Keccak256::new();
+// pub fn build_validator_remote_attestation_payload(
+//     validator_pk_set: PublicKeySet,
+//     signature: &crate::eth2::eth_types::BLSSignature,
+//     deposit_data_root: &crate::eth2::eth_types::Root,
+//     enc_sk_shares: Vec<String>,
+//     guardian_pks: Vec<EthPublicKey>,
+// ) -> Result<Vec<u8>> {
+//     let mut hasher = sha3::Keccak256::new();
 
-    // blsPubKeySet
-    hasher.update(validator_pk_set.to_bytes());
+//     // blsPubKeySet
+//     hasher.update(validator_pk_set.to_bytes());
 
-    // blsPubKey
-    hasher.update(validator_pk_set.public_key().to_bytes());
+//     // blsPubKey
+//     hasher.update(validator_pk_set.public_key().to_bytes());
 
-    // signature
-    hasher.update(hex::decode(deposit.signature)?);
+//     // signature
+//     hasher.update(signature.as_ssz_bytes());
 
-    // depositDataRoot
-    hasher.update(hex::decode(deposit.deposit_data_root)?);
+//     // depositDataRoot
+//     hasher.update(deposit_data_root);
 
-    for share in shares.iter() {
-        // blsEncryptedPrivKeyShares
-        let decoded_bytes = hex::decode(&share.encrypted_secret_key_share_hex)?;
-        hasher.update(&decoded_bytes);
+//     for (i, (sk_share, g_pk)) in enc_sk_shares.iter().zip(guardian_pks.iter()).enumerate() {
+//         // blsEncPrivKeyShares
+//         hasher.update(hex::decode(&sk_share)?);
 
-        // blsPubKeyShares
-        hasher.update(&share.public_key_share.to_bytes());
+//         // blsPubKeyShares
+//         hasher.update(&validator_pk_set.public_key_share(i).to_bytes());
 
-        // guardianPubKeys
-        hasher.update(&share.guardian_public_key.serialize());
-    }
+//         // guardianPubKeys
+//         hasher.update(&g_pk.serialize());
+//     }
 
-    // threshold
-    hasher.update(validator_pk_set.threshold().as_ssz_bytes());
+//     // threshold
+//     hasher.update(validator_pk_set.threshold().as_ssz_bytes());
 
-    let digest: [u8; 32] = hasher.finalize().into();
+//     let digest: [u8; 32] = hasher.finalize().into();
 
-    Ok(digest.to_vec())
-}
+//     Ok(digest.to_vec())
+// }
 
 #[cfg(test)]
 mod tests {
-    use crate::eth2::eth_types::Version;
-
     use super::*;
     use ecies::{PublicKey as EthPublicKey, SecretKey as EthSecretKey};
 
@@ -187,14 +199,12 @@ mod tests {
         let secret_key_set = crate::crypto::bls_keys::new_bls_key(threshold - 1);
         let validator_pk_set = secret_key_set.public_keys();
         let validator_pk = validator_pk_set.public_key();
-        // let validator_private_key = secret_key_set.secret_key();
-        let pk_hex: String = validator_pk_set.public_key().to_hex();
 
         // Shard the key into `n` keyshares
         let key_shares = crate::crypto::bls_keys::distribute_key_shares(&secret_key_set, n);
 
         // Encrypt the shares to using guardian pubkeys
-        let recipent_keys: Vec<EncryptedRecipientKeys> = g_pks
+        let recipient_keys: Vec<EncryptedRecipientKeys> = g_pks
             .iter()
             .zip(key_shares.into_iter())
             .map(
@@ -216,25 +226,25 @@ mod tests {
         save_bls_key(&secret_key_set).unwrap();
 
         // sign DepositMessage to deposit 32 ETH to beacon deposit contract
-        let deposit_message = crate::eth2::eth_types::DepositMessage {
-            pubkey: validator_pk.to_bytes().to_vec().into(),
+        let (signature, deposit_data_root) = crate::eth2::eth_signing::sign_full_deposit(
+            &secret_key_set,
             withdrawal_credentials,
-            amount: crate::constants::FULL_DEPOSIT_AMOUNT,
-        };
-
-        let deposit_resp = crate::eth2::eth_signing::get_deposit_signature(
-            pk_hex,
-            deposit_message,
-            Version::default(),
+            crate::eth2::eth_types::Version::default(),
         )
         .unwrap();
 
-        dbg!(&deposit_resp);
-
-        let payload = build_validator_remote_attestation_payload(
-            validator_pk_set.clone(),
-            deposit_resp.clone(),
-            recipent_keys.clone(),
+        let payload = crate::enclave::build_validator_remote_attestation_payload(
+            secret_key_set.public_keys().clone(),
+            &signature,
+            &deposit_data_root,
+            recipient_keys
+                .iter()
+                .map(|k| k.encrypted_secret_key_share_hex.clone())
+                .collect(),
+            recipient_keys
+                .iter()
+                .map(|k| k.guardian_public_key.clone())
+                .collect(),
         )
         .unwrap();
 
@@ -249,9 +259,9 @@ mod tests {
         let msg = b"hello puffer";
         for i in 0..n {
             let eth_sk = g_sks[i];
-            let pk_share = recipent_keys[i].public_key_share.clone();
+            let pk_share = recipient_keys[i].public_key_share.clone();
             let enc_sk_bytes =
-                hex::decode(recipent_keys[i].clone().encrypted_secret_key_share_hex).unwrap();
+                hex::decode(recipient_keys[i].clone().encrypted_secret_key_share_hex).unwrap();
 
             // decrypt guardian's sk share
             let sk_bytes =
@@ -280,7 +290,7 @@ mod tests {
 
         // verify each pk_share derived from pk_set
         for i in 0..n {
-            let pk_share = recipent_keys[i].public_key_share.clone();
+            let pk_share = recipient_keys[i].public_key_share.clone();
             assert_eq!(
                 hex::encode(pk_share.to_bytes()),
                 hex::encode(validator_pk_set.public_key_share(i).to_bytes())

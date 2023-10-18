@@ -12,6 +12,7 @@ pub async fn handler(
         keygen_payload.guardian_pubkeys,
         keygen_payload.threshold,
         GENESIS_FORK_VERSION,
+        keygen_payload.do_remote_attestation,
     ) {
         Ok(keygen_result) => {
             (axum::http::status::StatusCode::CREATED, Json(keygen_result)).into_response()
