@@ -10,6 +10,7 @@ pub mod enclave;
 pub mod client;
 pub mod eth2;
 pub mod io;
+pub mod middlewares;
 
 #[macro_export]
 macro_rules! strip_0x_prefix {

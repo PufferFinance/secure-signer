@@ -1,9 +1,18 @@
 extern crate puffersecuresigner;
+
+use axum::middleware;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+use puffersecuresigner::middlewares;
 use puffersecuresigner::{eth2::eth_types::Version, strip_0x_prefix};
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt::init();
+    let trace_filter = middlewares::tracing_filter::get_trace_filter();
+    tracing_subscriber::registry()
+        .with(trace_filter)
+        .with(tracing_subscriber::fmt::layer())
+        .init();
 
     let port = std::env::args()
         .nth(1)
@@ -48,7 +57,9 @@ async fn main() {
                 puffersecuresigner::enclave::shared::handlers::list_eth_keys::handler,
             ),
         )
-        ;
+        .layer(middleware::from_fn(
+            middlewares::terminal_logger::terminal_logger,
+        ));
 
     let addr = std::net::SocketAddr::from(([0, 0, 0, 0], port));
 
