@@ -30,24 +30,12 @@ impl GuardianClient {
     }
 
     pub async fn validate_custody(&self, 
-        keygen_payload: crate::enclave::types::BlsKeygenPayload,
-        guardian_enclave_public_key: ecies::PublicKey,
-        mrenclave: String,
-        mrsigner: String,
-        verify_remote_attestation: bool,
+        request: crate::enclave::types::ValidateCustodyRequest
     ) -> anyhow::Result<crate::enclave::types::ValidateCustodyResponse> {
-        let data = crate::enclave::types::ValidateCustodyRequest {
-            keygen_payload,
-            guardian_enclave_public_key,
-            mrenclave,
-            mrsigner,
-            verify_remote_attestation,
-        };
-
         Ok(dbg!(
             self.client
                 .post(format!("{}/eth/v1/validate-custody", self.url))
-                .json(&data)
+                .json(&request)
                 .send()
                 .await?
         )
