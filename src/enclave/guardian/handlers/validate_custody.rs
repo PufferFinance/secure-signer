@@ -6,7 +6,7 @@ pub async fn handler(
     Json(request): Json<crate::enclave::types::ValidateCustodyRequest>,
 ) -> axum::response::Response {
     info!("validate_custody()");
-    match crate::enclave::guardian::verify_and_sign_custody_received(request) {
+    match crate::enclave::guardian::verify_and_sign_custody_received(request).await {
         Ok(resp) => {
             (axum::http::status::StatusCode::OK, Json(resp)).into_response()
         }

@@ -1,12 +1,9 @@
+use ethers::signers::{Signer, LocalWallet};
 use sha3::Digest;
 pub mod handlers;
 use anyhow::{anyhow, bail, Result};
 use blsttc::PublicKeySet;
-use ecies::PublicKey as EthPublicKey;
 use libsecp256k1::SecretKey as EthSecretKey;
-use log::{error, info};
-use ssz_types::FixedVector;
-use tree_hash::TreeHash;
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct KeygenWithBlockhashRequest {
@@ -43,7 +40,7 @@ pub fn attest_new_eth_key_with_blockhash(
     Ok((proof, pk))
 }
 
-pub fn verify_and_sign_custody_received(
+pub async fn verify_and_sign_custody_received(
     request: crate::enclave::types::ValidateCustodyRequest
 ) -> Result<crate::enclave::types::ValidateCustodyResponse> {
     // Read enclave's eth secret key
@@ -71,10 +68,10 @@ pub fn verify_and_sign_custody_received(
     )?;
 
     // return guardian enclave signature
-    let signature = approve_custody(&request.keygen_payload, &guardian_enclave_sk)?;
+    let signature: String = approve_custody(&request.keygen_payload, &guardian_enclave_sk).await?;
 
     Ok(crate::enclave::types::ValidateCustodyResponse { 
-        enclave_signature: hex::encode(signature.serialize()),
+        enclave_signature: signature,
         bls_pub_key: request.keygen_payload.bls_pub_key,
         withdrawal_credentials: request.keygen_payload.withdrawal_credentials,
         deposit_signature: request.keygen_payload.signature,
@@ -180,10 +177,10 @@ fn verify_custody(
     bail!("verify_custody failed")
 }
 
-fn approve_custody(
+async fn approve_custody(
     keygen_payload: &crate::enclave::types::BlsKeygenPayload,
     guardian_enclave_sk: &EthSecretKey,
-) -> Result<libsecp256k1::Signature> {
+) -> Result<String> {
     let mut hasher = sha3::Keccak256::new();
 
     dbg!(&hex::encode(
@@ -217,19 +214,23 @@ fn approve_custody(
 
     dbg!(hex::encode(&msg));
 
-    hasher.update("\x19Ethereum Signed Message:\n");
-    hasher.update(msg.len().to_be_bytes()); // todo is this right
     hasher.update(msg);
     let msg_to_be_signed = hasher.finalize();
 
     dbg!(hex::encode(&msg_to_be_signed));
 
-    let (sig, msg) =
-        crate::crypto::eth_keys::sign_message(&msg_to_be_signed, &guardian_enclave_sk)?;
+    let wallet = hex::encode(guardian_enclave_sk.serialize())
+    .parse::<LocalWallet>()?;
+    let sig = wallet.sign_message(&msg_to_be_signed).await?;
+    let sig_str = sig.to_string();
 
-    dbg!(hex::encode(&sig.serialize()));
+    if sig.recover(&msg_to_be_signed[..])? != wallet.address() {
+        bail!("Failed to sign correctly");
+    }
 
-    Ok(sig)
+    dbg!(&sig_str);
+
+    Ok(sig_str)
 }
 
 #[cfg(test)]
@@ -237,6 +238,7 @@ mod tests {
     use super::*;
     use crate::enclave::types::BlsKeygenPayload;
     use ecies::{PublicKey as EthPublicKey, SecretKey as EthSecretKey};
+    use tree_hash::TreeHash;
 
     fn setup() -> (BlsKeygenPayload, Vec<EthSecretKey>, String, String) {
         let p = BlsKeygenPayload {
@@ -424,12 +426,12 @@ mod tests {
         verify_deposit_message(&resp).unwrap();
     }
 
-    #[test]
-    fn test_approve_custody() {
+    #[tokio::test]
+    async fn test_approve_custody() {
         let (resp, g_sks, mre, mrs) = setup();
 
         for g_sk in g_sks {
-            assert!(approve_custody(&resp, &g_sk).is_ok());
+            assert!(approve_custody(&resp, &g_sk).await.is_ok());
         }
         assert!(false);
     }
