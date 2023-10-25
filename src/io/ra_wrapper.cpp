@@ -7,8 +7,6 @@
 
 extern "C"
 void do_epid_ra(uint8_t data[64], char * report, char * signature, char * signing_cert) {
-
-
   // 64 Byte report data to embed in the intel-signed report
   sgx_report_data_t report_data = {0};
   for (int i = 0; i < 64; ++i) {

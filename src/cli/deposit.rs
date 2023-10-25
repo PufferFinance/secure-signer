@@ -41,7 +41,7 @@ fn build_deposit_request(
         32,
         "Invalid withdrawal credentials length"
     );
-    let mut withdrawal_fixed_bytes: [u8; 32] = [0_u8; 32];
+    let mut withdrawal_fixed_bytes: crate::eth2::eth_types::Bytes32 = [0_u8; 32];
     withdrawal_fixed_bytes.clone_from_slice(&withdrawal_bytes);
 
     let deposit = DepositMessage {

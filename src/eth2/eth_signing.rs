@@ -2,13 +2,14 @@ use super::eth_types::*;
 use crate::crypto::bls_keys;
 
 use anyhow::Result;
+use blsttc::SecretKeySet;
 use log::info;
 use serde::{Deserialize, Serialize};
 use ssz::Encode;
 use tree_hash::TreeHash;
 
 /// Return the signing root for the corresponding signing data.
-fn compute_signing_root<T: Encode + TreeHash>(ssz_object: T, domain: Domain) -> Root {
+pub fn compute_signing_root<T: Encode + TreeHash>(ssz_object: T, domain: Domain) -> Root {
     let object_root = ssz_object.tree_hash_root().to_fixed_bytes();
     let sign_data = SigningData {
         object_root,
@@ -117,6 +118,33 @@ pub fn get_deposit_signature(
     };
 
     Ok(dr)
+}
+
+pub fn sign_full_deposit(
+    sk_set: &SecretKeySet,
+    withdrawal_credentials: [u8; 32],
+    fork_version: Version,
+) -> Result<(BLSSignature, Root)> {
+    let deposit_message = DepositMessage {
+        pubkey: sk_set.public_keys().public_key().to_bytes().to_vec().into(),
+        withdrawal_credentials,
+        amount: crate::constants::FULL_DEPOSIT_AMOUNT,
+    };
+
+    let domain = compute_domain(DOMAIN_DEPOSIT, Some(fork_version), None);
+    let root: Root = compute_signing_root(deposit_message.clone(), domain);
+    let sig: BLSSignature = BLSSignature::from(sk_set.secret_key().sign(&root).to_bytes().to_vec());
+
+    let dd = DepositData {
+        pubkey: deposit_message.pubkey.clone(),
+        withdrawal_credentials: deposit_message.withdrawal_credentials,
+        amount: deposit_message.amount,
+        signature: sig.clone(),
+    };
+
+    let dd_root = dd.tree_hash_root().to_fixed_bytes();
+
+    Ok((sig, dd_root))
 }
 
 #[derive(Serialize, Deserialize, Debug)]

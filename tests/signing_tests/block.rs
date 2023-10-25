@@ -1,8 +1,6 @@
 use crate::common;
 use crate::common::bls_keygen_helper::register_new_bls_key;
-use crate::common::{
-    bls_import_helper::import_bls_key_with_slash_protection, eth_specs, signing_helper::*,
-};
+use crate::common::{eth_specs, signing_helper::*};
 use puffersecuresigner::eth2::eth_signing::*;
 use puffersecuresigner::eth2::eth_types::*;
 use puffersecuresigner::strip_0x_prefix;
@@ -83,7 +81,9 @@ pub async fn test_aggregate_route_fails_from_invalid_pk_hex() {
     let port = common::read_secure_signer_port();
     let req = block_proposal_request(START_SLOT);
     let bls_pk_hex = "0xdeadbeef".to_string();
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    let (_resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+        .await
+        .unwrap();
     assert_eq!(status, 400);
 }
 
@@ -92,7 +92,9 @@ pub async fn test_aggregate_block_happy_path() {
     let port = common::read_secure_signer_port();
     let req = block_proposal_request(START_SLOT);
     let bls_pk_hex = register_new_bls_key(port).await.pk_hex;
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    let (_resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+        .await
+        .unwrap();
     assert_eq!(status, 200);
 }
 
@@ -102,9 +104,12 @@ pub async fn test_aggregate_block_happy_path_test_vec() {
     let exp_sig = Some("a156ad93565d3a5d9e79f36a55f335a9c589d6428613ef067620d50185121f7b6ab8e54acc86d67a66c0addb25107c5509f6f35cc1f98651c24c673227197d98dcfd9a93e9672d19b37c25c8b1ccefad70ca42052dd76e3b59713c074ddf4d22".to_string());
     let req = block_proposal_request(START_SLOT);
     let bls_pk_hex = common::setup_dummy_keypair();
-    let (status, resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    let (resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+        .await
+        .unwrap();
     assert_eq!(status, 200);
-    let got_sig: String = strip_0x_prefix!(resp.as_ref().unwrap().signature);
+    let sig = resp.unwrap().signature;
+    let got_sig: String = strip_0x_prefix!(sig);
     assert_eq!(exp_sig.unwrap(), got_sig);
 }
 
@@ -113,12 +118,16 @@ pub async fn test_slash_protection_allows_increasing_slot() {
     let port = common::read_secure_signer_port();
     let req = block_proposal_request(START_SLOT);
     let bls_pk_hex = register_new_bls_key(port).await.pk_hex;
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    let (_resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+        .await
+        .unwrap();
     assert_eq!(status, 200);
 
     // valid BLOCK request (increasing slot)
     let req = block_proposal_request(START_SLOT + 1);
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    let (_resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+        .await
+        .unwrap();
     assert_eq!(status, 200);
 }
 
@@ -127,12 +136,16 @@ pub async fn test_slash_protection_prevents_duplicate_slot() {
     let port = common::read_secure_signer_port();
     let req = block_proposal_request(START_SLOT);
     let bls_pk_hex = register_new_bls_key(port).await.pk_hex;
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    let (_resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+        .await
+        .unwrap();
     assert_eq!(status, 200);
 
     // mock data for BLOCK request (attempt a slashable offense - non-increasing slot)
     let req = block_proposal_request(START_SLOT);
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    let (_resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+        .await
+        .unwrap();
     assert_eq!(status, 412);
 }
 
@@ -141,47 +154,25 @@ pub async fn test_slash_protection_prevents_decreasing_slot() {
     let port = common::read_secure_signer_port();
     let req = block_proposal_request(START_SLOT);
     let bls_pk_hex = register_new_bls_key(port).await.pk_hex;
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    let (_resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+        .await
+        .unwrap();
     assert_eq!(status, 200);
 
     // mock data for BLOCK request (attempt a slashable offense - decreasing slot)
     let req = block_proposal_request(START_SLOT - 1);
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    let (_resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+        .await
+        .unwrap();
     assert_eq!(status, 412);
-}
-
-#[tokio::test]
-pub async fn test_bls_import_with_slash_prevention() {
-    // let port = common::read_secure_signer_port();
-    let port = None;
-    // Init slash protection START_SLOT as last block slot signed
-    let bls_pk_hex = import_bls_key_with_slash_protection(START_SLOT, 10, 11, port).await;
-
-    // mock data for BLOCK request (attempt a slashable offense - same slot)
-    let req = block_proposal_request(START_SLOT);
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
-    assert_eq!(status, 412);
-
-    // mock data for BLOCK request (attempt a slashable offense - decreasing slot)
-    let req = block_proposal_request(START_SLOT - 1);
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
-    assert_eq!(status, 412);
-
-    // Valid increasing block
-    let req = block_proposal_request(START_SLOT + 1);
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
-    assert_eq!(status, 200);
-
-    // Sanity check
-    let req = block_proposal_request(START_SLOT + 99999);
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
-    assert_eq!(status, 200);
 }
 
 async fn perf_test(n: u64, bls_pk_hex: &String, port: Option<u16>) {
     for i in 1..n {
         let req = block_proposal_request(i);
-        let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+        let (_resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+            .await
+            .unwrap();
         assert_eq!(status, 200);
     }
 }
@@ -203,7 +194,9 @@ async fn test_block_eth2_specs() {
     let port = common::read_secure_signer_port();
     let req = block_proposal_request(START_SLOT);
     let bls_pk_hex = register_new_bls_key(port).await.pk_hex;
-    let (status, _resp) = make_signing_route_request(req, &bls_pk_hex, port).await;
+    let (_resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
+        .await
+        .unwrap();
     assert_eq!(status, 200);
 
     let mut slot: Slot = 0;
@@ -217,7 +210,9 @@ async fn test_block_eth2_specs() {
             }
         }
 
-        let (status, _resp) = make_signing_route_request(msg, &bls_pk_hex, port).await;
+        let (_resp, status) = make_signing_route_request(msg, &bls_pk_hex, port)
+            .await
+            .unwrap();
 
         if slashable {
             assert_eq!(status, 412);

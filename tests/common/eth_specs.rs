@@ -235,7 +235,6 @@ fn get_test_vec_sync_committee_contribution_and_proof(
 
 pub fn get_all_test_vecs(container_name: &str) -> Result<Vec<BLSSignMsg>> {
     let path: PathBuf = [BASE_DIR, container_name].iter().collect();
-    dbg!(&path);
     let file_paths = get_testvec_file_names(&path).unwrap();
 
     let func = match container_name {
@@ -254,8 +253,6 @@ pub fn get_all_test_vecs(container_name: &str) -> Result<Vec<BLSSignMsg>> {
     let mut test_vecs = Vec::new();
 
     for (ssz_file_path, root_file_path) in file_paths {
-        dbg!(&ssz_file_path);
-        dbg!(&root_file_path);
         let test_vec = func(ssz_file_path.as_path(), root_file_path.as_path()).unwrap();
         test_vecs.push(test_vec);
     }
@@ -267,7 +264,6 @@ fn test_eth1_data() {
     let path: PathBuf = [BASE_DIR, "Eth1Data"].iter().collect();
     let file_paths = get_testvec_file_names(&path).unwrap();
     for (ssz_file, root_file) in file_paths.iter() {
-        dbg!(ssz_file);
         get_test_vec_container::<Eth1Data>(ssz_file, root_file).unwrap();
     }
 }

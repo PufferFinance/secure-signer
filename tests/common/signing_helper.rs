@@ -3,36 +3,41 @@ use super::bls_keygen_helper::register_new_bls_key;
 use super::read_secure_signer_port;
 
 use anyhow::{Context, Result};
-use puffersecuresigner::{
-    api::{helpers::SignatureResponse, signing_route::bls_sign_route},
-    eth2::{eth_signing::BLSSignMsg, eth_types::GENESIS_FORK_VERSION},
-};
+use puffersecuresigner::eth2::{eth_signing::BLSSignMsg, eth_types::GENESIS_FORK_VERSION};
 use reqwest::{Client, Response, StatusCode};
 use serde_json;
 
 pub async fn mock_secure_sign_route(
     bls_pk: &String,
-    json_req: &String,
-) -> warp::http::Response<bytes::Bytes> {
-    let filter = bls_sign_route(GENESIS_FORK_VERSION);
-
+    signing_data: BLSSignMsg,
+) -> Result<axum_test::TestResponse> {
     let uri = format!("/api/v1/eth2/sign/{}", bls_pk);
-    dbg!(format!("mocking request to: {uri}"));
-    let res = warp::test::request()
-        .method("POST")
-        .path(&uri)
-        .body(&json_req)
-        .reply(&filter)
-        .await;
-    res
+    let test_app = axum::Router::new()
+        .route(
+            "/api/v1/eth2/sign/:bls_pk_hex",
+            axum::routing::post(
+                puffersecuresigner::enclave::secure_signer::handlers::secure_sign_bls::handler,
+            ),
+        )
+        .with_state(
+            puffersecuresigner::enclave::secure_signer::handlers::AppState {
+                genesis_fork_version: GENESIS_FORK_VERSION,
+            },
+        )
+        .into_make_service();
+
+    let server = axum_test::TestServer::new(test_app)?;
+
+    Ok(server.post(&uri).json(&signing_data).await)
 }
 
 /// Makes a request to Secure-Aggregator aggregate_route on the specified port
 pub async fn request_secure_sign_route(
     bls_pk: &String,
-    json_req: &String,
+    sign_msg: &BLSSignMsg,
     port: u16,
 ) -> Result<Response, reqwest::Error> {
+    let json_req = serde_json::to_string(sign_msg).unwrap();
     // Create a Reqwest client
     let client = Client::new();
 
@@ -54,32 +59,30 @@ pub async fn make_signing_route_request(
     signing_data: BLSSignMsg,
     bls_pk_hex: &String,
     port: Option<u16>,
-) -> (StatusCode, Result<SignatureResponse>) {
-    let json_req = serde_json::to_string(&signing_data).unwrap();
-    dbg!(&json_req);
-
+) -> Result<(
+    Option<puffersecuresigner::enclave::types::SignatureResponse>,
+    StatusCode,
+)> {
     match port {
         // Make the actual http req to a running Secure-Signer instance
         Some(p) => {
-            let resp = match request_secure_sign_route(&bls_pk_hex, &json_req, p).await {
-                Ok(resp) => resp,
-                Err(_) => panic!("Failed request_secure_sign_route"),
-            };
-            dbg!(&resp);
+            let resp = request_secure_sign_route(&bls_pk_hex, &signing_data, p).await?;
             let status = resp.status();
-            let sig: Result<SignatureResponse> = resp
-                .json()
+            let sig = resp
+                .json::<puffersecuresigner::enclave::types::SignatureResponse>()
                 .await
                 .with_context(|| format!("Failed to parse to SignatureResposne"));
-            (status, sig)
+
+            Ok((sig.ok(), status))
         }
         // Mock an http request
         None => {
-            let resp = mock_secure_sign_route(&bls_pk_hex, &json_req).await;
-            dbg!(&resp);
-            let sig: Result<SignatureResponse> = serde_json::from_slice(resp.body())
-                .with_context(|| "Failed to parse to SignatureResponse");
-            (resp.status().into(), sig)
+            let resp = mock_secure_sign_route(&bls_pk_hex, signing_data).await?;
+            let status = resp.status_code();
+            let sig: Option<puffersecuresigner::enclave::types::SignatureResponse> =
+                serde_json::from_slice(resp.as_bytes()).ok();
+
+            Ok((sig, status))
         }
     }
 }
@@ -119,7 +122,9 @@ async fn test_sign_route() {
     );
 
     let req: BLSSignMsg = serde_json::from_str(&req).unwrap();
-    let (status, resp) = make_signing_route_request(req, &bls_pk_hex.to_string(), port).await;
+    let (resp, status) = make_signing_route_request(req, &bls_pk_hex.to_string(), port)
+        .await
+        .unwrap();
+    _ = resp.unwrap();
     assert_eq!(status, 200);
-    dbg!(resp.unwrap().signature);
 }
