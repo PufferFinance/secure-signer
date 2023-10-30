@@ -1,4 +1,4 @@
-use ethers::signers::{Signer, LocalWallet};
+use ethers::signers::{LocalWallet, Signer};
 use sha3::Digest;
 pub mod handlers;
 use anyhow::{anyhow, bail, Result};
@@ -41,7 +41,7 @@ pub fn attest_new_eth_key_with_blockhash(
 }
 
 pub async fn verify_and_sign_custody_received(
-    request: crate::enclave::types::ValidateCustodyRequest
+    request: crate::enclave::types::ValidateCustodyRequest,
 ) -> Result<crate::enclave::types::ValidateCustodyResponse> {
     // Read enclave's eth secret key
     let Ok(guardian_enclave_sk) = crate::crypto::eth_keys::fetch_eth_key(
@@ -52,7 +52,11 @@ pub async fn verify_and_sign_custody_received(
 
     // verify the remote attestation evidence
     if request.verify_remote_attestation {
-        verify_remote_attestation_evidence(&request.keygen_payload, &request.mrenclave, &request.mrsigner)?;
+        verify_remote_attestation_evidence(
+            &request.keygen_payload,
+            &request.mrenclave,
+            &request.mrsigner,
+        )?;
     }
 
     // verify the deposit message is valid
@@ -70,13 +74,13 @@ pub async fn verify_and_sign_custody_received(
     // return guardian enclave signature
     let signature: String = approve_custody(&request.keygen_payload, &guardian_enclave_sk).await?;
 
-    Ok(crate::enclave::types::ValidateCustodyResponse { 
+    Ok(crate::enclave::types::ValidateCustodyResponse {
         enclave_signature: signature,
         bls_pub_key: request.keygen_payload.bls_pub_key,
         withdrawal_credentials: request.keygen_payload.withdrawal_credentials,
         deposit_signature: request.keygen_payload.signature,
         deposit_data_root: request.keygen_payload.deposit_data_root,
-     })
+    })
 }
 
 pub fn verify_remote_attestation_evidence(
@@ -219,8 +223,7 @@ async fn approve_custody(
 
     dbg!(hex::encode(&msg_to_be_signed));
 
-    let wallet = hex::encode(guardian_enclave_sk.serialize())
-    .parse::<LocalWallet>()?;
+    let wallet = hex::encode(guardian_enclave_sk.serialize()).parse::<LocalWallet>()?;
     let sig = wallet.sign_message(&msg_to_be_signed).await?;
     let sig_str = sig.to_string();
 
