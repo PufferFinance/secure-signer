@@ -25,6 +25,7 @@ async fn main() {
 
     let app_state = puffersecuresigner::enclave::shared::handlers::AppState {
         genesis_fork_version,
+        password_file: Some("password.txt".to_string())
     };
 
     let app = axum::Router::new()

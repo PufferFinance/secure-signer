@@ -22,6 +22,7 @@ pub async fn mock_secure_sign_route(
         .with_state(
             puffersecuresigner::enclave::shared::handlers::AppState {
                 genesis_fork_version: GENESIS_FORK_VERSION,
+                password_file: Some("password.txt".to_string())
             },
         )
         .into_make_service();

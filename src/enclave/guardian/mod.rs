@@ -114,7 +114,7 @@ pub fn verify_remote_attestation_evidence(
     let rec_payload = e.get_report_data()?;
     let mut dd_root: [u8; 32] = [0; 32];
     dd_root.copy_from_slice(&hex::decode(&keygen_payload.deposit_data_root)?);
-    let payload = crate::enclave::build_validator_remote_attestation_payload(
+    let payload = crate::enclave::shared::build_validator_remote_attestation_payload(
         pk_set,
         &hex::decode(&keygen_payload.signature)?.into(),
         &dd_root,
@@ -383,7 +383,7 @@ mod tests {
         dbg!(&resp.signature);
 
         let rec_payload = e.get_report_data().unwrap();
-        let payload = crate::enclave::build_validator_remote_attestation_payload(
+        let payload = crate::enclave::shared::build_validator_remote_attestation_payload(
             pk_set.clone(),
             &hex::decode(&resp.signature).unwrap().into(),
             &hex::decode(&resp.deposit_data_root)

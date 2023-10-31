@@ -1,9 +1,8 @@
 use crate::{crypto::bls_keys::save_bls_key, io::remote_attestation::AttestationEvidence};
 use anyhow::Result;
-use blsttc::{PublicKeySet, PublicKeyShare, SecretKeyShare, SignatureShare};
+use axum::extract::State;
+use blsttc::{PublicKeyShare, SecretKeyShare, SignatureShare};
 use ecies::PublicKey as EthPublicKey;
-use sha3::Digest;
-use ssz::Encode;
 pub mod handlers;
 
 #[derive(Clone, Debug)]
@@ -56,7 +55,9 @@ pub fn attest_fresh_bls_key(
     threshold: usize,
     fork_version: [u8; 4],
     do_remote_attestation: bool,
-) -> Result<super::types::BlsKeygenPayload> {
+    password: Option<String>
+) -> Result<crate::enclave::types::BlsKeygenPayload> {
+    dbg!(password);
     // Generate a SecretKeySet where t + 1 signature shares can be combined into a full signature. attest_fresh_bls_key() function assumes `threshold = t + 1`, so we must pass new_bls_key(t=threshold - 1)
     let secret_key_set = crate::crypto::bls_keys::new_bls_key(threshold - 1);
 
@@ -94,7 +95,7 @@ pub fn attest_fresh_bls_key(
     )?;
 
     // build remote attestation payload
-    let payload = crate::enclave::build_validator_remote_attestation_payload(
+    let payload = crate::enclave::shared::build_validator_remote_attestation_payload(
         secret_key_set.public_keys().clone(),
         &signature,
         &deposit_data_root,
@@ -193,7 +194,7 @@ mod tests {
         )
         .unwrap();
 
-        let payload = crate::enclave::build_validator_remote_attestation_payload(
+        let payload = crate::enclave::shared::build_validator_remote_attestation_payload(
             secret_key_set.public_keys().clone(),
             &signature,
             &deposit_data_root,

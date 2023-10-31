@@ -4,9 +4,10 @@ mod validator;
 
 fn build_client() -> super::Client {
     let builder = super::ClientBuilder::new();
-    builder.validator_url("http://localhost:3031".to_string())
-    .guardian_url("http://localhost:3032".to_string())
-    .build()
+    builder
+        .validator_url("http://localhost:3031".to_string())
+        .guardian_url("http://localhost:3032".to_string())
+        .build()
 }
 
 #[tokio::test]
@@ -30,13 +31,8 @@ async fn registration_flow_succeeds() {
     dbg!(&resp1);
 
     // Guardian's keys increase
-    let r: crate::enclave::types::ListKeysResponse = client
-        .guardian
-        .list_eth_keys()
-        .await
-        .unwrap();
+    let r: crate::enclave::types::ListKeysResponse = client.guardian.list_eth_keys().await.unwrap();
     assert!(dbg!(r.data).len() > 0);
-
 
     // Assume guardian called rotateGuardianKey()
 
@@ -81,22 +77,47 @@ async fn registration_flow_succeeds() {
         validator_index: 0,
         fork_info: crate::eth2::eth_types::ForkInfo::default(),
     };
-    let resp4: crate::enclave::types::SignExitResponse = client
-        .guardian
-        .sign_exit(req)
-        .await
-        .unwrap();
+    let resp4: crate::enclave::types::SignExitResponse =
+        client.guardian.sign_exit(req).await.unwrap();
 
     dbg!(resp4);
 }
 
-
-
 #[tokio::test]
 async fn test_foo() {
-    let pk_hex = "b0c223df688aa0a6f5546d55b7863f83f2a7702a321da11e0311f6408899b20d44896b7e0b88620c404b383584dbf49f".to_string();
-    // let sk = crate::crypto::bls_keys::fetch_bls_sk(&pk_hex).unwrap();
-    // dbg!(sk.secret_key().to_hex());
-    let sig = crate::crypto::bls_keys::bls_agg_sign_from_saved_sk(&pk_hex, b"asdfafs").unwrap();
+    let client = build_client();
+    let verify_remote_attestation = false;
+    let withdrawal_credentials = [1; 32];
+    let threshold = 1;
+
+    // Guardian generates fresh key
+    let resp1: crate::enclave::types::KeyGenResponse = client
+        .guardian
+        .attest_fresh_eth_key("0x0000000000000000000000000000000000000000000000000000000000000000")
+        .await
+        .unwrap();
+
+    dbg!(&resp1);
+
+    // Assume fetched from on-chain by validator:
+    let guardian_pk = crate::crypto::eth_keys::eth_pk_from_hex_uncompressed(&resp1.pk_hex).unwrap();
+
+    // Validator generates fresh key and provisions to Guardian
+    let payload = crate::enclave::types::AttestFreshBlsKeyPayload {
+        guardian_pubkeys: vec![guardian_pk.clone()],
+        withdrawal_credentials: withdrawal_credentials.clone(),
+        threshold: threshold,
+        do_remote_attestation: verify_remote_attestation,
+    };
+
+    let resp2: crate::enclave::types::BlsKeygenPayload = client
+        .validator
+        .attest_fresh_bls_key(&payload)
+        .await
+        .unwrap();
+
+    dbg!(&resp2);
+
+
     assert!(false);
 }
