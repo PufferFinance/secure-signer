@@ -118,6 +118,28 @@ async fn test_foo() {
 
     dbg!(&resp2);
 
-
     assert!(false);
+}
+
+#[test]
+fn foo() {
+    use rand::RngCore;
+    use std::path::Path;
+
+    let dir = Path::new("./keys");
+    let password = "hello";
+    let mut rng = rand::thread_rng();
+    let sk = crate::crypto::bls_keys::new_bls_key(0);
+    // eth_keystore_v3::encrypt_key("./etc", &mut rng, sk.secret_key().to_bytes(), password, Some(&sk.public_keys().public_key().to_hex())).unwrap();
+    dbg!(sk.public_keys().public_key().to_hex());
+
+    let dest = crate::io::key_management::write_bls_keystore(&sk.public_keys().public_key().to_hex(), &sk.secret_key().to_bytes(), &password.to_string()).unwrap();
+
+    dbg!(&dest);
+
+    // let got = eth_keystore_v3::decrypt_key(format!("{}/{}", crate::constants::BLS_KEYS_DIR, sk.public_keys().public_key().to_hex()), password).unwrap();
+    let got = crate::io::key_management::read_bls_keystore(&sk.public_keys().public_key().to_hex(), &password.to_string()).unwrap();
+    // let got = eth_keystore_v3::decrypt_key(&dest, password).unwrap();
+
+    assert!(hex::encode(got) == sk.secret_key().to_hex())
 }

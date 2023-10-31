@@ -31,6 +31,20 @@ pub fn write_bls_key(pk_hex: &String, sk_hex: &String) -> Result<()> {
     write_key(file_path, sk_hex)
 }
 
+/// Writes the BLS secret key to a keystore file
+pub fn write_bls_keystore(pk_hex: &String, sk: &[u8], password: &String) -> Result<String> {
+    // Create the keys dir if it does not exist
+    fs::create_dir_all(BLS_KEYS_DIR).with_context(|| "Failed to create keys dir")?;
+
+    // Sanitize inputs
+    let pk_hex: &str = strip_0x_prefix!(pk_hex);
+    let mut rng = rand::thread_rng();
+
+    // Create encrypted keystore
+    let uuid = eth_keystore_v3::encrypt_key(BLS_KEYS_DIR, &mut rng, sk, password, Some(pk_hex))?;
+    Ok(uuid)
+}
+
 /// Reads hex-encoded secret key from the specified path and returns the hex-decoded bytes
 fn read_key(file_path: PathBuf) -> Result<Vec<u8>> {
     let sk_rec_bytes = fs::read(&file_path).with_context(|| "Unable to read secret key")?;
@@ -49,6 +63,15 @@ pub fn read_bls_key(pk_hex: &str) -> Result<Vec<u8>> {
     let pk_hex: &str = strip_0x_prefix!(pk_hex);
     let file_path: PathBuf = [BLS_KEYS_DIR, pk_hex].iter().collect();
     read_key(file_path)
+}
+
+/// Reads BLS secret key from encrypted keystore
+pub fn read_bls_keystore(pk_hex: &String, password: &String) -> Result<Vec<u8>> {
+    // Sanitize inputs
+    let pk_hex: &str = strip_0x_prefix!(pk_hex);
+    let file_path: PathBuf = [BLS_KEYS_DIR, pk_hex].iter().collect();
+    let sk_bytes = eth_keystore_v3::decrypt_key(file_path, password)?;
+    Ok(sk_bytes)
 }
 
 /// Deletes the secret key saved at the specified path
@@ -209,6 +232,32 @@ mod test_key_management {
         // Read the BLS key
         let sk_bytes = read_bls_key(pk_hex).unwrap();
         assert_eq!(sk_bytes, vec![0xab, 0xcd, 0xef, 0x12, 0x34, 0x56]);
+
+        // Delete the BLS key
+        delete_bls_key(pk_hex).unwrap();
+
+        // Check if the BLS key was deleted
+        assert!(!bls_key_exists(pk_hex));
+    }
+
+    #[test]
+    fn test_write_read_delete_bls_keystore() {
+        fs::remove_dir_all("./etc").ok();
+        let pk_hex = "0x1234abcd";
+        let sk_hex = "abcdef123456";
+        let password = "password";
+
+        // Write the BLS key
+        let _uuid = write_bls_keystore(
+            &pk_hex.to_string(),
+            sk_hex.as_bytes(),
+            &password.to_string(),
+        )
+        .unwrap();
+
+        // Read the BLS key
+        let sk_bytes = read_bls_keystore(&pk_hex.to_string(), &password.to_string()).unwrap();
+        assert_eq!(sk_bytes, sk_hex.as_bytes());
 
         // Delete the BLS key
         delete_bls_key(pk_hex).unwrap();
