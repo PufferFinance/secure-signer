@@ -27,7 +27,7 @@ pub mod keystore_tests {
 
     #[test]
     /// Test vec from: https://eips.ethereum.org/EIPS/eip-2335
-    fn foo() {
+    fn test_import_keystore() {
         let keystore = r#"
         {
             "crypto": {
@@ -73,5 +73,22 @@ pub mod keystore_tests {
             Vec::from_hex("000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f")
                 .unwrap()
         );
+    }
+
+    #[test]
+    fn test_encrypt_decrypt_keystore() {
+        std::fs::create_dir_all("./test_keys").unwrap();
+        let secret =
+            Vec::from_hex("000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f")
+                .unwrap();
+        let dir = std::path::Path::new("./test_keys");
+        let mut rng = rand::thread_rng();
+        let name = eth_keystore::encrypt_key(&dir, &mut rng, &secret, "newpassword", None).unwrap();
+
+        let keypath = dir.join(&name);
+        assert_eq!(eth_keystore::decrypt_key(&keypath, "newpassword").unwrap(), secret);
+        assert!(eth_keystore::decrypt_key(&keypath, "notanewpassword").is_err());
+        assert!(std::fs::remove_file(&keypath).is_ok());
+        std::fs::remove_dir_all("./test_keys").ok();
     }
 }

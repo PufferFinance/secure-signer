@@ -1,8 +1,7 @@
-use axum::{extract::State, response::IntoResponse, Json};
+use axum::{response::IntoResponse, Json};
 use log::{error, info};
 
 pub async fn handler(
-    State(state): State<crate::enclave::shared::handlers::AppState>,
     Json(keygen_payload): Json<crate::enclave::types::AttestFreshBlsKeyPayload>,
 ) -> axum::response::Response {
     info!("attest_fresh_bls_key()");
@@ -12,7 +11,6 @@ pub async fn handler(
         keygen_payload.threshold,
         crate::eth2::eth_types::GENESIS_FORK_VERSION,
         keygen_payload.do_remote_attestation,
-        state.read_password()
     ) {
         Ok(keygen_result) => {
             (axum::http::status::StatusCode::CREATED, Json(keygen_result)).into_response()

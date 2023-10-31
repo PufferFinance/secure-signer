@@ -1,6 +1,5 @@
 use crate::{crypto::bls_keys::save_bls_key, io::remote_attestation::AttestationEvidence};
 use anyhow::Result;
-use axum::extract::State;
 use blsttc::{PublicKeyShare, SecretKeyShare, SignatureShare};
 use ecies::PublicKey as EthPublicKey;
 pub mod handlers;
@@ -55,9 +54,7 @@ pub fn attest_fresh_bls_key(
     threshold: usize,
     fork_version: [u8; 4],
     do_remote_attestation: bool,
-    password: Option<String>
 ) -> Result<crate::enclave::types::BlsKeygenPayload> {
-    dbg!(password);
     // Generate a SecretKeySet where t + 1 signature shares can be combined into a full signature. attest_fresh_bls_key() function assumes `threshold = t + 1`, so we must pass new_bls_key(t=threshold - 1)
     let secret_key_set = crate::crypto::bls_keys::new_bls_key(threshold - 1);
 

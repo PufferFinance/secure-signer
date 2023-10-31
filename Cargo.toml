@@ -35,7 +35,6 @@ sha3 = "0.10.6"
 
 # eth deps
 eth-keystore = { git = "https://github.com/PufferFinance/eth-keystore-rs" }
-eth-keystore-v3 = { version = "0.5", package = "eth-keystore" }
 eth2_ssz = "0.4.0"
 eth2_ssz_derive = "0.3.0"
 eth2_ssz_types = { git = "https://github.com/PufferFinance/ssz_types" }

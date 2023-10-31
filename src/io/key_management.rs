@@ -41,7 +41,7 @@ pub fn write_bls_keystore(pk_hex: &String, sk: &[u8], password: &String) -> Resu
     let mut rng = rand::thread_rng();
 
     // Create encrypted keystore
-    let uuid = eth_keystore_v3::encrypt_key(BLS_KEYS_DIR, &mut rng, sk, password, Some(pk_hex))?;
+    let uuid = eth_keystore::encrypt_key(BLS_KEYS_DIR, &mut rng, sk, password, Some(pk_hex))?;
     Ok(uuid)
 }
 
@@ -70,7 +70,7 @@ pub fn read_bls_keystore(pk_hex: &String, password: &String) -> Result<Vec<u8>> 
     // Sanitize inputs
     let pk_hex: &str = strip_0x_prefix!(pk_hex);
     let file_path: PathBuf = [BLS_KEYS_DIR, pk_hex].iter().collect();
-    let sk_bytes = eth_keystore_v3::decrypt_key(file_path, password)?;
+    let sk_bytes = eth_keystore::decrypt_key(file_path, password)?;
     Ok(sk_bytes)
 }
 
@@ -150,6 +150,8 @@ pub fn list_eth_keys() -> Result<Vec<String>> {
 
 #[cfg(test)]
 mod test_key_management {
+    use hex::FromHex;
+
     use super::*;
     use crate::constants::KEYS_DIR;
     use std::path::Path;
@@ -243,21 +245,22 @@ mod test_key_management {
     #[test]
     fn test_write_read_delete_bls_keystore() {
         fs::remove_dir_all("./etc").ok();
-        let pk_hex = "0x1234abcd";
-        let sk_hex = "abcdef123456";
+        let pk_hex = "a8a1580a80406ccb0a89e1115c92ec1a09994e2ac6341cfddcad5daf75f587244aa6d722b3449a17b0b0b482c1d13215";
+        let sk_hex = "4c627588f8040116b75f14fdb55b552612a46a2cd91e65b516defe39d81fc08f";
+        let sk_bytes_in = hex::decode(sk_hex).unwrap();
         let password = "password";
 
         // Write the BLS key
         let _uuid = write_bls_keystore(
             &pk_hex.to_string(),
-            sk_hex.as_bytes(),
+            &sk_bytes_in,
             &password.to_string(),
         )
         .unwrap();
 
         // Read the BLS key
-        let sk_bytes = read_bls_keystore(&pk_hex.to_string(), &password.to_string()).unwrap();
-        assert_eq!(sk_bytes, sk_hex.as_bytes());
+        let sk_bytes_out = read_bls_keystore(&pk_hex.to_string(), &password.to_string()).unwrap();
+        assert_eq!(sk_bytes_out, sk_bytes_in);
 
         // Delete the BLS key
         delete_bls_key(pk_hex).unwrap();
