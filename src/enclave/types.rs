@@ -189,7 +189,7 @@ pub struct BlsKeygenPayload {
     pub intel_x509: String,
     pub guardian_eth_pub_keys: Vec<String>,
     pub withdrawal_credentials: String,
-    pub fork_version: crate::eth2::eth_types::Version
+    pub fork_version: crate::eth2::eth_types::Version,
 }
 
 impl BlsKeygenPayload {
@@ -218,9 +218,7 @@ impl BlsKeygenPayload {
         Ok(blsttc::Signature::from_bytes(sig_bytes)?)
     }
 
-    pub fn deposit_message_root(
-        &self,
-    ) -> Result<crate::eth2::eth_types::Root> {
+    pub fn deposit_message_root(&self) -> Result<crate::eth2::eth_types::Root> {
         let pk_set = self.public_key_set()?;
         let withdrawal_credentials = self.withdrawal_credentials()?;
         dbg!(hex::encode(&pk_set.public_key().to_bytes().to_vec()));
@@ -258,15 +256,21 @@ impl BlsKeygenPayload {
         Ok(pk_set.public_key().to_hex() == exp_pk_hex)
     }
 
-    pub fn decrypt_sk_share(&self, share_index: usize, guardian_enclave_sk: &EthSecretKey) -> Result<blsttc::SecretKeyShare> {
+    pub fn decrypt_sk_share(
+        &self,
+        share_index: usize,
+        guardian_enclave_sk: &EthSecretKey,
+    ) -> Result<blsttc::SecretKeyShare> {
         let sanitized_enc_sk_share: String = match self.bls_enc_priv_key_shares.get(share_index) {
             Some(s) => crate::strip_0x_prefix!(s),
-            None => bail!("bad share_index to read from bls_enc_priv_key_shares")
+            None => bail!("bad share_index to read from bls_enc_priv_key_shares"),
         };
         let enc_sk_bytes = hex::decode(&sanitized_enc_sk_share)?;
         let sk_bytes =
             crate::crypto::eth_keys::envelope_decrypt(&guardian_enclave_sk, &enc_sk_bytes)?;
-        Ok(blsttc::SecretKeyShare::from_bytes(sk_bytes[..].try_into()?)?)
+        Ok(blsttc::SecretKeyShare::from_bytes(
+            sk_bytes[..].try_into()?,
+        )?)
     }
 }
 

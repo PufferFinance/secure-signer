@@ -30,7 +30,6 @@ async fn call_attest_fresh_eth_with_failure_bad_blockhash() {
         .is_err())
 }
 
-
 #[tokio::test]
 async fn call_validate_custody_with_success() {
     let n: usize = 8;
@@ -50,7 +49,7 @@ async fn call_validate_custody_with_success() {
         guardian_pubkeys: g_pks,
         withdrawal_credentials: [1; 32],
         threshold: 7,
-        do_remote_attestation: false
+        do_remote_attestation: false,
     };
 
     let resp: crate::enclave::types::BlsKeygenPayload = client

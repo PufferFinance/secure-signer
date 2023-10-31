@@ -58,7 +58,7 @@ async fn registration_flow_succeeds() {
         .unwrap();
 
     dbg!(&resp2);
-    
+
     // Assume validator is enqueued on-chain
     let req = crate::enclave::types::ValidateCustodyRequest {
         keygen_payload: resp2.clone(),
@@ -69,11 +69,8 @@ async fn registration_flow_succeeds() {
     };
 
     // Guardian validates they received custody
-    let resp3: crate::enclave::types::ValidateCustodyResponse = client
-        .guardian
-        .validate_custody(req)
-        .await
-        .unwrap();
+    let resp3: crate::enclave::types::ValidateCustodyResponse =
+        client.guardian.validate_custody(req).await.unwrap();
 
     dbg!(&resp3);
 
