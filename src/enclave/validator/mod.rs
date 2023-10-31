@@ -48,11 +48,6 @@ impl RecipientKeys {
     ) -> bool {
         self.public_key_share.verify(signature, message)
     }
-
-    //     pub fn guardian_public_keys(&self) -> &Vec<PublicKeyShare> {
-    //         self.guardian_public_keys().iter()
-    // j
-    //     }
 }
 
 pub fn attest_fresh_bls_key(
@@ -87,6 +82,9 @@ pub fn attest_fresh_bls_key(
 
     // save validator private key to enclave
     save_bls_key(&secret_key_set)?;
+
+    // Create a new slashing protection database
+    crate::eth2::slash_protection::SlashingProtectionData::from_pk_hex(&validator_pubkey.to_hex())?.write()?;
 
     // sign DepositMessage to deposit 32 ETH to beacon deposit contract
     let (signature, deposit_data_root) = crate::eth2::eth_signing::sign_full_deposit(
