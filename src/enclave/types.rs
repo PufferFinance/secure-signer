@@ -272,13 +272,24 @@ impl BlsKeygenPayload {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct EigenPodData {
-    pub puffer_pool_address: ethers::abi::Address,
-    pub eigen_pod_manager_address: ethers::abi::Address,
-    pub eigen_pod_beacon_address: ethers::abi::Address,
-    pub eigen_pod_proxy_init_code: String,
-    pub beacon_proxy_bytecode: String,
-    pub pod_account_owners: Vec<ethers::types::Address>,
+pub struct SignExitRequest {
+    pub bls_pub_key_set: String,
+    pub guardian_index: u64,
+    pub validator_index: u64,
+    pub fork_info: crate::eth2::eth_types::ForkInfo,
+}
+
+impl SignExitRequest {
+    pub fn public_key_set(&self) -> Result<PublicKeySet> {
+        let sanitized: String = crate::strip_0x_prefix!(&self.bls_pub_key_set);
+        Ok(PublicKeySet::from_bytes(hex::decode(sanitized)?)?)
+    }
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SignExitResponse {
+    pub signature: String,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]

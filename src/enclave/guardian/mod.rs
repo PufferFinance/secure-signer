@@ -1,9 +1,12 @@
-use ethers::signers::{Signer, LocalWallet};
+use ethers::signers::{LocalWallet, Signer};
 use sha3::Digest;
 pub mod handlers;
 use anyhow::{anyhow, bail, Result};
-use blsttc::PublicKeySet;
+use blsttc::{PublicKeySet, SecretKeyShare};
 use libsecp256k1::SecretKey as EthSecretKey;
+use ssz::Encode;
+
+use crate::eth2::eth_types::BLSSignature;
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct KeygenWithBlockhashRequest {
@@ -41,7 +44,7 @@ pub fn attest_new_eth_key_with_blockhash(
 }
 
 pub async fn verify_and_sign_custody_received(
-    request: crate::enclave::types::ValidateCustodyRequest
+    request: crate::enclave::types::ValidateCustodyRequest,
 ) -> Result<crate::enclave::types::ValidateCustodyResponse> {
     // Read enclave's eth secret key
     let Ok(guardian_enclave_sk) = crate::crypto::eth_keys::fetch_eth_key(
@@ -52,7 +55,11 @@ pub async fn verify_and_sign_custody_received(
 
     // verify the remote attestation evidence
     if request.verify_remote_attestation {
-        verify_remote_attestation_evidence(&request.keygen_payload, &request.mrenclave, &request.mrsigner)?;
+        verify_remote_attestation_evidence(
+            &request.keygen_payload,
+            &request.mrenclave,
+            &request.mrsigner,
+        )?;
     }
 
     // verify the deposit message is valid
@@ -70,13 +77,13 @@ pub async fn verify_and_sign_custody_received(
     // return guardian enclave signature
     let signature: String = approve_custody(&request.keygen_payload, &guardian_enclave_sk).await?;
 
-    Ok(crate::enclave::types::ValidateCustodyResponse { 
+    Ok(crate::enclave::types::ValidateCustodyResponse {
         enclave_signature: signature,
         bls_pub_key: request.keygen_payload.bls_pub_key,
         withdrawal_credentials: request.keygen_payload.withdrawal_credentials,
         deposit_signature: request.keygen_payload.signature,
         deposit_data_root: request.keygen_payload.deposit_data_root,
-     })
+    })
 }
 
 pub fn verify_remote_attestation_evidence(
@@ -219,8 +226,7 @@ async fn approve_custody(
 
     dbg!(hex::encode(&msg_to_be_signed));
 
-    let wallet = hex::encode(guardian_enclave_sk.serialize())
-    .parse::<LocalWallet>()?;
+    let wallet = hex::encode(guardian_enclave_sk.serialize()).parse::<LocalWallet>()?;
     let sig = wallet.sign_message(&msg_to_be_signed).await?;
     let sig_str = sig.to_string();
 
@@ -233,11 +239,50 @@ async fn approve_custody(
     Ok(sig_str)
 }
 
+pub fn sign_voluntary_exit_message(
+    req: crate::enclave::types::SignExitRequest,
+) -> Result<crate::enclave::types::SignExitResponse> {
+
+    // Read the validator's secret key share
+    let pk_hex = hex::encode(req.public_key_set()?.public_key_share(req.guardian_index).to_bytes());
+    let sk = crate::crypto::bls_keys::fetch_bls_sk(&pk_hex)?.secret_key();
+
+    // Sign a VoluntaryExitMessage with Epoch 0 
+    let (sig, _root)  = sign_vem(sk, 0, req.validator_index, req.fork_info)?;
+
+    Ok(crate::enclave::types::SignExitResponse {
+        signature: hex::encode(sig.as_ssz_bytes())
+    })
+}
+
+fn sign_vem(
+    sk_share: blsttc::SecretKey,
+    epoch: crate::eth2::eth_types::Epoch,
+    validator_index: crate::eth2::eth_types::ValidatorIndex,
+    fork_info: crate::eth2::eth_types::ForkInfo,
+) -> Result<(BLSSignature, crate::eth2::eth_types::Root)> {
+    let voluntary_exit = crate::eth2::eth_types::VoluntaryExit {
+        epoch,
+        validator_index,
+    };
+
+    let vem_req = crate::eth2::eth_types::VoluntaryExitRequest {
+        fork_info,
+        signingRoot: None,
+        voluntary_exit,
+    };
+
+    let root = crate::eth2::eth_signing::BLSSignMsg::VOLUNTARY_EXIT(vem_req).to_signing_root(None);
+
+    let sig: BLSSignature = BLSSignature::from(sk_share.sign(&root).to_bytes().to_vec());
+
+    Ok((sig, root))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::enclave::types::BlsKeygenPayload;
-    use ecies::{PublicKey as EthPublicKey, SecretKey as EthSecretKey};
     use tree_hash::TreeHash;
 
     fn setup() -> (BlsKeygenPayload, Vec<EthSecretKey>, String, String) {
@@ -399,7 +444,7 @@ mod tests {
 
     #[test]
     fn test_verify_custody_with_success() {
-        let (resp, g_sks, mre, mrs) = setup();
+        let (resp, g_sks, _mre, _mrs) = setup();
 
         for g_sk in g_sks {
             assert!(verify_custody(&resp, &g_sk).is_ok());
@@ -408,31 +453,64 @@ mod tests {
 
     #[test]
     fn test_verify_custody_with_fail() {
-        let (resp, g_sks, mre, mrs) = setup();
+        let (resp, _g_sks, _mre, _mrs) = setup();
         let g_sk = EthSecretKey::default();
         assert!(verify_custody(&resp, &g_sk).is_err());
     }
 
     #[test]
     fn test_verify_remote_attestation_evidence_with_success() {
-        let (resp, g_sks, mre, mrs) = setup();
+        let (resp, _g_sks, mre, mrs) = setup();
 
         verify_remote_attestation_evidence(&resp, &mre, &mrs).unwrap();
     }
 
     #[test]
     fn test_verify_deposit_message() {
-        let (resp, g_sks, mre, mrs) = setup();
+        let (resp, _g_sks, _mre, _mrs) = setup();
         verify_deposit_message(&resp).unwrap();
     }
 
     #[tokio::test]
     async fn test_approve_custody() {
-        let (resp, g_sks, mre, mrs) = setup();
+        let (resp, g_sks, _mre, _mrs) = setup();
 
         for g_sk in g_sks {
             assert!(approve_custody(&resp, &g_sk).await.is_ok());
         }
-        assert!(false);
+    }
+
+    #[test]
+    fn test_sign_vem() {
+        let (resp, _g_sks, _mre, _mrs) = setup();
+
+        let mut sig_shares: Vec<blsttc::SignatureShare> = Vec::new();
+        let mut msg_root = [0_u8; 32];
+        for i in 0.._g_sks.len() {
+            let req = crate::enclave::types::SignExitRequest {
+                bls_pub_key_set: resp.bls_pub_key_set.clone(),
+                    guardian_index: i as u64,
+                validator_index: 0,
+                fork_info: crate::eth2::eth_types::ForkInfo::default(),
+            };
+            let sk_share = verify_custody(&resp, &_g_sks[i]).unwrap();
+            let sk = blsttc::SecretKey::from_bytes(sk_share.to_bytes()).unwrap();
+            let (sig, root) = sign_vem(sk, 0, req.validator_index, req.fork_info).unwrap();
+            msg_root = root;
+
+            let mut sig_bytes: [u8; crate::constants::BLS_SIG_BYTES] =
+            [0; crate::constants::BLS_SIG_BYTES];
+            sig_bytes.copy_from_slice(
+                &sig[..]);
+            let sig = blsttc::SignatureShare::from_bytes(sig_bytes).unwrap();
+
+            sig_shares.push(sig);
+        }
+
+        // aggregate the partial sigs
+        let sig = crate::crypto::bls_keys::aggregate_signature_shares(&resp.public_key_set().unwrap(), &sig_shares).unwrap();
+
+        // verify the signature is valid
+        assert!(resp.public_key_set().unwrap().public_key().verify(&sig, msg_root));
     }
 }
