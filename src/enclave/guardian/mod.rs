@@ -217,7 +217,7 @@ async fn approve_custody(
         ),
         ethers::abi::Token::Bytes(keygen_payload.withdrawal_credentials()?.to_vec()),
         ethers::abi::Token::Bytes(keygen_payload.signature()?.to_bytes().to_vec()),
-        ethers::abi::Token::Bytes(keygen_payload.deposit_data_root()?.to_vec()),
+        ethers::abi::Token::FixedBytes(keygen_payload.deposit_data_root()?.to_vec()),
     ]);
 
     dbg!(hex::encode(&msg));
