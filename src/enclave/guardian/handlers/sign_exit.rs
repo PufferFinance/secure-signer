@@ -3,10 +3,10 @@ use axum::Json;
 use log::{error, info};
 
 pub async fn handler(
-    Json(request): Json<crate::enclave::types::ValidateCustodyRequest>,
+    Json(request): Json<crate::enclave::types::SignExitRequest>,
 ) -> axum::response::Response {
     info!("sign_exit()");
-    match crate::enclave::guardian::sign_voluntary_exit_message(request).await {
+    match crate::enclave::guardian::sign_voluntary_exit_message(request) {
         Ok(resp) => {
             (axum::http::status::StatusCode::OK, Json(resp)).into_response()
         }

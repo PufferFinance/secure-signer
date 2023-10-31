@@ -19,6 +19,7 @@ pub fn attest_new_eth_key_with_blockhash(
     crate::io::remote_attestation::AttestationEvidence,
     ecies::PublicKey,
 )> {
+    dbg!("attest_new_eth_key_with_blockhash()");
     // Generate a fresh SECP256K1 ETH keypair (saving ETH private key)
     let pk = crate::crypto::eth_keys::eth_key_gen()?;
     let blockhash: String = crate::strip_0x_prefix!(blockhash);
