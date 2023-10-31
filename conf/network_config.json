@@ -1,10 +1,10 @@
 {
-    "network_name": "goerli",
+    "network_name": "ephemery",
     "deposit_cli_version": "2.3.0",
     "fork_info": {
         "fork": {
-            "previous_version": "0x00001020",
-            "current_version": "0x00001020",
+            "previous_version": "0x1000101a",
+            "current_version": "0x1000101b",
             "epoch": "0"
         },
         "genesis_validators_root": "0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69"

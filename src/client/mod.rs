@@ -49,13 +49,13 @@ impl ClientBuilder {
             },
             guardian: GuardianClient {
                 url: self
-                    .secure_signer_url
+                    .guardian_url
                     .unwrap_or(default_client_guardian_url()),
                 client: client.clone(),
             },
             secure_signer: SecureSignerClient {
                 url: self
-                    .guardian_url
+                    .secure_signer_url
                     .unwrap_or(default_client_secure_signer_url()),
                 client: client.clone(),
             },

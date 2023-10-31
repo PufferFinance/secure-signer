@@ -29,23 +29,32 @@ async fn main() {
             "/health",
             axum::routing::get(puffersecuresigner::enclave::shared::handlers::health::handler),
         )
+        // Endpoint generated a new ETH key
         .route(
             "/eth/v1/keygen",
             axum::routing::post(
                 puffersecuresigner::enclave::guardian::handlers::attest_fresh_eth_key_with_blockhash::handler,
             ),
         )
+        // Endpoint to list the pks of all the generated ETH keys
         .route(
-            "/eth/v1/validate-custody",
+            "/eth/v1/keygen",
+            axum::routing::get(
+                puffersecuresigner::enclave::shared::handlers::list_eth_keys::handler,
+            ),
+        )
+        // Endpoint to validate and receive BLS keyshare custody
+        .route(
+            "/guardian/v1/validate-custody",
             axum::routing::post(
                 puffersecuresigner::enclave::guardian::handlers::validate_custody::handler,
             ),
         )
-         // Endpoint to list the pks of all the generated ETH keys
+        // Endpoint to sign a VoluntaryExitMessage
         .route(
-            "/eth/v1/keygen/secp256k1",
-            axum::routing::get(
-                puffersecuresigner::enclave::shared::handlers::list_eth_keys::handler,
+            "/guardian/v1/sign-exit",
+            axum::routing::post(
+                puffersecuresigner::enclave::guardian::handlers::sign_exit::handler,
             ),
         )
         ;

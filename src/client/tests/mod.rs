@@ -4,7 +4,9 @@ mod validator;
 
 fn build_client() -> super::Client {
     let builder = super::ClientBuilder::new();
-    builder.build()
+    builder.validator_url("http://localhost:3031".to_string())
+    .guardian_url("http://localhost:3032".to_string())
+    .build()
 }
 
 #[tokio::test]
@@ -26,6 +28,15 @@ async fn registration_flow_succeeds() {
         .unwrap();
 
     dbg!(&resp1);
+
+    // Guardian's keys increase
+    let r: crate::enclave::types::ListKeysResponse = client
+        .guardian
+        .list_eth_keys()
+        .await
+        .unwrap();
+    assert!(dbg!(r.data).len() > 0);
+
 
     // Assume guardian called rotateGuardianKey()
 
@@ -50,7 +61,7 @@ async fn registration_flow_succeeds() {
 
     // Assume validator is enqueued on-chain
     let req = crate::enclave::types::ValidateCustodyRequest {
-        keygen_payload: resp2,
+        keygen_payload: resp2.clone(),
         guardian_enclave_public_key: guardian_pk,
         mrenclave,
         mrsigner,
@@ -62,6 +73,21 @@ async fn registration_flow_succeeds() {
         client.guardian.validate_custody(req).await.unwrap();
 
     dbg!(&resp3);
+
+    // Guardian signs VEMs
+    let req = crate::enclave::types::SignExitRequest {
+        bls_pub_key_set: resp2.bls_pub_key_set.clone(),
+        guardian_index: 0,
+        validator_index: 0,
+        fork_info: crate::eth2::eth_types::ForkInfo::default(),
+    };
+    let resp4: crate::enclave::types::SignExitResponse = client
+        .guardian
+        .sign_exit(req)
+        .await
+        .unwrap();
+
+    dbg!(resp4);
 
     assert!(false);
 }

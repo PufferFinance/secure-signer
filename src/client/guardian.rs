@@ -32,13 +32,38 @@ impl GuardianClient {
         .await?)
     }
 
+
+    pub async fn list_eth_keys(&self) -> anyhow::Result<crate::enclave::types::ListKeysResponse> {
+        Ok(self
+            .client
+            .get(format!("{}/eth/v1/keygen", self.url))
+            .send()
+            .await?
+            .json::<crate::enclave::types::ListKeysResponse>()
+            .await?)
+    }
+  
     pub async fn validate_custody(
         &self,
         request: crate::enclave::types::ValidateCustodyRequest,
     ) -> anyhow::Result<crate::enclave::types::ValidateCustodyResponse> {
         Ok(dbg!(
             self.client
-                .post(format!("{}/eth/v1/validate-custody", self.url))
+                .post(format!("{}/guardian/v1/validate-custody", self.url))
+                .json(&request)
+                .send()
+                .await?
+        )
+        .json()
+        .await?)
+    }
+
+    pub async fn sign_exit(&self, 
+        request: crate::enclave::types::SignExitRequest
+    ) -> anyhow::Result<crate::enclave::types::SignExitResponse> {
+        Ok(dbg!(
+            self.client
+                .post(format!("{}/guardian/v1/sign-exit", self.url))
                 .json(&request)
                 .send()
                 .await?
