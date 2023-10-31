@@ -88,6 +88,15 @@ async fn registration_flow_succeeds() {
         .unwrap();
 
     dbg!(resp4);
+}
 
+
+
+#[tokio::test]
+async fn test_foo() {
+    let pk_hex = "b0c223df688aa0a6f5546d55b7863f83f2a7702a321da11e0311f6408899b20d44896b7e0b88620c404b383584dbf49f".to_string();
+    // let sk = crate::crypto::bls_keys::fetch_bls_sk(&pk_hex).unwrap();
+    // dbg!(sk.secret_key().to_hex());
+    let sig = crate::crypto::bls_keys::bls_agg_sign_from_saved_sk(&pk_hex, b"asdfafs").unwrap();
     assert!(false);
 }
