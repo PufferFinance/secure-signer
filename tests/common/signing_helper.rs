@@ -16,11 +16,11 @@ pub async fn mock_secure_sign_route(
         .route(
             "/api/v1/eth2/sign/:bls_pk_hex",
             axum::routing::post(
-                puffersecuresigner::enclave::secure_signer::handlers::secure_sign_bls::handler,
+                puffersecuresigner::enclave::shared::handlers::secure_sign_bls::handler,
             ),
         )
         .with_state(
-            puffersecuresigner::enclave::secure_signer::handlers::AppState {
+            puffersecuresigner::enclave::shared::handlers::AppState {
                 genesis_fork_version: GENESIS_FORK_VERSION,
             },
         )

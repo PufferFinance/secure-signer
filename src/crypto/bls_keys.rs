@@ -1,5 +1,5 @@
 use crate::constants::BLS_PUB_KEY_BYTES;
-use crate::io::key_management::{read_bls_key, write_bls_key};
+use crate::io::key_management::{read_bls_key, write_bls_key, read_bls_keystore, write_bls_keystore};
 use crate::strip_0x_prefix;
 
 use blsttc::{
@@ -37,10 +37,30 @@ pub fn save_bls_key(sk_set: &SecretKeySet) -> Result<()> {
     write_bls_key(&pk_hex, &sk_hex).with_context(|| "aggregate bls sk failed to save")
 }
 
+/// Write the BLS secret key to an encrypted using the hex encoded pk as filename
+pub fn save_bls_keystore(sk_set: &SecretKeySet, password: &String) -> Result<String> {
+    // Hex-encode pk 
+    let pk_hex = sk_set.public_keys().public_key().to_hex();
+
+    // Save keystore
+    let uuid = write_bls_keystore(&pk_hex, &sk_set.secret_key().to_bytes(), &password.to_string()).with_context(|| "aggregate bls sk failed to save")?;
+    Ok(uuid)
+}
+
 /// Read the BLS secret key from a secure file using the hex encoded pk as filename
 pub fn fetch_bls_sk(pk_hex: &String) -> Result<SecretKeySet> {
     let pk_hex: &str = strip_0x_prefix!(pk_hex);
     let sk_bytes = read_bls_key(pk_hex)?;
+    match SecretKeySet::from_bytes(sk_bytes) {
+        Ok(sk) => Ok(sk),
+        Err(e) => bail!("Error deserializing bls sk bytes: {:?}", e),
+    }
+}
+
+/// Read the BLS secret key from an encrypted keystore file using the hex encoded pk as filename
+pub fn fetch_bls_sk_keystore(pk_hex: &String, password: &String) -> Result<SecretKeySet> {
+    let pk_hex: &str = strip_0x_prefix!(pk_hex);
+    let sk_bytes = read_bls_keystore(&pk_hex.to_string(), password)?;
     match SecretKeySet::from_bytes(sk_bytes) {
         Ok(sk) => Ok(sk),
         Err(e) => bail!("Error deserializing bls sk bytes: {:?}", e),
@@ -155,6 +175,32 @@ mod tests {
 
         // Verify the fetched key is the same as the original
         assert!(sk_set == fetched_sk_set,);
+
+        // Delete the BLS key
+        delete_bls_key(&pk_hex).unwrap();
+
+        // Verify the file was deleted
+        assert!(!bls_key_exists(&pk_hex));
+    }
+
+    #[test]
+    fn test_save_and_fetch_bls_keystore() {
+        let threshold = 3;
+        let sk_set = new_bls_key(threshold);
+        let pk_hex = sk_set.public_keys().public_key().to_hex();
+        let password = "password".to_string();
+
+        // Test save_bls_key
+        save_bls_keystore(&sk_set, &password).unwrap();
+
+        // Verify the file was created
+        assert!(bls_key_exists(&pk_hex));
+
+        // Test fetch_bls_sk
+        let fetched_sk_set = fetch_bls_sk_keystore(&pk_hex, &password).expect("Failed to fetch BLS key");
+
+        // Verify the fetched key is the same as the original
+        assert!(sk_set.secret_key().to_hex() == fetched_sk_set.secret_key().to_hex());
 
         // Delete the BLS key
         delete_bls_key(&pk_hex).unwrap();

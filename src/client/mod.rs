@@ -8,6 +8,7 @@ mod guardian;
 mod secure_signer;
 mod tests;
 mod validator;
+mod keygen;
 
 pub struct Client {
     pub validator: ValidatorClient,

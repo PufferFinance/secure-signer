@@ -4,9 +4,10 @@ mod validator;
 
 fn build_client() -> super::Client {
     let builder = super::ClientBuilder::new();
-    builder.validator_url("http://localhost:3031".to_string())
-    .guardian_url("http://localhost:3032".to_string())
-    .build()
+    builder
+        .validator_url("http://localhost:3031".to_string())
+        .guardian_url("http://localhost:3032".to_string())
+        .build()
 }
 
 #[tokio::test]
@@ -30,13 +31,8 @@ async fn registration_flow_succeeds() {
     dbg!(&resp1);
 
     // Guardian's keys increase
-    let r: crate::enclave::types::ListKeysResponse = client
-        .guardian
-        .list_eth_keys()
-        .await
-        .unwrap();
+    let r: crate::enclave::types::ListKeysResponse = client.guardian.list_eth_keys().await.unwrap();
     assert!(dbg!(r.data).len() > 0);
-
 
     // Assume guardian called rotateGuardianKey()
 
@@ -81,13 +77,64 @@ async fn registration_flow_succeeds() {
         validator_index: 0,
         fork_info: crate::eth2::eth_types::ForkInfo::default(),
     };
-    let resp4: crate::enclave::types::SignExitResponse = client
+    let resp4: crate::enclave::types::SignExitResponse =
+        client.guardian.sign_exit(req).await.unwrap();
+
+    dbg!(resp4);
+}
+
+#[tokio::test]
+async fn test_cli_keygen_verified_by_guardians() {
+    let client = build_client();
+    let verify_remote_attestation = false;
+    let withdrawal_credentials = [1; 32];
+    let threshold = 1;
+    let password = "password".to_string();
+
+    // Guardian generates fresh key
+    let resp1: crate::enclave::types::KeyGenResponse = client
         .guardian
-        .sign_exit(req)
+        .attest_fresh_eth_key("0x0000000000000000000000000000000000000000000000000000000000000000")
         .await
         .unwrap();
 
-    dbg!(resp4);
+    dbg!(&resp1);
 
-    assert!(false);
+    // Assume fetched from on-chain by validator:
+    let guardian_pk = crate::crypto::eth_keys::eth_pk_from_hex_uncompressed(&resp1.pk_hex).unwrap();
+
+    // Validator generates a local encrypted keystore and provisions to Guardian
+    let bls_keygen_input = crate::enclave::types::AttestFreshBlsKeyPayload {
+        guardian_pubkeys: vec![guardian_pk.clone()],
+        withdrawal_credentials: withdrawal_credentials.clone(),
+        threshold: threshold,
+        do_remote_attestation: verify_remote_attestation,
+    };
+    let bls_keygen_payload =
+        dbg!(crate::client::keygen::generate_bls_keystore_handler(bls_keygen_input, &password).unwrap());
+
+    // Assume validator is enqueued on-chain
+    let req = crate::enclave::types::ValidateCustodyRequest {
+        keygen_payload: bls_keygen_payload.clone(),
+        guardian_enclave_public_key: guardian_pk,
+        mrenclave: "".to_string(),
+        mrsigner: "".to_string(),
+        verify_remote_attestation,
+    };
+
+    // Guardian validates they received custody
+    let resp3: crate::enclave::types::ValidateCustodyResponse =
+        client.guardian.validate_custody(req).await.unwrap();
+
+    dbg!(&resp3);
+
+    // Guardian signs VEMs
+    let req = crate::enclave::types::SignExitRequest {
+        bls_pub_key_set: bls_keygen_payload.bls_pub_key_set.clone(),
+        guardian_index: 0,
+        validator_index: 0,
+        fork_info: crate::eth2::eth_types::ForkInfo::default(),
+    };
+    let _resp4: crate::enclave::types::SignExitResponse =
+        client.guardian.sign_exit(req).await.unwrap();
 }

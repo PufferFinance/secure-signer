@@ -1,8 +1,6 @@
 use axum::{response::IntoResponse, Json};
 use log::{error, info};
 
-use crate::eth2::eth_types::GENESIS_FORK_VERSION;
-
 pub async fn handler(
     Json(keygen_payload): Json<crate::enclave::types::AttestFreshBlsKeyPayload>,
 ) -> axum::response::Response {
@@ -11,7 +9,7 @@ pub async fn handler(
         keygen_payload.withdrawal_credentials,
         keygen_payload.guardian_pubkeys,
         keygen_payload.threshold,
-        GENESIS_FORK_VERSION,
+        crate::eth2::eth_types::GENESIS_FORK_VERSION,
         keygen_payload.do_remote_attestation,
     ) {
         Ok(keygen_result) => {

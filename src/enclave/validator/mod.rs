@@ -1,9 +1,7 @@
 use crate::{crypto::bls_keys::save_bls_key, io::remote_attestation::AttestationEvidence};
 use anyhow::Result;
-use blsttc::{PublicKeySet, PublicKeyShare, SecretKeyShare, SignatureShare};
+use blsttc::{PublicKeyShare, SecretKeyShare, SignatureShare};
 use ecies::PublicKey as EthPublicKey;
-use sha3::Digest;
-use ssz::Encode;
 pub mod handlers;
 
 #[derive(Clone, Debug)]
@@ -48,11 +46,6 @@ impl RecipientKeys {
     ) -> bool {
         self.public_key_share.verify(signature, message)
     }
-
-    //     pub fn guardian_public_keys(&self) -> &Vec<PublicKeyShare> {
-    //         self.guardian_public_keys().iter()
-    // j
-    //     }
 }
 
 pub fn attest_fresh_bls_key(
@@ -61,7 +54,7 @@ pub fn attest_fresh_bls_key(
     threshold: usize,
     fork_version: [u8; 4],
     do_remote_attestation: bool,
-) -> Result<super::types::BlsKeygenPayload> {
+) -> Result<crate::enclave::types::BlsKeygenPayload> {
     // Generate a SecretKeySet where t + 1 signature shares can be combined into a full signature. attest_fresh_bls_key() function assumes `threshold = t + 1`, so we must pass new_bls_key(t=threshold - 1)
     let secret_key_set = crate::crypto::bls_keys::new_bls_key(threshold - 1);
 
@@ -88,6 +81,9 @@ pub fn attest_fresh_bls_key(
     // save validator private key to enclave
     save_bls_key(&secret_key_set)?;
 
+    // Create a new slashing protection database
+    crate::eth2::slash_protection::SlashingProtectionData::from_pk_hex(&validator_pubkey.to_hex())?.write()?;
+
     // sign DepositMessage to deposit 32 ETH to beacon deposit contract
     let (signature, deposit_data_root) = crate::eth2::eth_signing::sign_full_deposit(
         &secret_key_set,
@@ -96,7 +92,7 @@ pub fn attest_fresh_bls_key(
     )?;
 
     // build remote attestation payload
-    let payload = crate::enclave::build_validator_remote_attestation_payload(
+    let payload = crate::enclave::shared::build_validator_remote_attestation_payload(
         secret_key_set.public_keys().clone(),
         &signature,
         &deposit_data_root,
@@ -195,7 +191,7 @@ mod tests {
         )
         .unwrap();
 
-        let payload = crate::enclave::build_validator_remote_attestation_payload(
+        let payload = crate::enclave::shared::build_validator_remote_attestation_payload(
             secret_key_set.public_keys().clone(),
             &signature,
             &deposit_data_root,
