@@ -110,8 +110,11 @@ async fn test_cli_keygen_verified_by_guardians() {
         threshold: threshold,
         do_remote_attestation: verify_remote_attestation,
     };
-    let bls_keygen_payload =
-        dbg!(crate::client::keygen::generate_bls_keystore_handler(bls_keygen_input, &password).unwrap());
+    let bls_keygen_payload = dbg!(crate::client::keygen::generate_bls_keystore_handler(
+        bls_keygen_input,
+        &password
+    )
+    .unwrap());
 
     // Assume validator is enqueued on-chain
     let req = crate::enclave::types::ValidateCustodyRequest {

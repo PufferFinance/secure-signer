@@ -34,7 +34,6 @@ async fn main() {
             "/health",
             axum::routing::get(puffersecuresigner::enclave::shared::handlers::health::handler),
         )
-
         // Endpoint to securely generate and save a BLS sk
         .route(
             "/bls/v1/keygen",
@@ -42,15 +41,13 @@ async fn main() {
                 puffersecuresigner::enclave::validator::handlers::attest_fresh_bls_key::handler,
             ),
         )
-
         // Endpoint to list all pks of saved bls keys in the enclave
         .route(
             "/eth/v1/keystores",
             axum::routing::get(
                 puffersecuresigner::enclave::shared::handlers::list_bls_keys::handler,
             ),
-        )        
-
+        )
         // Endpoint to request a signature using BLS sk
         .route(
             "/api/v1/eth2/sign/:bls_pk_hex",

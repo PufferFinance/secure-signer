@@ -7,9 +7,7 @@ pub async fn handler(
 ) -> axum::response::Response {
     info!("sign_exit()");
     match crate::enclave::guardian::sign_voluntary_exit_message(request) {
-        Ok(resp) => {
-            (axum::http::status::StatusCode::OK, Json(resp)).into_response()
-        }
+        Ok(resp) => (axum::http::status::StatusCode::OK, Json(resp)).into_response(),
 
         Err(e) => {
             error!("{:?}", e);

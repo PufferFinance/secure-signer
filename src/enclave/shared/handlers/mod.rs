@@ -1,8 +1,7 @@
 pub mod health;
-pub mod secure_sign_bls;
 pub mod list_bls_keys;
 pub mod list_eth_keys;
-
+pub mod secure_sign_bls;
 
 #[derive(Clone)]
 pub struct AppState {

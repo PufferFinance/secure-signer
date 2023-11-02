@@ -82,7 +82,8 @@ pub fn attest_fresh_bls_key(
     save_bls_key(&secret_key_set)?;
 
     // Create a new slashing protection database
-    crate::eth2::slash_protection::SlashingProtectionData::from_pk_hex(&validator_pubkey.to_hex())?.write()?;
+    crate::eth2::slash_protection::SlashingProtectionData::from_pk_hex(&validator_pubkey.to_hex())?
+        .write()?;
 
     // sign DepositMessage to deposit 32 ETH to beacon deposit contract
     let (signature, deposit_data_root) = crate::eth2::eth_signing::sign_full_deposit(

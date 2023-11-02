@@ -5,10 +5,12 @@ use self::{
 };
 
 mod guardian;
+mod keygen;
 mod secure_signer;
 mod tests;
 mod validator;
-mod keygen;
+
+pub use keygen::generate_bls_keystore_handler;
 
 pub struct Client {
     pub validator: ValidatorClient,
@@ -49,9 +51,7 @@ impl ClientBuilder {
                 client: client.clone(),
             },
             guardian: GuardianClient {
-                url: self
-                    .guardian_url
-                    .unwrap_or(default_client_guardian_url()),
+                url: self.guardian_url.unwrap_or(default_client_guardian_url()),
                 client: client.clone(),
             },
             secure_signer: SecureSignerClient {

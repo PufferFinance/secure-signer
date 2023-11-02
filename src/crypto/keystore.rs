@@ -86,7 +86,10 @@ pub mod keystore_tests {
         let name = eth_keystore::encrypt_key(&dir, &mut rng, &secret, "newpassword", None).unwrap();
 
         let keypath = dir.join(&name);
-        assert_eq!(eth_keystore::decrypt_key(&keypath, "newpassword").unwrap(), secret);
+        assert_eq!(
+            eth_keystore::decrypt_key(&keypath, "newpassword").unwrap(),
+            secret
+        );
         assert!(eth_keystore::decrypt_key(&keypath, "notanewpassword").is_err());
         assert!(std::fs::remove_file(&keypath).is_ok());
         std::fs::remove_dir_all("./test_keys").ok();

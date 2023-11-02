@@ -19,11 +19,9 @@ pub async fn mock_secure_sign_route(
                 puffersecuresigner::enclave::shared::handlers::secure_sign_bls::handler,
             ),
         )
-        .with_state(
-            puffersecuresigner::enclave::shared::handlers::AppState {
-                genesis_fork_version: GENESIS_FORK_VERSION,
-            },
-        )
+        .with_state(puffersecuresigner::enclave::shared::handlers::AppState {
+            genesis_fork_version: GENESIS_FORK_VERSION,
+        })
         .into_make_service();
 
     let server = axum_test::TestServer::new(test_app)?;
