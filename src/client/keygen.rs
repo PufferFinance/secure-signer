@@ -96,9 +96,13 @@ mod tests {
         let payload = generate_bls_keystore_handler(payload, &password).unwrap();
 
         // Verify we can decrypt the keystore
-        let sk = crate::crypto::bls_keys::fetch_bls_sk_keystore(&payload.bls_pub_key, &password).unwrap();
+        let sk = crate::crypto::bls_keys::fetch_bls_sk_keystore(&payload.bls_pub_key, &password)
+            .unwrap();
 
         // Verify the fields match
-        assert_eq!(sk.public_keys().public_key().to_hex(), payload.public_key_set().unwrap().public_key().to_hex());
+        assert_eq!(
+            sk.public_keys().public_key().to_hex(),
+            payload.public_key_set().unwrap().public_key().to_hex()
+        );
     }
 }

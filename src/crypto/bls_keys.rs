@@ -1,5 +1,7 @@
 use crate::constants::BLS_PUB_KEY_BYTES;
-use crate::io::key_management::{read_bls_key, write_bls_key, read_bls_keystore, write_bls_keystore};
+use crate::io::key_management::{
+    read_bls_key, read_bls_keystore, write_bls_key, write_bls_keystore,
+};
 use crate::strip_0x_prefix;
 
 use blsttc::{
@@ -39,11 +41,16 @@ pub fn save_bls_key(sk_set: &SecretKeySet) -> Result<()> {
 
 /// Write the BLS secret key to an encrypted using the hex encoded pk as filename
 pub fn save_bls_keystore(sk_set: &SecretKeySet, password: &String) -> Result<String> {
-    // Hex-encode pk 
+    // Hex-encode pk
     let pk_hex = sk_set.public_keys().public_key().to_hex();
 
     // Save keystore
-    let uuid = write_bls_keystore(&pk_hex, &sk_set.secret_key().to_bytes(), &password.to_string()).with_context(|| "aggregate bls sk failed to save")?;
+    let uuid = write_bls_keystore(
+        &pk_hex,
+        &sk_set.secret_key().to_bytes(),
+        &password.to_string(),
+    )
+    .with_context(|| "aggregate bls sk failed to save")?;
     Ok(uuid)
 }
 
@@ -197,7 +204,8 @@ mod tests {
         assert!(bls_key_exists(&pk_hex));
 
         // Test fetch_bls_sk
-        let fetched_sk_set = fetch_bls_sk_keystore(&pk_hex, &password).expect("Failed to fetch BLS key");
+        let fetched_sk_set =
+            fetch_bls_sk_keystore(&pk_hex, &password).expect("Failed to fetch BLS key");
 
         // Verify the fetched key is the same as the original
         assert!(sk_set.secret_key().to_hex() == fetched_sk_set.secret_key().to_hex());

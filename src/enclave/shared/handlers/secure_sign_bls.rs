@@ -12,8 +12,5 @@ pub async fn handler(
     Json(req): Json<crate::eth2::eth_signing::BLSSignMsg>,
 ) -> axum::response::Response {
     info!("secure_sign_bls()");
-    crate::enclave::shared::sign_validator_message(
-        Path(bls_pk_hex),
-        State(state),
-        Json(req))
+    crate::enclave::shared::sign_validator_message(Path(bls_pk_hex), State(state), Json(req))
 }

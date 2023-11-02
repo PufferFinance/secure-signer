@@ -251,12 +251,8 @@ mod test_key_management {
         let password = "password";
 
         // Write the BLS key
-        let _uuid = write_bls_keystore(
-            &pk_hex.to_string(),
-            &sk_bytes_in,
-            &password.to_string(),
-        )
-        .unwrap();
+        let _uuid =
+            write_bls_keystore(&pk_hex.to_string(), &sk_bytes_in, &password.to_string()).unwrap();
 
         // Read the BLS key
         let sk_bytes_out = read_bls_keystore(&pk_hex.to_string(), &password.to_string()).unwrap();

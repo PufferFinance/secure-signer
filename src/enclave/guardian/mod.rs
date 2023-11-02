@@ -243,16 +243,19 @@ async fn approve_custody(
 pub fn sign_voluntary_exit_message(
     req: crate::enclave::types::SignExitRequest,
 ) -> Result<crate::enclave::types::SignExitResponse> {
-
     // Read the validator's secret key share
-    let pk_hex = hex::encode(req.public_key_set()?.public_key_share(req.guardian_index).to_bytes());
+    let pk_hex = hex::encode(
+        req.public_key_set()?
+            .public_key_share(req.guardian_index)
+            .to_bytes(),
+    );
     let sk = crate::crypto::bls_keys::fetch_bls_sk(&pk_hex)?.secret_key();
 
-    // Sign a VoluntaryExitMessage with Epoch 0 
-    let (sig, _root)  = sign_vem(sk, 0, req.validator_index, req.fork_info)?;
+    // Sign a VoluntaryExitMessage with Epoch 0
+    let (sig, _root) = sign_vem(sk, 0, req.validator_index, req.fork_info)?;
 
     Ok(crate::enclave::types::SignExitResponse {
-        signature: hex::encode(sig.as_ssz_bytes())
+        signature: hex::encode(sig.as_ssz_bytes()),
     })
 }
 
@@ -491,7 +494,7 @@ mod tests {
         for i in 0.._g_sks.len() {
             let req = crate::enclave::types::SignExitRequest {
                 bls_pub_key_set: resp.bls_pub_key_set.clone(),
-                    guardian_index: i as u64,
+                guardian_index: i as u64,
                 validator_index: 0,
                 fork_info: crate::eth2::eth_types::ForkInfo::default(),
             };
@@ -501,18 +504,25 @@ mod tests {
             msg_root = root;
 
             let mut sig_bytes: [u8; crate::constants::BLS_SIG_BYTES] =
-            [0; crate::constants::BLS_SIG_BYTES];
-            sig_bytes.copy_from_slice(
-                &sig[..]);
+                [0; crate::constants::BLS_SIG_BYTES];
+            sig_bytes.copy_from_slice(&sig[..]);
             let sig = blsttc::SignatureShare::from_bytes(sig_bytes).unwrap();
 
             sig_shares.push(sig);
         }
 
         // aggregate the partial sigs
-        let sig = crate::crypto::bls_keys::aggregate_signature_shares(&resp.public_key_set().unwrap(), &sig_shares).unwrap();
+        let sig = crate::crypto::bls_keys::aggregate_signature_shares(
+            &resp.public_key_set().unwrap(),
+            &sig_shares,
+        )
+        .unwrap();
 
         // verify the signature is valid
-        assert!(resp.public_key_set().unwrap().public_key().verify(&sig, msg_root));
+        assert!(resp
+            .public_key_set()
+            .unwrap()
+            .public_key()
+            .verify(&sig, msg_root));
     }
 }
