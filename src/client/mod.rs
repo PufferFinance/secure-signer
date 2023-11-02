@@ -10,6 +10,8 @@ mod secure_signer;
 mod tests;
 mod validator;
 
+pub use keygen::generate_bls_keystore_handler;
+
 pub struct Client {
     pub validator: ValidatorClient,
     pub secure_signer: SecureSignerClient,
