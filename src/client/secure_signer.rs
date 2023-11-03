@@ -7,7 +7,7 @@ pub struct SecureSignerClient {
 
 impl SecureSignerClient {
     pub async fn health(&self) -> bool {
-        let Ok(resp) = self.client.get(format!("{}/health", self.url)).send().await else {
+        let Ok(resp) = self.client.get(format!("{}/upcheck", self.url)).send().await else {
             return false;
         };
         resp.status() == reqwest::StatusCode::OK
