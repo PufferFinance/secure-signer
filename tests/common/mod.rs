@@ -10,7 +10,7 @@ pub mod getter_routes_helper;
 pub mod signing_helper;
 
 /// Reads the `SECURE_SIGNER_PORT` environment variable.
-/// If the return value is Some(port), it is expected that Secure-Aggregator is running on localhost:port
+/// If the return value is Some(port), it is expected that Secure-Signer is running on localhost:port
 pub fn read_secure_signer_port() -> Option<u16> {
     let port = match std::env::var("SECURE_SIGNER_PORT") {
         Ok(port_str) => match port_str.parse::<u16>() {
