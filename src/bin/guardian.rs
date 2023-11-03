@@ -26,7 +26,7 @@ async fn main() {
     let app = axum::Router::new()
         // Endpoint to check health
         .route(
-            "/health",
+            "/upcheck",
             axum::routing::get(puffersecuresigner::enclave::shared::handlers::health::handler),
         )
         // Endpoint generated a new ETH key
