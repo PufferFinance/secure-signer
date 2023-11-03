@@ -36,6 +36,17 @@ def compile_rust(binary_name, build_flags):
     cmd.extend(build_flags)
     subprocess.run(cmd)
 
+def update_occlum_json(enclave_path):
+    with open(f"{enclave_path}/Occlum.json", "r") as occlum_config_file:
+        c = json.load(occlum_config_file)
+        c["resource_limits"]["user_space_size"] = "1024MB"
+        c["resource_limits"]["kernel_space_heap_size"] = "512MB"
+        c["process"]["default_heap_size"] = "512MB"
+        c["env"]["default"] = ["OCCLUM=yes", "RUST_LOG=info"]
+        c["metadata"]["debuggable"] = False
+    with open(f"{enclave_path}/Occlum.json", "w") as occlum_config_file:
+        occlum_config_file.write(json.dumps(c))
+
 def new_instance(enclave_name, enclave_path):
     if os.path.exists(enclave_path):
         subprocess.run(["rm", "-rf", enclave_path])
@@ -46,9 +57,7 @@ def new_instance(enclave_name, enclave_path):
     subprocess.run(["cp", f"../conf/ra_config.json", "./image/etc/"])
     subprocess.run(["cp", "/etc/resolv.conf", "./image/etc"])
     subprocess.run(["cp", "/etc/hosts", "./image/etc"])
-    new_json = subprocess.check_output(["jq", '.resource_limits.user_space_size = "1024MB" | .resource_limits.kernel_space_heap_size="512MB" | .process.default_heap_size = "512MB" | .resource_limits.max_num_of_threads = 32 | .env.default = ["OCCLUM=yes", "RUST_LOG=info"] | .metadata.debuggable = false', "Occlum.json"]).decode("utf-8")
-    with open("Occlum.json", "w") as occlum_json_file:
-        occlum_json_file.write(new_json)
+    update_occlum_json(enclave_path)
     subprocess.run(["occlum", "build"])
 
 def run_enclave(binary_name, enclave_path, port, fork_version):
