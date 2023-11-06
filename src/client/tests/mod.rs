@@ -2,6 +2,8 @@ mod guardian;
 mod secure_signer;
 mod validator;
 
+use crate::eth2::eth_types::GENESIS_FORK_VERSION;
+
 fn build_client() -> super::Client {
     let builder = super::ClientBuilder::new();
     builder
@@ -44,6 +46,7 @@ async fn registration_flow_succeeds() {
         guardian_pubkeys: vec![guardian_pk.clone()],
         withdrawal_credentials: withdrawal_credentials.clone(),
         threshold: threshold,
+        fork_version: GENESIS_FORK_VERSION,
         do_remote_attestation: verify_remote_attestation,
     };
 
@@ -108,6 +111,7 @@ async fn test_cli_keygen_verified_by_guardians() {
         guardian_pubkeys: vec![guardian_pk.clone()],
         withdrawal_credentials: withdrawal_credentials.clone(),
         threshold: threshold,
+        fork_version: GENESIS_FORK_VERSION,
         do_remote_attestation: verify_remote_attestation,
     };
     let bls_keygen_payload = dbg!(crate::client::keygen::generate_bls_keystore_handler(

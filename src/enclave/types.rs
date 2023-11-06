@@ -310,6 +310,7 @@ pub struct AttestFreshBlsKeyPayload {
     )]
     pub withdrawal_credentials: [u8; 32],
     pub threshold: usize,
+    pub fork_version: crate::eth2::eth_types::Version,
     pub do_remote_attestation: bool,
 }
 

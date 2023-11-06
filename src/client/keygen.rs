@@ -77,6 +77,8 @@ fn generate_bls_keystore(
 
 #[cfg(test)]
 mod tests {
+    use crate::eth2::eth_types::GENESIS_FORK_VERSION;
+
     use super::*;
 
     #[test]
@@ -91,6 +93,7 @@ mod tests {
             guardian_pubkeys: vec![g_pk.clone()],
             withdrawal_credentials: withdrawal_credentials.clone(),
             threshold,
+            fork_version: GENESIS_FORK_VERSION,
             do_remote_attestation: false,
         };
         let payload = generate_bls_keystore_handler(payload, &password).unwrap();

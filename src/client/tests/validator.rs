@@ -1,3 +1,5 @@
+use crate::eth2::eth_types::GENESIS_FORK_VERSION;
+
 #[tokio::test]
 async fn call_health_with_success() {
     let client = super::build_client();
@@ -16,6 +18,7 @@ async fn call_attest_fresh_bls_key_with_success() {
         ],
         withdrawal_credentials: [0; 32],
         threshold: 3,
+        fork_version: GENESIS_FORK_VERSION,
         do_remote_attestation: true,
     };
     client
@@ -52,6 +55,7 @@ async fn call_attest_fresh_bls_key_and_decrypt() {
         guardian_pubkeys: g_pks,
         withdrawal_credentials: [1; 32],
         threshold: 3,
+        fork_version: GENESIS_FORK_VERSION,
         do_remote_attestation: true,
     };
 

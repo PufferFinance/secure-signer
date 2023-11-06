@@ -6,7 +6,12 @@ pub struct ValidatorClient {
 
 impl ValidatorClient {
     pub async fn health(&self) -> bool {
-        let Ok(resp) = self.client.get(format!("{}/upcheck", self.url)).send().await else {
+        let Ok(resp) = self
+            .client
+            .get(format!("{}/upcheck", self.url))
+            .send()
+            .await
+        else {
             return false;
         };
         resp.status() == reqwest::StatusCode::OK

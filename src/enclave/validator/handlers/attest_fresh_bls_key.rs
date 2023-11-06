@@ -9,7 +9,7 @@ pub async fn handler(
         keygen_payload.withdrawal_credentials,
         keygen_payload.guardian_pubkeys,
         keygen_payload.threshold,
-        crate::eth2::eth_types::GENESIS_FORK_VERSION,
+        keygen_payload.fork_version,
         keygen_payload.do_remote_attestation,
     ) {
         Ok(keygen_result) => {

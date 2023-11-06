@@ -1,3 +1,5 @@
+use crate::eth2::eth_types::GENESIS_FORK_VERSION;
+
 #[tokio::test]
 async fn call_health_with_success() {
     let client = super::build_client();
@@ -49,6 +51,7 @@ async fn call_validate_custody_with_success() {
         guardian_pubkeys: g_pks,
         withdrawal_credentials: [1; 32],
         threshold: 7,
+        fork_version: GENESIS_FORK_VERSION,
         do_remote_attestation: false,
     };
 
