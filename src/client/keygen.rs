@@ -11,6 +11,7 @@ pub fn generate_bls_keystore_handler(
         keygen_payload.guardian_pubkeys,
         keygen_payload.threshold,
         keystore_password,
+        keygen_payload.fork_version,
     )
 }
 
@@ -19,6 +20,7 @@ fn generate_bls_keystore(
     guardian_public_keys: Vec<EthPublicKey>,
     threshold: usize,
     password: &String,
+    fork_version: crate::eth2::eth_types::Version,
 ) -> Result<crate::enclave::types::BlsKeygenPayload> {
     // Generate a SecretKeySet where t + 1 signature shares can be combined into a full signature. attest_fresh_bls_key() function assumes `threshold = t + 1`, so we must pass new_bls_key(t=threshold - 1)
     let secret_key_set = crate::crypto::bls_keys::new_bls_key(threshold - 1);
@@ -50,7 +52,7 @@ fn generate_bls_keystore(
     let (signature, deposit_data_root) = crate::eth2::eth_signing::sign_full_deposit(
         &secret_key_set,
         withdrawal_credentials.clone(),
-        crate::eth2::eth_types::GENESIS_FORK_VERSION,
+        fork_version,
     )?;
 
     // Return the payload

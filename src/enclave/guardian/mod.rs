@@ -137,7 +137,7 @@ fn verify_deposit_message(keygen_payload: &crate::enclave::types::BlsKeygenPaylo
 
     // Verify correct DepositMessage was signed
     if !pk_set.public_key().verify(
-        &keygen_payload.signature()?,
+        dbg!(&keygen_payload.signature()?),
         keygen_payload.deposit_message_root()?,
     ) {
         bail!("DepositMessage signature invalid")
