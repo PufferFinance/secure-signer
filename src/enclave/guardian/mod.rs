@@ -2,7 +2,7 @@ use ethers::signers::{LocalWallet, Signer};
 use sha3::Digest;
 pub mod handlers;
 use anyhow::{anyhow, bail, Result};
-use blsttc::{PublicKeySet, SecretKeyShare};
+use blsttc::PublicKeySet;
 use libsecp256k1::SecretKey as EthSecretKey;
 use ssz::Encode;
 

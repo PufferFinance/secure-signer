@@ -1,4 +1,6 @@
 use std::sync::Arc;
+
+use crate::{eth2::eth_types::BLSSignature, strip_0x_prefix};
 pub struct ValidatorClient {
     pub url: String,
     pub client: Arc<reqwest::Client>,
@@ -40,5 +42,33 @@ impl ValidatorClient {
             .await?
             .json::<crate::enclave::types::ListKeysResponse>()
             .await?)
+    }
+
+    pub async fn sign_voluntary_exit_message(
+        &self,
+        bls_pk_hex: String,
+        epoch: crate::eth2::eth_types::Epoch,
+        validator_index: crate::eth2::eth_types::ValidatorIndex,
+        fork_info: crate::eth2::eth_types::ForkInfo,
+    ) -> anyhow::Result<crate::enclave::types::SignatureResponse> {
+        let bls_pk_hex: String = strip_0x_prefix!(bls_pk_hex);
+        let vem = crate::eth2::eth_types::VoluntaryExitRequest {
+            signingRoot: None,
+            fork_info: fork_info,
+            voluntary_exit: crate::eth2::eth_types::VoluntaryExit {
+                epoch,
+                validator_index,
+            },
+        };
+        let req = crate::eth2::eth_signing::BLSSignMsg::VOLUNTARY_EXIT(vem);
+        Ok(dbg!(
+            self.client
+                .post(format!("{}/api/v1/eth2/sign/{}", self.url, bls_pk_hex))
+                .json(&req)
+                .send()
+                .await?
+        )
+        .json()
+        .await?)
     }
 }
