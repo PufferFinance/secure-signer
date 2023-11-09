@@ -61,14 +61,13 @@ impl ValidatorClient {
             },
         };
         let req = crate::eth2::eth_signing::BLSSignMsg::VOLUNTARY_EXIT(vem);
-        Ok(dbg!(
-            self.client
-                .post(format!("{}/api/v1/eth2/sign/{}", self.url, bls_pk_hex))
-                .json(&req)
-                .send()
-                .await?
-        )
-        .json()
-        .await?)
+        Ok(self
+            .client
+            .post(format!("{}/api/v1/eth2/sign/{}", self.url, bls_pk_hex))
+            .json(&req)
+            .send()
+            .await?
+            .json()
+            .await?)
     }
 }

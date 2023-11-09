@@ -26,15 +26,14 @@ impl GuardianClient {
             blockhash: blockhash.to_string(),
         };
 
-        Ok(dbg!(
-            self.client
-                .post(format!("{}/eth/v1/keygen", self.url))
-                .json(&data)
-                .send()
-                .await?
-        )
-        .json()
-        .await?)
+        Ok(self
+            .client
+            .post(format!("{}/eth/v1/keygen", self.url))
+            .json(&data)
+            .send()
+            .await?
+            .json()
+            .await?)
     }
 
     pub async fn list_eth_keys(&self) -> anyhow::Result<crate::enclave::types::ListKeysResponse> {
@@ -51,29 +50,27 @@ impl GuardianClient {
         &self,
         request: crate::enclave::types::ValidateCustodyRequest,
     ) -> anyhow::Result<crate::enclave::types::ValidateCustodyResponse> {
-        Ok(dbg!(
-            self.client
-                .post(format!("{}/guardian/v1/validate-custody", self.url))
-                .json(&request)
-                .send()
-                .await?
-        )
-        .json()
-        .await?)
+        Ok(self
+            .client
+            .post(format!("{}/guardian/v1/validate-custody", self.url))
+            .json(&request)
+            .send()
+            .await?
+            .json()
+            .await?)
     }
 
     pub async fn sign_exit(
         &self,
         request: crate::enclave::types::SignExitRequest,
     ) -> anyhow::Result<crate::enclave::types::SignExitResponse> {
-        Ok(dbg!(
-            self.client
-                .post(format!("{}/guardian/v1/sign-exit", self.url))
-                .json(&request)
-                .send()
-                .await?
-        )
-        .json()
-        .await?)
+        Ok(self
+            .client
+            .post(format!("{}/guardian/v1/sign-exit", self.url))
+            .json(&request)
+            .send()
+            .await?
+            .json()
+            .await?)
     }
 }

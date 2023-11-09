@@ -211,7 +211,5 @@ pub fn build_validator_remote_attestation_payload(
     // Pad with zeros to make the Vec length 64
     padded.extend(vec![0; 32]);
 
-    dbg!(hex::encode(&padded));
-
     Ok(padded)
 }

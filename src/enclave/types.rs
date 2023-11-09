@@ -221,8 +221,6 @@ impl BlsKeygenPayload {
     pub fn deposit_message_root(&self) -> Result<crate::eth2::eth_types::Root> {
         let pk_set = self.public_key_set()?;
         let withdrawal_credentials = self.withdrawal_credentials()?;
-        dbg!(hex::encode(&pk_set.public_key().to_bytes().to_vec()));
-        dbg!(hex::encode(&withdrawal_credentials));
         let deposit_message = crate::eth2::eth_types::DepositMessage {
             pubkey: pk_set.public_key().to_bytes().to_vec().into(),
             withdrawal_credentials: withdrawal_credentials.clone(),
