@@ -461,7 +461,6 @@ mod tests {
         for g_sk in g_sks {
             assert!(approve_custody(&resp, &g_sk).await.is_ok());
         }
-        assert!(false)
     }
 
     #[test]

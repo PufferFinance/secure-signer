@@ -7,8 +7,8 @@ use crate::eth2::eth_types::GENESIS_FORK_VERSION;
 fn build_client() -> super::Client {
     let builder = super::ClientBuilder::new();
     builder
-        .validator_url("http://localhost:3031".to_string())
-        .guardian_url("http://localhost:3032".to_string())
+        .validator_url("http://localhost:9003".to_string())
+        .guardian_url("http://localhost:9002".to_string())
         .build()
 }
 
