@@ -1,8 +1,9 @@
 use ethers::signers::{LocalWallet, Signer};
+use log::info;
 use sha3::Digest;
 pub mod handlers;
 use anyhow::{anyhow, bail, Result};
-use blsttc::{PublicKeySet, SecretKeyShare};
+use blsttc::PublicKeySet;
 use libsecp256k1::SecretKey as EthSecretKey;
 use ssz::Encode;
 
@@ -19,7 +20,7 @@ pub fn attest_new_eth_key_with_blockhash(
     crate::io::remote_attestation::AttestationEvidence,
     ecies::PublicKey,
 )> {
-    dbg!("attest_new_eth_key_with_blockhash()");
+    info!("attest_new_eth_key_with_blockhash()");
     // Generate a fresh SECP256K1 ETH keypair (saving ETH private key)
     let pk = crate::crypto::eth_keys::eth_key_gen()?;
     let blockhash: String = crate::strip_0x_prefix!(blockhash);
@@ -137,7 +138,7 @@ fn verify_deposit_message(keygen_payload: &crate::enclave::types::BlsKeygenPaylo
 
     // Verify correct DepositMessage was signed
     if !pk_set.public_key().verify(
-        dbg!(&keygen_payload.signature()?),
+        &keygen_payload.signature()?,
         keygen_payload.deposit_message_root()?,
     ) {
         bail!("DepositMessage signature invalid")
@@ -177,12 +178,11 @@ fn verify_custody(
         if hex::encode(pk_set.public_key_share(i).to_bytes())
             == hex::encode(sk_share.public_key_share().to_bytes())
         {
-            dbg!("match on iteration {:?}", i);
             return Ok(sk_share);
         }
     }
 
-    bail!("verify_custody failed")
+    bail!("verify_custody failed to decrypt using Guardian enclave key")
 }
 
 async fn approve_custody(
@@ -190,21 +190,6 @@ async fn approve_custody(
     guardian_enclave_sk: &EthSecretKey,
 ) -> Result<String> {
     let mut hasher = sha3::Keccak256::new();
-
-    dbg!(&hex::encode(
-        keygen_payload
-            .public_key_set()?
-            .public_key()
-            .to_bytes()
-            .to_vec()
-    ));
-    dbg!(&hex::encode(
-        keygen_payload.withdrawal_credentials()?.to_vec()
-    ));
-    dbg!(&hex::encode(
-        keygen_payload.signature()?.to_bytes().to_vec()
-    ));
-    dbg!(&hex::encode(keygen_payload.deposit_data_root()?.to_vec()));
 
     // pubKey, withdrawalCredentials, signature, depositDataRoot
     let msg = ethers::abi::encode(&[
@@ -220,12 +205,8 @@ async fn approve_custody(
         ethers::abi::Token::FixedBytes(keygen_payload.deposit_data_root()?.to_vec()),
     ]);
 
-    dbg!(hex::encode(&msg));
-
     hasher.update(msg);
     let msg_to_be_signed = hasher.finalize();
-
-    dbg!(hex::encode(&msg_to_be_signed));
 
     let wallet = hex::encode(guardian_enclave_sk.serialize()).parse::<LocalWallet>()?;
     let sig = wallet.sign_message(&msg_to_be_signed).await?;
@@ -234,8 +215,6 @@ async fn approve_custody(
     if sig.recover(&msg_to_be_signed[..])? != wallet.address() {
         bail!("Failed to sign correctly");
     }
-
-    dbg!(&sig_str);
 
     Ok(sig_str)
 }
@@ -482,7 +461,6 @@ mod tests {
         for g_sk in g_sks {
             assert!(approve_custody(&resp, &g_sk).await.is_ok());
         }
-        assert!(false)
     }
 
     #[test]
