@@ -25,13 +25,10 @@ ENV PATH="/opt/occlum/build/bin:/usr/local/occlum/bin:$PATH"
 ARG OCCLUM_PACKAGE
 ADD $OCCLUM_PACKAGE /
 
-ARG SS_CLIENT
-COPY $SS_CLIENT /home
-
 ARG NETWORK_CONFIG
 COPY $NETWORK_CONFIG /home/conf/network_config.json
 
 ARG MRENCLAVE
-COPY $MRENCLAVE /Secure-Signer/MRENCLAVE
+COPY $MRENCLAVE /MRENCLAVE
 
-WORKDIR /Secure-Signer
+WORKDIR /

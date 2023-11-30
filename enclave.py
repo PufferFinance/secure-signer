@@ -5,6 +5,9 @@ import argparse
 import json
 
 OPENSSL_DIR = "/usr/local/occlum/x86_64-linux-musl/"
+BASE_IMAGE_PATH = "container/Dockerfile_SS.ubuntu20.04"
+DOCKER_REGISTRY = "pufferfinance"
+NETWORK_CONFIG = "./conf/ephemery_network_config.json" # todo holesky
 
 def build_enclave(enclave_name, binary_name, enclave_path):
     compile_rust(binary_name, build_flags)
@@ -81,6 +84,19 @@ def read_fork_version(path):
     except:
         exit(f"Error loading config file: '{path}'")
 
+def dockerize(image_name, enclave_name, tag):
+    enclave_zip = f"./{enclave_name}/{enclave_name}.tar.gz"
+    measurement = f"./{enclave_name}/MRENCLAVE"
+    cmd = ["./container/build_image.sh",
+            "-i", enclave_zip,
+            "-n", image_name,
+            "-b", BASE_IMAGE_PATH,
+            "-r", DOCKER_REGISTRY,
+            "-g", tag,
+            "-c", NETWORK_CONFIG,
+            "-m", measurement]
+    subprocess.run(cmd)
+
 def process_args():
     parser = argparse.ArgumentParser(description="Build and containerize enclave.")
     parser.add_argument("-p", "--port", type=int, default=9001, help="Enclave port (default: 9001)")
@@ -90,10 +106,12 @@ def process_args():
     parser.add_argument("-v", "--validator", action="store_true", help="Use Validator enclave")
     parser.add_argument("-b", "--build", action="store_true", help="Build from cached dependencies")
     parser.add_argument("-x", "--run", action="store_true", help="Run service on specified port or default")
-    parser.add_argument("-t", "--unit-tests", action="store_true", help="Run unit tests")
+    parser.add_argument("-u", "--unit-tests", action="store_true", help="Run unit tests")
     parser.add_argument("-c", "--config", default="./conf/ephemery_network_config.json", help="Network config JSON")
     parser.add_argument("-m", "--measure", action="store_true", help="Print the specified enclave's measurements")
     parser.add_argument("-o", "--output-package", action="store_true", help="Package the Occlum image for Dockerization")
+    parser.add_argument("-d", "--dockerize", action="store_true", help="Dockerize a packaged Occlum image")
+    parser.add_argument("-t", "--tag", default="latest", help="Tag for the Docker image")
     args = parser.parse_args()
 
     # global vars
@@ -159,6 +177,16 @@ def process_args():
     
     if args.unit_tests:
         unit_tests()
+
+    if args.dockerize:
+        if build_type == "secure-signer":
+            dockerize("secure_signer", "Secure-Signer", args.tag)
+        elif build_type == "guardian":
+            dockerize("guardian_enclave", "Guardian", args.tag)
+        elif build_type == "validator":
+            dockerize("validator_enclave", "Validator", args.tag)
+        else:
+            exit("Error: No valid type specified. Use -v, -g, or -s first.")
     
 if __name__ == "__main__":
     script_dir = os.path.dirname(os.path.abspath(__file__))
