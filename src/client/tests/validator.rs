@@ -1,5 +1,7 @@
 use crate::strip_0x_prefix;
 
+use crate::client::traits::ValidatorClientTrait;
+
 #[tokio::test]
 async fn call_health_with_success() {
     let client = super::build_client();

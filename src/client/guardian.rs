@@ -1,12 +1,17 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
+
+use crate::client::traits::GuardianClientTrait;
+
 pub struct GuardianClient {
     pub url: String,
     pub client: Arc<reqwest::Client>,
 }
 
-impl GuardianClient {
-    pub async fn health(&self) -> bool {
+#[async_trait]
+impl GuardianClientTrait for GuardianClient {
+    async fn health(&self) -> bool {
         let Ok(resp) = self
             .client
             .get(format!("{}/upcheck", self.url))
@@ -18,7 +23,7 @@ impl GuardianClient {
         resp.status() == reqwest::StatusCode::OK
     }
 
-    pub async fn attest_fresh_eth_key(
+    async fn attest_fresh_eth_key(
         &self,
         blockhash: &str,
     ) -> anyhow::Result<crate::enclave::types::KeyGenResponse> {
@@ -36,7 +41,7 @@ impl GuardianClient {
             .await?)
     }
 
-    pub async fn list_eth_keys(&self) -> anyhow::Result<crate::enclave::types::ListKeysResponse> {
+    async fn list_eth_keys(&self) -> anyhow::Result<crate::enclave::types::ListKeysResponse> {
         Ok(self
             .client
             .get(format!("{}/eth/v1/keygen", self.url))
@@ -46,7 +51,7 @@ impl GuardianClient {
             .await?)
     }
 
-    pub async fn validate_custody(
+    async fn validate_custody(
         &self,
         request: crate::enclave::types::ValidateCustodyRequest,
     ) -> anyhow::Result<crate::enclave::types::ValidateCustodyResponse> {
@@ -60,7 +65,7 @@ impl GuardianClient {
             .await?)
     }
 
-    pub async fn sign_exit(
+    async fn sign_exit(
         &self,
         request: crate::enclave::types::SignExitRequest,
     ) -> anyhow::Result<crate::enclave::types::SignExitResponse> {

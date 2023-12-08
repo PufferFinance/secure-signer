@@ -1,13 +1,19 @@
 use std::sync::Arc;
 
-use crate::{eth2::eth_types::BLSSignature, strip_0x_prefix};
+use async_trait::async_trait;
+
+use crate::strip_0x_prefix;
+
+use crate::client::traits::ValidatorClientTrait;
+
 pub struct ValidatorClient {
     pub url: String,
     pub client: Arc<reqwest::Client>,
 }
 
-impl ValidatorClient {
-    pub async fn health(&self) -> bool {
+#[async_trait]
+impl ValidatorClientTrait for ValidatorClient {
+    async fn health(&self) -> bool {
         let Ok(resp) = self
             .client
             .get(format!("{}/upcheck", self.url))
@@ -19,7 +25,7 @@ impl ValidatorClient {
         resp.status() == reqwest::StatusCode::OK
     }
 
-    pub async fn attest_fresh_bls_key(
+    async fn attest_fresh_bls_key(
         &self,
         payload: &crate::enclave::types::AttestFreshBlsKeyPayload,
     ) -> anyhow::Result<crate::enclave::types::BlsKeygenPayload> {
@@ -34,7 +40,7 @@ impl ValidatorClient {
             .await?)
     }
 
-    pub async fn list_bls_keys(&self) -> anyhow::Result<crate::enclave::types::ListKeysResponse> {
+    async fn list_bls_keys(&self) -> anyhow::Result<crate::enclave::types::ListKeysResponse> {
         Ok(self
             .client
             .get(format!("{}/eth/v1/keystores", self.url))
@@ -44,7 +50,7 @@ impl ValidatorClient {
             .await?)
     }
 
-    pub async fn sign_voluntary_exit_message(
+    async fn sign_voluntary_exit_message(
         &self,
         bls_pk_hex: String,
         epoch: crate::eth2::eth_types::Epoch,

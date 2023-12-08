@@ -1,5 +1,7 @@
 use crate::eth2::eth_types::GENESIS_FORK_VERSION;
 
+use crate::client::traits::{GuardianClientTrait, ValidatorClientTrait};
+
 #[tokio::test]
 async fn call_health_with_success() {
     let client = super::build_client();

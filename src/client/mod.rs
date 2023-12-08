@@ -4,11 +4,16 @@ use self::{
     guardian::GuardianClient, secure_signer::SecureSignerClient, validator::ValidatorClient,
 };
 
+pub mod mock;
+pub mod traits;
+
 mod guardian;
 mod keygen;
 mod secure_signer;
-mod tests;
 mod validator;
+
+#[cfg(test)]
+mod tests;
 
 pub use keygen::generate_bls_keystore_handler;
 
