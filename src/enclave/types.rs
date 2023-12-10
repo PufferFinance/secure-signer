@@ -111,7 +111,7 @@ impl ListKeysResponse {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SignatureResponse {
     pub signature: String,
 }

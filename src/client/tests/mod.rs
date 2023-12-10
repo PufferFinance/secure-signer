@@ -2,6 +2,8 @@ mod guardian;
 mod secure_signer;
 mod validator;
 
+use crate::client::traits::{GuardianClientTrait, ValidatorClientTrait};
+
 use crate::eth2::eth_types::GENESIS_FORK_VERSION;
 
 fn build_client() -> super::Client {
