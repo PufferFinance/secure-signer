@@ -3,12 +3,11 @@ use crate::{crypto::eth_keys, strip_0x_prefix};
 use anyhow::{bail, Result};
 use blsttc::{PublicKey as BlsPublicKey, PublicKeySet};
 use ecies::{PublicKey as EthPublicKey, SecretKey as EthSecretKey};
-use ethers::types::TxHash;
 use serde::ser::SerializeSeq;
 use serde::{Deserialize, Serialize};
 use tree_hash::TreeHash;
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct KeyGenResponse {
     pub pk_hex: String,
     pub evidence: AttestationEvidence,
@@ -81,12 +80,12 @@ impl KeyGenResponse {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ListKeysResponseInner {
     pub pubkey: String,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct ListKeysResponse {
     pub data: Vec<ListKeysResponseInner>,
 }
@@ -140,7 +139,7 @@ pub struct ValidateCustodyRequest {
     pub verify_remote_attestation: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ValidateCustodyResponse {
     pub enclave_signature: String,
