@@ -10,7 +10,8 @@ pub struct MockGuardianClient {
     pub health_responses: Arc<Mutex<VecDeque<bool>>>,
     pub attest_fresh_eth_key_responses: Arc<Mutex<VecDeque<crate::enclave::types::KeyGenResponse>>>,
     pub list_eth_keys_responses: Arc<Mutex<VecDeque<crate::enclave::types::ListKeysResponse>>>,
-    pub validate_custody_responses: Arc<Mutex<VecDeque<crate::enclave::types::ValidateCustodyResponse>>>,
+    pub validate_custody_responses:
+        Arc<Mutex<VecDeque<crate::enclave::types::ValidateCustodyResponse>>>,
     pub sign_exit_responses: Arc<Mutex<VecDeque<crate::enclave::types::SignExitResponse>>>,
 }
 
@@ -25,24 +26,27 @@ impl MockGuardianClient {
         &mut self,
         value: crate::enclave::types::KeyGenResponse,
     ) {
-        self.attest_fresh_eth_key_responses.lock().unwrap().push_back(value);
+        self.attest_fresh_eth_key_responses
+            .lock()
+            .unwrap()
+            .push_back(value);
     }
-    pub fn push_list_eth_keys_response(
-        &mut self,
-        value: crate::enclave::types::ListKeysResponse,
-    ) {
-        self.list_eth_keys_responses.lock().unwrap().push_back(value);
+    pub fn push_list_eth_keys_response(&mut self, value: crate::enclave::types::ListKeysResponse) {
+        self.list_eth_keys_responses
+            .lock()
+            .unwrap()
+            .push_back(value);
     }
     pub fn push_validate_custody_response(
         &mut self,
         value: crate::enclave::types::ValidateCustodyResponse,
     ) {
-        self.validate_custody_responses.lock().unwrap().push_back(value);
+        self.validate_custody_responses
+            .lock()
+            .unwrap()
+            .push_back(value);
     }
-    pub fn push_sign_exit_response(
-        &mut self,
-        value: crate::enclave::types::SignExitResponse,
-    ) {
+    pub fn push_sign_exit_response(&mut self, value: crate::enclave::types::SignExitResponse) {
         self.sign_exit_responses.lock().unwrap().push_back(value);
     }
 }
@@ -60,11 +64,16 @@ impl GuardianClientTrait for MockGuardianClient {
         &self,
         blockhash: &str,
     ) -> anyhow::Result<crate::enclave::types::KeyGenResponse> {
-        match self.attest_fresh_eth_key_responses.lock().unwrap().pop_front() {
+        match self
+            .attest_fresh_eth_key_responses
+            .lock()
+            .unwrap()
+            .pop_front()
+        {
             Some(res) => Ok(res),
             None => Err(std::io::Error::new(
                 std::io::ErrorKind::BrokenPipe,
-                "No response set".to_string(),
+                "No attest_fresh_eth_key response set".to_string(),
             )
             .into()),
         }
@@ -75,7 +84,7 @@ impl GuardianClientTrait for MockGuardianClient {
             Some(res) => Ok(res),
             None => Err(std::io::Error::new(
                 std::io::ErrorKind::BrokenPipe,
-                "No response set".to_string(),
+                "No list_eth_keys response set".to_string(),
             )
             .into()),
         }
@@ -89,7 +98,7 @@ impl GuardianClientTrait for MockGuardianClient {
             Some(res) => Ok(res),
             None => Err(std::io::Error::new(
                 std::io::ErrorKind::BrokenPipe,
-                "No response set".to_string(),
+                "No validate_custody response set".to_string(),
             )
             .into()),
         }
@@ -103,7 +112,7 @@ impl GuardianClientTrait for MockGuardianClient {
             Some(res) => Ok(res),
             None => Err(std::io::Error::new(
                 std::io::ErrorKind::BrokenPipe,
-                "No response set".to_string(),
+                "No sign_exit response set".to_string(),
             )
             .into()),
         }
