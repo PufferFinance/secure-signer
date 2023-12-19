@@ -1,7 +1,7 @@
-use crate::enclave::types::ListKeysResponse;
 use async_trait::async_trait;
 
 use crate::client::traits::ValidatorClientTrait;
+use crate::enclave::types::ListKeysResponse;
 
 #[derive(Clone, Debug, Default)]
 pub struct MockValidatorClient {
@@ -11,6 +11,9 @@ pub struct MockValidatorClient {
 }
 
 impl MockValidatorClient {
+    pub fn new() -> Self {
+        Self::default()
+    }
     pub fn set_health_response(&mut self, response: bool) {
         self.health = response;
     }
