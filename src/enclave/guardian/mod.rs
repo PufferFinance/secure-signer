@@ -7,7 +7,7 @@ use blsttc::PublicKeySet;
 use libsecp256k1::SecretKey as EthSecretKey;
 use ssz::Encode;
 
-use crate::eth2::eth_types::BLSSignature;
+use crate::eth2::eth_types::{BLSSignature, ValidatorIndex};
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct KeygenWithBlockhashRequest {
@@ -46,7 +46,7 @@ pub fn attest_new_eth_key_with_blockhash(
 }
 
 pub async fn verify_and_sign_custody_received(
-    request: crate::enclave::types::ValidateCustodyRequest,
+    request: crate::enclave::types::ValidateCustodyRequest
 ) -> Result<crate::enclave::types::ValidateCustodyResponse> {
     // Read enclave's eth secret key
     let Ok(guardian_enclave_sk) = crate::crypto::eth_keys::fetch_eth_key(
@@ -77,7 +77,12 @@ pub async fn verify_and_sign_custody_received(
     )?;
 
     // return guardian enclave signature
-    let signature: String = approve_custody(&request.keygen_payload, &guardian_enclave_sk).await?;
+    let signature: String = approve_custody(
+        &request.keygen_payload,
+        &guardian_enclave_sk,
+        &request.validator_index,
+    )
+    .await?;
 
     Ok(crate::enclave::types::ValidateCustodyResponse {
         enclave_signature: signature,
@@ -188,11 +193,13 @@ fn verify_custody(
 async fn approve_custody(
     keygen_payload: &crate::enclave::types::BlsKeygenPayload,
     guardian_enclave_sk: &EthSecretKey,
+    validator_index: &ValidatorIndex,
 ) -> Result<String> {
     let mut hasher = sha3::Keccak256::new();
 
-    // pubKey, withdrawalCredentials, signature, depositDataRoot
+    // validatorIndex, pubKey, withdrawalCredentials, signature, depositDataRoot
     let msg = ethers::abi::encode(&[
+        ethers::abi::Token::Bytes(validator_index.to_be_bytes().to_vec()),
         ethers::abi::Token::Bytes(
             keygen_payload
                 .public_key_set()?
@@ -459,7 +466,7 @@ mod tests {
         let (resp, g_sks, _mre, _mrs) = setup();
 
         for g_sk in g_sks {
-            assert!(approve_custody(&resp, &g_sk).await.is_ok());
+            assert!(approve_custody(&resp, &g_sk, &0).await.is_ok());
         }
     }
 
