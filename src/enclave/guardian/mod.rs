@@ -1,13 +1,15 @@
-use ethers::signers::{LocalWallet, Signer};
 use log::info;
 use sha3::Digest;
 pub mod handlers;
+use crate::eth2::eth_types::{BLSSignature, ValidatorIndex};
 use anyhow::{anyhow, bail, Result};
 use blsttc::PublicKeySet;
+use ethers::{
+    core::types::U256,
+    signers::{LocalWallet, Signer},
+};
 use libsecp256k1::SecretKey as EthSecretKey;
 use ssz::Encode;
-
-use crate::eth2::eth_types::{BLSSignature, ValidatorIndex};
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct KeygenWithBlockhashRequest {
@@ -46,7 +48,7 @@ pub fn attest_new_eth_key_with_blockhash(
 }
 
 pub async fn verify_and_sign_custody_received(
-    request: crate::enclave::types::ValidateCustodyRequest
+    request: crate::enclave::types::ValidateCustodyRequest,
 ) -> Result<crate::enclave::types::ValidateCustodyResponse> {
     // Read enclave's eth secret key
     let Ok(guardian_enclave_sk) = crate::crypto::eth_keys::fetch_eth_key(
@@ -199,7 +201,7 @@ async fn approve_custody(
 
     // validatorIndex, pubKey, withdrawalCredentials, signature, depositDataRoot
     let msg = ethers::abi::encode(&[
-        ethers::abi::Token::Bytes(validator_index.to_be_bytes().to_vec()),
+        ethers::abi::Token::Uint(U256::from(validator_index.clone())),
         ethers::abi::Token::Bytes(
             keygen_payload
                 .public_key_set()?
