@@ -32,6 +32,7 @@ pub type Gwei = u64;
 pub type DomainType = Bytes4;
 pub type Domain = Bytes32;
 pub type ExecutionAddress = Bytes20;
+pub type KZGCommitment = Bytes48;
 
 // typenums for specifying the length of FixedVector
 #[allow(non_camel_case_types)]
@@ -91,6 +92,10 @@ pub type Transaction = VariableList<u8, MAX_BYTES_PER_TRANSACTION>;
 pub type MAX_BLS_TO_EXECUTION_CHANGES = typenum::U16;
 #[allow(non_camel_case_types)]
 pub type MAX_WITHDRAWALS_PER_PAYLOAD = typenum::U16;
+
+// deneb
+#[allow(non_camel_case_types)]
+pub type MAX_BLOB_COMMITMENTS_PER_BLOCK = typenum::U4096;
 
 // Custom deserializers
 pub fn from_hex_to_ssz_type<'de, D, T>(deserializer: D) -> Result<T, D::Error>
@@ -451,11 +456,14 @@ pub struct BeaconBlockBody {
     pub sync_aggregate: SyncAggregate, // # [New in Altair]
 
     // https://github.com/ethereum/consensus-specs/blob/dev/specs/bellatrix/beacon-chain.md#beaconblockbody
-    pub execution_payload: ExecutionPayload, //   # [New in Bellatrix]
+    pub execution_payload: ExecutionPayload, //   # [Modified in Deneb:EIP4844]
 
     // https://github.com/ethereum/consensus-specs/blob/dev/specs/capella/beacon-chain.md#beaconblockbody
     pub bls_to_execution_changes:
         VariableList<SignedBLSToExecutionChange, MAX_BLS_TO_EXECUTION_CHANGES>, // [New in Capella]
+
+    // https://github.com/ethereum/consensus-specs/blob/dev/specs/deneb/beacon-chain.md#beaconblockbody
+    pub blob_kzg_commitments: VariableList<KZGCommitment, MAX_BLOB_COMMITMENTS_PER_BLOCK>, // [New in Deneb:EIP4844]
 }
 
 #[derive(Debug, Deserialize, Serialize, Encode, Decode, TreeHash, Clone)]
@@ -502,6 +510,10 @@ pub struct ExecutionPayload {
     pub block_hash: Root, // Hash of execution block
     pub transactions: VariableList<Transaction, MAX_TRANSACTIONS_PER_PAYLOAD>,
     pub withdrawals: VariableList<Withdrawal, MAX_WITHDRAWALS_PER_PAYLOAD>, // [New in Capella]
+    #[serde(with = "quoted_u64")]
+    pub blob_gas_used: u64,                // [New in Deneb:EIP4844]
+    #[serde(with = "quoted_u64")]
+    pub excess_blob_gas: u64,              // [New in Deneb:EIP4844]
 }
 
 #[derive(Debug, Deserialize, Serialize, Encode, Decode, TreeHash, Clone)]
