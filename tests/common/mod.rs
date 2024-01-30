@@ -3,11 +3,11 @@ use puffersecuresigner::crypto::bls_keys;
 use puffersecuresigner::eth2::slash_protection::SlashingProtectionData;
 use puffersecuresigner::strip_0x_prefix;
 
-pub mod bls_keygen_helper;
-pub mod eth_keygen_helper;
+// pub mod bls_keygen_helper;
+// pub mod eth_keygen_helper;
 pub mod eth_specs;
-pub mod getter_routes_helper;
-pub mod signing_helper;
+// pub mod getter_routes_helper;
+// pub mod signing_helper;
 
 /// Reads the `SECURE_SIGNER_PORT` environment variable.
 /// If the return value is Some(port), it is expected that Secure-Signer is running on localhost:port

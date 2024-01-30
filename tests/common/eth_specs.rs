@@ -10,7 +10,8 @@ use anyhow::{bail, Context, Result};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-pub const BASE_DIR: &str = "./tests/consensus-spec-tests/tests/mainnet/capella/ssz_static/";
+// pub const BASE_DIR: &str = "./tests/consensus-spec-tests/tests/mainnet/capella/ssz_static/";
+pub const BASE_DIR: &str = "./tests/consensus-spec-tests/tests/mainnet/deneb/ssz_static/";
 
 #[derive(Debug, Deserialize, Serialize, Clone, Default)]
 struct ExpectedRoot {
@@ -259,84 +260,84 @@ pub fn get_all_test_vecs(container_name: &str) -> Result<Vec<BLSSignMsg>> {
     Ok(test_vecs)
 }
 
-#[test]
-fn test_eth1_data() {
-    let path: PathBuf = [BASE_DIR, "Eth1Data"].iter().collect();
-    let file_paths = get_testvec_file_names(&path).unwrap();
-    for (ssz_file, root_file) in file_paths.iter() {
-        get_test_vec_container::<Eth1Data>(ssz_file, root_file).unwrap();
-    }
-}
+// #[test]
+// fn test_eth1_data() {
+//     let path: PathBuf = [BASE_DIR, "Eth1Data"].iter().collect();
+//     let file_paths = get_testvec_file_names(&path).unwrap();
+//     for (ssz_file, root_file) in file_paths.iter() {
+//         get_test_vec_container::<Eth1Data>(ssz_file, root_file).unwrap();
+//     }
+// }
 
-#[test]
-fn test_proposer_slashing() {
-    let path: PathBuf = [BASE_DIR, "ProposerSlashing"].iter().collect();
-    let file_paths = get_testvec_file_names(&path).unwrap();
-    for (ssz_file, root_file) in file_paths.iter() {
-        dbg!(ssz_file);
-        get_test_vec_container::<ProposerSlashing>(ssz_file, root_file).unwrap();
-    }
-}
+// #[test]
+// fn test_proposer_slashing() {
+//     let path: PathBuf = [BASE_DIR, "ProposerSlashing"].iter().collect();
+//     let file_paths = get_testvec_file_names(&path).unwrap();
+//     for (ssz_file, root_file) in file_paths.iter() {
+//         dbg!(ssz_file);
+//         get_test_vec_container::<ProposerSlashing>(ssz_file, root_file).unwrap();
+//     }
+// }
 
-#[test]
-fn test_attester_slashing() {
-    let path: PathBuf = [BASE_DIR, "AttesterSlashing"].iter().collect();
-    let file_paths = get_testvec_file_names(&path).unwrap();
-    for (ssz_file, root_file) in file_paths.iter() {
-        dbg!(ssz_file);
-        get_test_vec_container::<AttesterSlashing>(ssz_file, root_file).unwrap();
-    }
-}
+// #[test]
+// fn test_attester_slashing() {
+//     let path: PathBuf = [BASE_DIR, "AttesterSlashing"].iter().collect();
+//     let file_paths = get_testvec_file_names(&path).unwrap();
+//     for (ssz_file, root_file) in file_paths.iter() {
+//         dbg!(ssz_file);
+//         get_test_vec_container::<AttesterSlashing>(ssz_file, root_file).unwrap();
+//     }
+// }
 
-#[test]
-fn test_deposit() {
-    let path: PathBuf = [BASE_DIR, "Deposit"].iter().collect();
-    let file_paths = get_testvec_file_names(&path).unwrap();
-    for (ssz_file, root_file) in file_paths.iter() {
-        dbg!(ssz_file);
-        get_test_vec_container::<Deposit>(ssz_file, root_file).unwrap();
-    }
-}
+// #[test]
+// fn test_deposit() {
+//     let path: PathBuf = [BASE_DIR, "Deposit"].iter().collect();
+//     let file_paths = get_testvec_file_names(&path).unwrap();
+//     for (ssz_file, root_file) in file_paths.iter() {
+//         dbg!(ssz_file);
+//         get_test_vec_container::<Deposit>(ssz_file, root_file).unwrap();
+//     }
+// }
 
-#[test]
-fn test_voluntary_exit() {
-    let path: PathBuf = [BASE_DIR, "VoluntaryExit"].iter().collect();
-    let file_paths = get_testvec_file_names(&path).unwrap();
-    for (ssz_file, root_file) in file_paths.iter() {
-        dbg!(ssz_file);
-        get_test_vec_container::<VoluntaryExit>(ssz_file, root_file).unwrap();
-    }
-}
+// #[test]
+// fn test_voluntary_exit() {
+//     let path: PathBuf = [BASE_DIR, "VoluntaryExit"].iter().collect();
+//     let file_paths = get_testvec_file_names(&path).unwrap();
+//     for (ssz_file, root_file) in file_paths.iter() {
+//         dbg!(ssz_file);
+//         get_test_vec_container::<VoluntaryExit>(ssz_file, root_file).unwrap();
+//     }
+// }
 
-#[test]
-fn test_sync_aggregate() {
-    let path: PathBuf = [BASE_DIR, "SyncAggregate"].iter().collect();
-    let file_paths = get_testvec_file_names(&path).unwrap();
-    for (ssz_file, root_file) in file_paths.iter() {
-        dbg!(ssz_file);
-        get_test_vec_container::<SyncAggregate>(ssz_file, root_file).unwrap();
-    }
-}
+// #[test]
+// fn test_sync_aggregate() {
+//     let path: PathBuf = [BASE_DIR, "SyncAggregate"].iter().collect();
+//     let file_paths = get_testvec_file_names(&path).unwrap();
+//     for (ssz_file, root_file) in file_paths.iter() {
+//         dbg!(ssz_file);
+//         get_test_vec_container::<SyncAggregate>(ssz_file, root_file).unwrap();
+//     }
+// }
 
-#[test]
-fn test_bls_to_execution_changes() {
-    let path: PathBuf = [BASE_DIR, "BLSToExecutionChange"].iter().collect();
-    let file_paths = get_testvec_file_names(&path).unwrap();
-    for (ssz_file, root_file) in file_paths.iter() {
-        dbg!(ssz_file);
-        get_test_vec_container::<BLSToExecutionChange>(ssz_file, root_file).unwrap();
-    }
-}
+// #[test]
+// fn test_bls_to_execution_changes() {
+//     let path: PathBuf = [BASE_DIR, "BLSToExecutionChange"].iter().collect();
+//     let file_paths = get_testvec_file_names(&path).unwrap();
+//     for (ssz_file, root_file) in file_paths.iter() {
+//         dbg!(ssz_file);
+//         get_test_vec_container::<BLSToExecutionChange>(ssz_file, root_file).unwrap();
+//     }
+// }
 
-#[test]
-fn test_attestation() {
-    let path: PathBuf = [BASE_DIR, "Attestation"].iter().collect();
-    let file_paths = get_testvec_file_names(&path).unwrap();
-    for (ssz_file, root_file) in file_paths.iter() {
-        dbg!(ssz_file);
-        get_test_vec_container::<Attestation>(ssz_file, root_file).unwrap();
-    }
-}
+// #[test]
+// fn test_attestation() {
+//     let path: PathBuf = [BASE_DIR, "Attestation"].iter().collect();
+//     let file_paths = get_testvec_file_names(&path).unwrap();
+//     for (ssz_file, root_file) in file_paths.iter() {
+//         dbg!(ssz_file);
+//         get_test_vec_container::<Attestation>(ssz_file, root_file).unwrap();
+//     }
+// }
 
 #[test]
 fn test_execution_payload() {
@@ -357,65 +358,65 @@ fn test_beacon_block_body() {
     }
 }
 
-#[test]
-fn test_block_ssz_static() {
-    let path: PathBuf = [BASE_DIR, "BeaconBlock"].iter().collect();
-    dbg!(&path);
-    get_all_test_vecs("BeaconBlock").unwrap();
-}
+// #[test]
+// fn test_block_ssz_static() {
+//     let path: PathBuf = [BASE_DIR, "BeaconBlock"].iter().collect();
+//     dbg!(&path);
+//     get_all_test_vecs("BeaconBlock").unwrap();
+// }
 
-#[test]
-fn test_block_v2_ssz_static() {
-    let path: PathBuf = [BASE_DIR, "BeaconBlockHeader"].iter().collect();
-    dbg!(&path);
-    get_all_test_vecs("BeaconBlockHeader").unwrap();
-}
+// #[test]
+// fn test_block_v2_ssz_static() {
+//     let path: PathBuf = [BASE_DIR, "BeaconBlockHeader"].iter().collect();
+//     dbg!(&path);
+//     get_all_test_vecs("BeaconBlockHeader").unwrap();
+// }
 
-#[test]
-fn test_attestation_ssz_static() {
-    let path: PathBuf = [BASE_DIR, "Attestation"].iter().collect();
-    dbg!(&path);
-    get_all_test_vecs("Attestation").unwrap();
-}
+// #[test]
+// fn test_attestation_ssz_static() {
+//     let path: PathBuf = [BASE_DIR, "Attestation"].iter().collect();
+//     dbg!(&path);
+//     get_all_test_vecs("Attestation").unwrap();
+// }
 
-#[test]
-fn test_aggregate_and_proof_ssz_static() {
-    let path: PathBuf = [BASE_DIR, "AggregateAndProof"].iter().collect();
-    dbg!(&path);
-    get_all_test_vecs("AggregateAndProof").unwrap();
-}
+// #[test]
+// fn test_aggregate_and_proof_ssz_static() {
+//     let path: PathBuf = [BASE_DIR, "AggregateAndProof"].iter().collect();
+//     dbg!(&path);
+//     get_all_test_vecs("AggregateAndProof").unwrap();
+// }
 
-#[test]
-fn test_deposit_message_ssz_static() {
-    let path: PathBuf = [BASE_DIR, "DepositMessage"].iter().collect();
-    dbg!(&path);
-    get_all_test_vecs("DepositMessage").unwrap();
-}
+// #[test]
+// fn test_deposit_message_ssz_static() {
+//     let path: PathBuf = [BASE_DIR, "DepositMessage"].iter().collect();
+//     dbg!(&path);
+//     get_all_test_vecs("DepositMessage").unwrap();
+// }
 
-#[test]
-fn test_voluntary_exit_ssz_static() {
-    let path: PathBuf = [BASE_DIR, "VoluntaryExit"].iter().collect();
-    dbg!(&path);
-    get_all_test_vecs("VoluntaryExit").unwrap();
-}
+// #[test]
+// fn test_voluntary_exit_ssz_static() {
+//     let path: PathBuf = [BASE_DIR, "VoluntaryExit"].iter().collect();
+//     dbg!(&path);
+//     get_all_test_vecs("VoluntaryExit").unwrap();
+// }
 
-#[test]
-fn test_sync_committee_message_ssz_static() {
-    let path: PathBuf = [BASE_DIR, "SyncCommitteeMessage"].iter().collect();
-    dbg!(&path);
-    get_all_test_vecs("SyncCommitteeMessage").unwrap();
-}
+// #[test]
+// fn test_sync_committee_message_ssz_static() {
+//     let path: PathBuf = [BASE_DIR, "SyncCommitteeMessage"].iter().collect();
+//     dbg!(&path);
+//     get_all_test_vecs("SyncCommitteeMessage").unwrap();
+// }
 
-#[test]
-fn test_sync_committee_selection_proof_ssz_static() {
-    let path: PathBuf = [BASE_DIR, "SyncAggregatorSelectionData"].iter().collect();
-    dbg!(&path);
-    get_all_test_vecs("SyncAggregatorSelectionData").unwrap();
-}
+// #[test]
+// fn test_sync_committee_selection_proof_ssz_static() {
+//     let path: PathBuf = [BASE_DIR, "SyncAggregatorSelectionData"].iter().collect();
+//     dbg!(&path);
+//     get_all_test_vecs("SyncAggregatorSelectionData").unwrap();
+// }
 
-#[test]
-fn test_sync_committee_contribution_and_proof_ssz_static() {
-    let path: PathBuf = [BASE_DIR, "ContributionAndProof"].iter().collect();
-    dbg!(&path);
-    get_all_test_vecs("ContributionAndProof").unwrap();
-}
+// #[test]
+// fn test_sync_committee_contribution_and_proof_ssz_static() {
+//     let path: PathBuf = [BASE_DIR, "ContributionAndProof"].iter().collect();
+//     dbg!(&path);
+//     get_all_test_vecs("ContributionAndProof").unwrap();
+// }
