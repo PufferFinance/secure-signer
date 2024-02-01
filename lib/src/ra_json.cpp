@@ -168,7 +168,7 @@ TeeErrorCode JsonConfig::LoadConfiguration(const std::string& filename) {
 
   TeeJsonDocPtr doc(new rapidjson::Document);
   if (doc.get()->Parse(config_str.data()).HasParseError()) {
-    TEE_LOG_ERROR("Fail to parse json configration file");
+    TEE_LOG_ERROR("Fail to parse json configuration file");
     return TEE_ERROR_PARSE_CONFIGURATIONS;
   }
 

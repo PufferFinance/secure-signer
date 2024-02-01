@@ -73,7 +73,7 @@ static size_t ParseReportResponseBody(const void* contents, size_t size,
   size_t content_length = size * nmemb;
   RaIasReport* report = RCAST(RaIasReport*, response);
 
-  // The json response body maybe will be splited into two times
+  // The json response body maybe will be split into two times
   report->mutable_response_body()->append(body, content_length);
 
   rapidjson::Document doc;
@@ -145,7 +145,7 @@ void RaIasClient::InitIasConnection(const std::string& endpoint) {
   curl_easy_setopt(curl_, CURLOPT_HTTPHEADER, headers_);
   curl_easy_setopt(curl_, CURLOPT_USERAGENT, "sgx-sp/1.0");
 
-  /* set commom option */
+  /* set common option */
   curl_easy_setopt(curl_, CURLOPT_FORBID_REUSE, 1L);
   curl_easy_setopt(curl_, CURLOPT_NOSIGNAL, 1L);
   curl_easy_setopt(curl_, CURLOPT_TIMEOUT, 60L);

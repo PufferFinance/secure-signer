@@ -13,7 +13,7 @@ post:
         $ref: "../../keygen/schemas.yaml#/components/schemas/Pubkey"
   responses:
     '200':
-      description: 'Success reponse: a JSON encoded DepositResponse'
+      description: 'Success response: a JSON encoded DepositResponse'
       content:
         application/json:
           schema:
