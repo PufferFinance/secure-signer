@@ -7,6 +7,7 @@ use ssz::Decode;
 use tree_hash::TreeHash;
 
 use anyhow::{bail, Context, Result};
+use core::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -91,9 +92,16 @@ fn get_testvec_file_names(start_dir: &Path) -> Result<Vec<(PathBuf, PathBuf)>> {
     Ok(file_pairs)
 }
 
-fn get_test_vec_container<T: Decode + TreeHash>(ssz_file: &Path, root_file: &Path) -> Result<T> {
+fn get_test_vec_container<T: Decode + TreeHash + fmt::Debug>(
+    ssz_file: &Path,
+    root_file: &Path,
+) -> Result<T> {
     let eth2_container = snappy_decode_file_to_eth_type::<T>(ssz_file)?;
     let root = ExpectedRoot::from_file(root_file)?;
+
+    // println!("Root: {:?}", eth2_container.tree_hash_root().0.to_vec());
+    // println!("Expected: {:?}", root);
+    // println!("Block: {:?}", eth2_container);
 
     // Compare the derived tree_root_hash with expected
     if eth2_container.tree_hash_root().as_bytes() != root {

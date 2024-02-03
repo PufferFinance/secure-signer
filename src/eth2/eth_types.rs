@@ -10,7 +10,6 @@ use ssz::{Decode, Encode};
 use ssz_derive::{Decode, Encode};
 use ssz_types::{typenum, BitList, BitVector, FixedVector, VariableList};
 use std::fmt::{self, Debug};
-use tree_hash::TreeHash as TreeHashTrait;
 use tree_hash_derive::TreeHash;
 
 use crate::strip_0x_prefix;
@@ -36,80 +35,80 @@ pub type Gwei = u64;
 pub type DomainType = Bytes4;
 pub type Domain = Bytes32;
 pub type ExecutionAddress = Bytes20;
-// pub type KZGCommitment = Bytes48;
+pub type KZGCommitment = Bytes48;
 
-#[derive(Clone, Encode, Decode)]
-pub struct KZGCommitment {
-    pub data: Bytes48,
-}
+// #[derive(Clone, Encode, Decode)]
+// pub struct KZGCommitment {
+//     pub data: Bytes48,
+// }
 
-impl TreeHashTrait for KZGCommitment {
-    fn tree_hash_type() -> tree_hash::TreeHashType {
-        <FixedVector<u8, typenum::U48> as TreeHashTrait>::tree_hash_type()
-    }
+// impl TreeHashTrait for KZGCommitment {
+//     fn tree_hash_type() -> tree_hash::TreeHashType {
+//         <FixedVector<u8, typenum::U48> as TreeHashTrait>::tree_hash_type()
+//     }
 
-    fn tree_hash_packed_encoding(&self) -> tree_hash::PackedEncoding {
-        self.data.tree_hash_packed_encoding()
-    }
+//     fn tree_hash_packed_encoding(&self) -> tree_hash::PackedEncoding {
+//         self.data.tree_hash_packed_encoding()
+//     }
 
-    fn tree_hash_packing_factor() -> usize {
-        <FixedVector<u8, typenum::U48> as TreeHashTrait>::tree_hash_packing_factor()
-    }
+//     fn tree_hash_packing_factor() -> usize {
+//         <FixedVector<u8, typenum::U48> as TreeHashTrait>::tree_hash_packing_factor()
+//     }
 
-    fn tree_hash_root(&self) -> tree_hash::Hash256 {
-        self.data.tree_hash_root()
-    }
-}
+//     fn tree_hash_root(&self) -> tree_hash::Hash256 {
+//         self.data.tree_hash_root()
+//     }
+// }
 
-impl FromStr for KZGCommitment {
-    type Err = String;
+// impl FromStr for KZGCommitment {
+//     type Err = String;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if let Some(stripped) = s.strip_prefix("0x") {
-            let bytes = hex::decode(stripped).map_err(|e| e.to_string())?;
-            if bytes.len() == 48 {
-                let mut kzg_commitment_bytes = [0; 48];
-                kzg_commitment_bytes[..].copy_from_slice(&bytes);
-                Ok(Self {
-                    data: kzg_commitment_bytes.to_vec().into(),
-                })
-            } else {
-                Err(format!(
-                    "InvalidByteLength: got {}, expected {}",
-                    bytes.len(),
-                    48
-                ))
-            }
-        } else {
-            Err("must start with 0x".to_string())
-        }
-    }
-}
+//     fn from_str(s: &str) -> Result<Self, Self::Err> {
+//         if let Some(stripped) = s.strip_prefix("0x") {
+//             let bytes = hex::decode(stripped).map_err(|e| e.to_string())?;
+//             if bytes.len() == 48 {
+//                 let mut kzg_commitment_bytes = [0; 48];
+//                 kzg_commitment_bytes[..].copy_from_slice(&bytes);
+//                 Ok(Self {
+//                     data: kzg_commitment_bytes.to_vec().into(),
+//                 })
+//             } else {
+//                 Err(format!(
+//                     "InvalidByteLength: got {}, expected {}",
+//                     bytes.len(),
+//                     48
+//                 ))
+//             }
+//         } else {
+//             Err("must start with 0x".to_string())
+//         }
+//     }
+// }
 
-impl Serialize for KZGCommitment {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(&format!("{:?}", self))
-    }
-}
+// impl Serialize for KZGCommitment {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: Serializer,
+//     {
+//         serializer.serialize_str(&format!("{:?}", self))
+//     }
+// }
 
-impl<'de> Deserialize<'de> for KZGCommitment {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let string = String::deserialize(deserializer)?;
-        Self::from_str(&string).map_err(serde::de::Error::custom)
-    }
-}
+// impl<'de> Deserialize<'de> for KZGCommitment {
+//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+//     where
+//         D: Deserializer<'de>,
+//     {
+//         let string = String::deserialize(deserializer)?;
+//         Self::from_str(&string).map_err(serde::de::Error::custom)
+//     }
+// }
 
-impl Debug for KZGCommitment {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", serde_utils::hex::encode(self.data.as_ssz_bytes()))
-    }
-}
+// impl Debug for KZGCommitment {
+//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//         write!(f, "{}", serde_utils::hex::encode(self.data.as_ssz_bytes()))
+//     }
+// }
 
 // typenums for specifying the length of FixedVector
 #[allow(non_camel_case_types)]
@@ -180,6 +179,7 @@ where
     D: Deserializer<'de>,
     T: From<Vec<u8>>,
 {
+    println!("Inside hex deserialization!!!!!!!!!!!!!!!!!!!!!!!!!!!");
     let hex_str: &str = Deserialize::deserialize(deserializer)?;
     let hex_str: &str = strip_0x_prefix!(hex_str);
     let bytes = match hex::decode(hex_str) {
@@ -207,8 +207,10 @@ where
 {
     let mut res: Vec<FixedVector<u8, typenum::U48>> = Vec::new();
     println!("Inside blob deserialization!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-    let opt: Option<Vec<String>> = Option::deserialize(deserializer)?;
-    let hex_string_vec = opt.unwrap_or_default();
+    let hex_string_vec: Vec<String> =
+        Vec::deserialize(deserializer).expect("Failed to deserialize");
+    println!("After hex deserialization!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    // let hex_string_vec = opt.unwrap_or_default();
 
     for hex_str in hex_string_vec {
         let hex_str: &str = strip_0x_prefix!(hex_str);
@@ -217,7 +219,7 @@ where
             Err(e) => return Err(de::Error::custom(format!("Not valid hex: {:?}", e))),
         };
         println!("<================== KZG Blob Bytes: {:?}", bytes.clone());
-        res.push(bytes.into());
+        res.push(FixedVector::<u8, typenum::U48>::new(bytes).unwrap());
     }
     Ok(VariableList::new(res).unwrap())
 }
@@ -584,10 +586,10 @@ pub struct BeaconBlockBody {
         VariableList<SignedBLSToExecutionChange, MAX_BLS_TO_EXECUTION_CHANGES>, // [New in Capella]
 
     // https://github.com/ethereum/consensus-specs/blob/dev/specs/deneb/beacon-chain.md#beaconblockbody
-    // #[serde(
-    //     deserialize_with = "from_hex_vec_to_ssz_type",
-    //     serialize_with = "to_hex_vec_from_ssz_type"
-    // )]
+    #[serde(
+        deserialize_with = "from_hex_vec_to_ssz_type",
+        serialize_with = "to_hex_vec_from_ssz_type"
+    )]
     pub blob_kzg_commitments: VariableList<KZGCommitment, MAX_BLOB_COMMITMENTS_PER_BLOCK>, // [New in Deneb:EIP4844]
 }
 
@@ -635,10 +637,10 @@ pub struct ExecutionPayload {
     pub block_hash: Root, // Hash of execution block
     pub transactions: VariableList<Transaction, MAX_TRANSACTIONS_PER_PAYLOAD>,
     pub withdrawals: VariableList<Withdrawal, MAX_WITHDRAWALS_PER_PAYLOAD>, // [New in Capella]
-    // #[serde(with = "quoted_u64")]
-    // pub blob_gas_used: u64,                // [New in Deneb:EIP4844]
-    // #[serde(with = "quoted_u64")]
-    // pub excess_blob_gas: u64,              // [New in Deneb:EIP4844]
+    #[serde(with = "quoted_u64")]
+    pub blob_gas_used: u64,                // [New in Deneb:EIP4844]
+    #[serde(with = "quoted_u64")]
+    pub excess_blob_gas: u64,              // [New in Deneb:EIP4844]
     #[serde(
         deserialize_with = "from_u256_string",
         serialize_with = "to_u256_string"
@@ -973,10 +975,167 @@ pub struct ValidatorRegistrationRequest {
     pub validator_registration: ValidatorRegistration,
 }
 
+//////// TEST //////
+#[derive(Deserialize, Serialize, Debug)]
+#[allow(non_snake_case)]
+pub struct CustomKZG {
+    #[serde(
+        deserialize_with = "from_hex_vec_to_ssz_type",
+        serialize_with = "to_hex_vec_from_ssz_type"
+    )]
+    pub data: VariableList<Bytes48, MAX_BLOB_COMMITMENTS_PER_BLOCK>,
+}
+
+impl fmt::Display for BeaconBlockBody {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "BeaconBlockBody blob_kzg_commitments: {:?} ",
+            // self.randao_reveal,
+            // self.eth1_data,
+            // self.graffiti,
+            // self.proposer_slashings,
+            // self.attester_slashings,
+            // self.attestations,
+            // self.deposits,
+            // self.voluntary_exits,
+            // self.sync_aggregate,
+            // self.execution_payload,
+            // self.bls_to_execution_changes,
+            self.blob_kzg_commitments
+        )
+    }
+}
+
 #[cfg(test)]
 mod serialization_tests {
     use super::*;
     use anyhow::Result;
+
+    //////// REMOVE LATER /////////
+
+    // fn snappy_decode_file_to_eth_type<T: Decode + TreeHash>(path: &Path) -> Result<T> {
+    //     let bytes = fs::read(path).with_context(|| format!("Unable to load {}", path.display()))?;
+    //     let mut decoder = Decoder::new();
+    //     let bytes = decoder
+    //         .decompress_vec(&bytes)
+    //         .with_context(|| format!("Error decoding snappy encoding for {}", path.display(),))?;
+    //     match T::from_ssz_bytes(&bytes) {
+    //         Ok(res) => Ok(res),
+    //         Err(e) => bail!("Failed to decode to ssz type: {:?}", e),
+    //     }
+    // }
+
+    #[test]
+    fn test_deserialize_custom_kzg() -> Result<()> {
+        let req = r#"
+            {
+                "data": ["0x7f82e0c1f7964445ecbcac74bc186724df0f7b2da6a67f2051e1457e155fc9a21f1b44d1a2a8910f0aadee0905b71007",
+                "0x345bc9a138646b7dac7bd2e5d615cb15c240db5309e20f391cdc5e593dca384be69e6140a0758f1e0f0c5d010f0e409c",
+                "0xb2c97b0d59487670503b518a51fb1dd7ebc18fa04f7a340188518af77164da34cd9b865956eeb4251bd0e16d2d2f4103",
+                "0x604c092a784346ce44690d932eff0494d8aa9321f4f0fa935782e9a4b47739510560b246568a387ad945f3f5a6216e4b"]
+            }"#;
+
+        let v0 = hex::decode("7f82e0c1f7964445ecbcac74bc186724df0f7b2da6a67f2051e1457e155fc9a21f1b44d1a2a8910f0aadee0905b71007").unwrap();
+        let v1 = hex::decode("345bc9a138646b7dac7bd2e5d615cb15c240db5309e20f391cdc5e593dca384be69e6140a0758f1e0f0c5d010f0e409c").unwrap();
+        let v2 = hex::decode("b2c97b0d59487670503b518a51fb1dd7ebc18fa04f7a340188518af77164da34cd9b865956eeb4251bd0e16d2d2f4103").unwrap();
+        let v3 = hex::decode("604c092a784346ce44690d932eff0494d8aa9321f4f0fa935782e9a4b47739510560b246568a387ad945f3f5a6216e4b").unwrap();
+
+        let v: CustomKZG = serde_json::from_str(req)?;
+        assert_eq!(v.data.len(), 4);
+        assert_eq!(v.data[0], FixedVector::<u8, typenum::U48>::new(v0).unwrap());
+        assert_eq!(v.data[1], FixedVector::<u8, typenum::U48>::new(v1).unwrap());
+        assert_eq!(v.data[2], FixedVector::<u8, typenum::U48>::new(v2).unwrap());
+        assert_eq!(v.data[3], FixedVector::<u8, typenum::U48>::new(v3).unwrap());
+
+        // assert_eq!(
+        //     v.data[0],
+        //     FixedVector::<u8, typenum::U48>::new(
+        //         [
+        //             127, 130, 224, 193, 247, 150, 68, 69, 236, 188, 172, 116, 188, 24, 103, 36,
+        //             223, 15, 123, 45, 166, 127, 32, 81, 225, 69, 126, 21, 95, 201, 162, 31, 27, 68,
+        //             209, 162, 168, 145, 15, 10, 173, 238, 9, 5, 183, 16, 7
+        //         ]
+        //         .to_vec()
+        //     )
+        //     .unwrap()
+        // );
+        // assert_eq!(
+        //     v.data[1],
+        //     FixedVector::<u8, typenum::U48>::new(
+        //         [
+        //             52, 91, 201, 161, 56, 100, 107, 125, 172, 123, 210, 229, 214, 21, 203, 21, 194,
+        //             64, 219, 83, 9, 226, 15, 57, 28, 220, 94, 89, 61, 202, 56, 75, 230, 158, 97,
+        //             64, 160, 117, 143, 30, 15, 12, 93, 1, 15, 14, 64, 156
+        //         ]
+        //         .to_vec()
+        //     )
+        //     .unwrap()
+        // );
+        // assert_eq!(
+        //     v.data[2],
+        //     FixedVector::<u8, typenum::U48>::new(
+        //         [
+        //             178, 201, 123, 13, 89, 72, 118, 112, 80, 59, 81, 138, 81, 251, 29, 215, 235,
+        //             193, 143, 160, 79, 122, 52, 1, 136, 81, 138, 247, 113, 100, 218, 52, 205, 155,
+        //             134, 89, 86, 238, 180, 37, 27, 208, 225, 109, 45, 47, 65, 3
+        //         ]
+        //         .to_vec()
+        //     )
+        //     .unwrap()
+        // );
+        // assert_eq!(
+        //     v.data[3],
+        //     FixedVector::<u8, typenum::U48>::new(
+        //         [
+        //             96, 76, 9, 42, 120, 67, 70, 206, 68, 105, 13, 147, 46, 255, 4, 148, 216, 170,
+        //             147, 33, 244, 240, 250, 147, 87, 46, 154, 75, 71, 55, 149, 16, 86, 11, 36, 101,
+        //             104, 163, 135, 173, 148, 95, 63, 90, 98, 22, 228, 177
+        //         ]
+        //         .to_vec()
+        //     )
+        //     .unwrap()
+        // );
+        // assert_eq!(
+        //     v.data[0],
+        //     FixedVector::<u8, typenum::U48>::new(
+        //         [
+        //             2, 32, 30, 60, 205, 61, 54, 174, 47, 60, 165, 220, 215, 152, 149, 48, 154, 72,
+        //             185, 209, 171, 78, 36, 64, 240, 144, 192, 248, 240, 165, 176, 74, 244, 49, 56,
+        //             246, 167, 84, 171, 26, 47, 252, 177, 223, 229, 46, 94, 170
+        //         ]
+        //         .to_vec()
+        //     )
+        //     .unwrap()
+        // );
+
+        // assert_eq!(
+        //     v.data[1],
+        //     FixedVector::<u8, typenum::U48>::new(
+        //         [
+        //             159, 57, 3, 231, 90, 85, 26, 107, 68, 154, 198, 44, 12, 23, 167, 153, 133, 114,
+        //             18, 211, 157, 97, 184, 30, 100, 174, 251, 74, 215, 4, 194, 248, 206, 100, 115,
+        //             234, 117, 196, 155, 112, 21, 81, 99, 255, 179, 27, 197, 137
+        //         ]
+        //         .to_vec()
+        //     )
+        //     .unwrap()
+        // );
+
+        // assert_eq!(
+        //     v.data[2],
+        //     FixedVector::<u8, typenum::U48>::new(
+        //         [
+        //             121, 126, 116, 170, 94, 74, 253, 228, 17, 184, 58, 6, 31, 126, 23, 95, 135,
+        //             241, 220, 206, 65, 100, 52, 5, 66, 79, 56, 60, 105, 134, 77, 121, 56, 98, 35,
+        //             65, 117, 180, 91, 93, 253, 93, 248, 8, 81, 70, 245, 233
+        //         ]
+        //         .to_vec()
+        //     )
+        //     .unwrap()
+        // );
+        Ok(())
+    }
 
     #[test]
     fn test_deserialize_fork() -> Result<()> {

@@ -1,2 +1,2 @@
 mod common;
-// mod signing_tests;
+mod signing_tests;
