@@ -1,4 +1,4 @@
-TESTS_TAG := v1.3.0-rc.4
+TESTS_TAG := v1.4.0-alpha.0
 TESTS = general minimal mainnet
 TARBALLS = $(patsubst %,%-$(TESTS_TAG).tar.gz,$(TESTS))
 
@@ -7,7 +7,7 @@ OUTPUT_DIR := ./$(REPO_NAME)
 BASE_URL := https://github.com/ethereum/$(REPO_NAME)/releases/download/$(TESTS_TAG)
 
 BLS_TEST_REPO_NAME := bls12-381-tests
-BLS_TEST_TAG := v0.1.1
+BLS_TEST_TAG := v0.1.2
 BLS_TEST = bls_tests_yaml
 BLS_TARBALL = $(patsubst %,%-$(BLS_TEST_TAG).tar.gz,$(BLS_TEST))
 BLS_OUTPUT_DIR := $(OUTPUT_DIR)/$(BLS_TEST_REPO_NAME)
