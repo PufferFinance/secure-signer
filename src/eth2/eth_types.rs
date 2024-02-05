@@ -637,10 +637,10 @@ pub struct ExecutionPayload {
     pub block_hash: Root, // Hash of execution block
     pub transactions: VariableList<Transaction, MAX_TRANSACTIONS_PER_PAYLOAD>,
     pub withdrawals: VariableList<Withdrawal, MAX_WITHDRAWALS_PER_PAYLOAD>, // [New in Capella]
-    #[serde(with = "quoted_u64")]
-    pub blob_gas_used: u64,                // [New in Deneb:EIP4844]
-    #[serde(with = "quoted_u64")]
-    pub excess_blob_gas: u64,              // [New in Deneb:EIP4844]
+    // #[serde(with = "quoted_u64")]
+    // pub blob_gas_used: u64,                // [New in Deneb:EIP4844]
+    // #[serde(with = "quoted_u64")]
+    // pub excess_blob_gas: u64,              // [New in Deneb:EIP4844]
     #[serde(
         deserialize_with = "from_u256_string",
         serialize_with = "to_u256_string"
