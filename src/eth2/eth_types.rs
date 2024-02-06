@@ -1,6 +1,6 @@
 use num_bigint::BigUint;
 use serde::de::{self, Deserializer};
-use serde::ser::{self, Serializer, SerializeSeq};
+use serde::ser::{self, SerializeSeq, Serializer};
 use serde::{Deserialize, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 use serde_utils::quoted_u64;
@@ -153,7 +153,6 @@ where
     let mut res: Vec<FixedVector<u8, typenum::U48>> = Vec::new();
     let hex_string_vec: Vec<String> =
         Vec::deserialize(deserializer).expect("Failed to deserialize");
-;
     for hex_str in hex_string_vec {
         let hex_str: &str = strip_0x_prefix!(hex_str);
         let bytes = match hex::decode(hex_str) {
