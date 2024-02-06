@@ -10,7 +10,7 @@ use anyhow::{bail, Context, Result};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-pub const BASE_DIR: &str = "./tests/consensus-spec-tests/tests/mainnet/capella/ssz_static/";
+pub const BASE_DIR: &str = "./tests/consensus-spec-tests/tests/mainnet/deneb/ssz_static/";
 
 #[derive(Debug, Deserialize, Serialize, Clone, Default)]
 struct ExpectedRoot {
