@@ -37,79 +37,6 @@ pub type Domain = Bytes32;
 pub type ExecutionAddress = Bytes20;
 pub type KZGCommitment = Bytes48;
 
-// #[derive(Clone, Encode, Decode)]
-// pub struct KZGCommitment {
-//     pub data: Bytes48,
-// }
-
-// impl TreeHashTrait for KZGCommitment {
-//     fn tree_hash_type() -> tree_hash::TreeHashType {
-//         <FixedVector<u8, typenum::U48> as TreeHashTrait>::tree_hash_type()
-//     }
-
-//     fn tree_hash_packed_encoding(&self) -> tree_hash::PackedEncoding {
-//         self.data.tree_hash_packed_encoding()
-//     }
-
-//     fn tree_hash_packing_factor() -> usize {
-//         <FixedVector<u8, typenum::U48> as TreeHashTrait>::tree_hash_packing_factor()
-//     }
-
-//     fn tree_hash_root(&self) -> tree_hash::Hash256 {
-//         self.data.tree_hash_root()
-//     }
-// }
-
-// impl FromStr for KZGCommitment {
-//     type Err = String;
-
-//     fn from_str(s: &str) -> Result<Self, Self::Err> {
-//         if let Some(stripped) = s.strip_prefix("0x") {
-//             let bytes = hex::decode(stripped).map_err(|e| e.to_string())?;
-//             if bytes.len() == 48 {
-//                 let mut kzg_commitment_bytes = [0; 48];
-//                 kzg_commitment_bytes[..].copy_from_slice(&bytes);
-//                 Ok(Self {
-//                     data: kzg_commitment_bytes.to_vec().into(),
-//                 })
-//             } else {
-//                 Err(format!(
-//                     "InvalidByteLength: got {}, expected {}",
-//                     bytes.len(),
-//                     48
-//                 ))
-//             }
-//         } else {
-//             Err("must start with 0x".to_string())
-//         }
-//     }
-// }
-
-// impl Serialize for KZGCommitment {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-//     where
-//         S: Serializer,
-//     {
-//         serializer.serialize_str(&format!("{:?}", self))
-//     }
-// }
-
-// impl<'de> Deserialize<'de> for KZGCommitment {
-//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-//     where
-//         D: Deserializer<'de>,
-//     {
-//         let string = String::deserialize(deserializer)?;
-//         Self::from_str(&string).map_err(serde::de::Error::custom)
-//     }
-// }
-
-// impl Debug for KZGCommitment {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//         write!(f, "{}", serde_utils::hex::encode(self.data.as_ssz_bytes()))
-//     }
-// }
-
 // typenums for specifying the length of FixedVector
 #[allow(non_camel_case_types)]
 pub type MAX_VALIDATORS_PER_COMMITTEE = typenum::U2048;
@@ -179,7 +106,6 @@ where
     D: Deserializer<'de>,
     T: From<Vec<u8>>,
 {
-    println!("Inside hex deserialization!!!!!!!!!!!!!!!!!!!!!!!!!!!");
     let hex_str: &str = Deserialize::deserialize(deserializer)?;
     let hex_str: &str = strip_0x_prefix!(hex_str);
     let bytes = match hex::decode(hex_str) {
@@ -206,19 +132,15 @@ where
     N: typenum::Unsigned,
 {
     let mut res: Vec<FixedVector<u8, typenum::U48>> = Vec::new();
-    println!("Inside blob deserialization!!!!!!!!!!!!!!!!!!!!!!!!!!!");
     let hex_string_vec: Vec<String> =
         Vec::deserialize(deserializer).expect("Failed to deserialize");
-    println!("After hex deserialization!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-    // let hex_string_vec = opt.unwrap_or_default();
-
+;
     for hex_str in hex_string_vec {
         let hex_str: &str = strip_0x_prefix!(hex_str);
         let bytes = match hex::decode(hex_str) {
             Ok(bs) => bs,
             Err(e) => return Err(de::Error::custom(format!("Not valid hex: {:?}", e))),
         };
-        println!("<================== KZG Blob Bytes: {:?}", bytes.clone());
         res.push(FixedVector::<u8, typenum::U48>::new(bytes).unwrap());
     }
     Ok(VariableList::new(res).unwrap())
@@ -231,7 +153,6 @@ pub fn to_hex_vec_from_ssz_type<S>(
 where
     S: Serializer,
 {
-    println!("Inside blob serialization!!!!!!!!!!!!!!!!!!!!!!!!!!!");
     let mut res: Vec<String> = Vec::new();
     for d in data {
         let hex_string = "0x".to_string() + &hex::encode(d.as_ssz_bytes());
@@ -637,10 +558,6 @@ pub struct ExecutionPayload {
     pub block_hash: Root, // Hash of execution block
     pub transactions: VariableList<Transaction, MAX_TRANSACTIONS_PER_PAYLOAD>,
     pub withdrawals: VariableList<Withdrawal, MAX_WITHDRAWALS_PER_PAYLOAD>, // [New in Capella]
-    // #[serde(with = "quoted_u64")]
-    // pub blob_gas_used: u64,                // [New in Deneb:EIP4844]
-    // #[serde(with = "quoted_u64")]
-    // pub excess_blob_gas: u64,              // [New in Deneb:EIP4844]
     #[serde(
         deserialize_with = "from_u256_string",
         serialize_with = "to_u256_string"
