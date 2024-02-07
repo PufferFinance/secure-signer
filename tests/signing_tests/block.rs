@@ -6,6 +6,8 @@ use puffersecuresigner::eth2::eth_types::*;
 use puffersecuresigner::strip_0x_prefix;
 use std::path::PathBuf;
 
+use blsttc::SecretKeySet;
+
 use ethers::utils::hex;
 
 const START_SLOT: u64 = 1234;
@@ -26,7 +28,7 @@ fn mock_propose_block_request(slot: u64) -> String {
                   "fork":{{
                      "previous_version":"0x03000000",
                      "current_version":"0x04000000",
-                     "epoch":"18446744073709551615"
+                     "epoch":"0"
                   }},
                   "genesis_validators_root":"0x270d43e74ce340de4bca2b1936beca0f4f5408d9e78aec4850920baf659d5b69"
                }},
@@ -74,7 +76,7 @@ fn mock_propose_block_request(slot: u64) -> String {
                      "blob_kzg_commitments": []
                   }}
                }},
-               "signingRoot": "0xaffb8a55ef3f26b7126201b1bb470c9c906304e0685ac1656e3f96ac94ab2d63"
+               "signingRoot": "0x2370dfd2695d0cc024e54ab68621a13f8d9863434938b670ec0aaea9fcef3b69"
             }}"#
     );
     req
@@ -82,8 +84,34 @@ fn mock_propose_block_request(slot: u64) -> String {
 
 #[tokio::test]
 pub async fn print_signing_root() {
-  let req = block_proposal_request(START_SLOT); 
-  println!("{:?}", hex::encode(req.to_signing_root(None)));
+  
+
+  let req: BLSSignMsg = block_proposal_request(START_SLOT); 
+  let root = req.to_signing_root(Some([0,0,0,0])); 
+
+  println!("root: {:?}", root);
+
+  if let BLSSignMsg::BLOCK(block_req) = req {
+    let block = block_req.block;
+
+    // root: [35, 112, 223, 210, 105, 93, 12, 192, 36, 229, 74, 182, 134, 33, 161, 63, 141, 152, 99, 67, 73, 56, 182, 112, 236, 10, 174, 169, 252, 239, 59, 105]
+    // sk_set: [85, 40, 245, 17, 84, 193, 234, 155, 24, 234, 181, 58, 171, 193, 209, 164, 120, 147, 10, 174, 189, 228, 119, 48, 181, 19, 117, 223, 2, 240, 7, 108]
+
+    let sk_hex = "5528f51154c1ea9b18eab53aabc1d1a478930aaebde47730b51375df02f0076c";
+    dbg!(&sk_hex);
+    let sk_hex: String = strip_0x_prefix!(sk_hex);
+    let sk_bytes = hex::decode(sk_hex).unwrap();
+    let sk_set = SecretKeySet::from_bytes(sk_bytes).unwrap();
+
+    println!("sk_set: {:?}", sk_set.to_bytes());
+
+    println!("pub_key: {:?}", sk_set.public_keys().public_key().to_hex());
+
+    let sig = hex::encode(sk_set.secret_key().sign(&root).to_bytes());
+
+    println!("signature: {:?}", sig);
+
+  }
 }
 
 #[tokio::test]
@@ -111,9 +139,11 @@ pub async fn test_aggregate_block_happy_path() {
 #[tokio::test]
 pub async fn test_aggregate_block_happy_path_test_vec() {
     let port = None;
-    let exp_sig = Some("a156ad93565d3a5d9e79f36a55f335a9c589d6428613ef067620d50185121f7b6ab8e54acc86d67a66c0addb25107c5509f6f35cc1f98651c24c673227197d98dcfd9a93e9672d19b37c25c8b1ccefad70ca42052dd76e3b59713c074ddf4d22".to_string());
+    let exp_sig = Some("980115f17f4b80a047676fc7acb628acdac0261ecf6204e37ab24f6a39f6b72abe652f2a9fe6f2311779b885d287efe7190720ab46b9311eb087828185e35712d207a36a1763d93bbd33dd1aabdb9f1a8b0d618107a466d8f5f0c449f8de62fd".to_string());
     let req = block_proposal_request(START_SLOT);
     let bls_pk_hex = common::setup_dummy_keypair();
+
+    println!("bls_pk_hex: {:?}", &bls_pk_hex);
     let (resp, status) = make_signing_route_request(req, &bls_pk_hex, port)
         .await
         .unwrap();

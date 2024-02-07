@@ -56,13 +56,13 @@ pub fn eth_pk_from_hex(pk_hex: &String) -> Result<EthPublicKey> {
     }
 }
 
-/// Derives an ETH public key from a hex-string, expects the hex string to be in compressed 33B form
+/// Derives an ETH public key from a hex-string, expects the hex string to be in uncompressed 65B form
 pub fn eth_pk_from_hex_uncompressed(pk_hex: &String) -> Result<EthPublicKey> {
     let pk_hex: String = strip_0x_prefix!(pk_hex);
     let pk_bytes = hex::decode(&pk_hex)?;
 
     if pk_bytes.len() != ETH_UNCOMPRESSED_PK_BYTES {
-        bail!("ETH pk should be in compressed 33B form")
+        bail!("ETH pk should be in 65B form")
     }
 
     let mut pk_uncompressed_bytes = [0_u8; ETH_UNCOMPRESSED_PK_BYTES];
