@@ -84,34 +84,31 @@ fn mock_propose_block_request(slot: u64) -> String {
 
 #[tokio::test]
 pub async fn print_signing_root() {
-  
+    let req: BLSSignMsg = block_proposal_request(START_SLOT);
+    let root = req.to_signing_root(Some([0, 0, 0, 0]));
 
-  let req: BLSSignMsg = block_proposal_request(START_SLOT); 
-  let root = req.to_signing_root(Some([0,0,0,0])); 
+    println!("root: {:?}", root);
 
-  println!("root: {:?}", root);
+    if let BLSSignMsg::BLOCK(block_req) = req {
+        let block = block_req.block;
 
-  if let BLSSignMsg::BLOCK(block_req) = req {
-    let block = block_req.block;
+        // root: [35, 112, 223, 210, 105, 93, 12, 192, 36, 229, 74, 182, 134, 33, 161, 63, 141, 152, 99, 67, 73, 56, 182, 112, 236, 10, 174, 169, 252, 239, 59, 105]
+        // sk_set: [85, 40, 245, 17, 84, 193, 234, 155, 24, 234, 181, 58, 171, 193, 209, 164, 120, 147, 10, 174, 189, 228, 119, 48, 181, 19, 117, 223, 2, 240, 7, 108]
 
-    // root: [35, 112, 223, 210, 105, 93, 12, 192, 36, 229, 74, 182, 134, 33, 161, 63, 141, 152, 99, 67, 73, 56, 182, 112, 236, 10, 174, 169, 252, 239, 59, 105]
-    // sk_set: [85, 40, 245, 17, 84, 193, 234, 155, 24, 234, 181, 58, 171, 193, 209, 164, 120, 147, 10, 174, 189, 228, 119, 48, 181, 19, 117, 223, 2, 240, 7, 108]
+        let sk_hex = "5528f51154c1ea9b18eab53aabc1d1a478930aaebde47730b51375df02f0076c";
+        dbg!(&sk_hex);
+        let sk_hex: String = strip_0x_prefix!(sk_hex);
+        let sk_bytes = hex::decode(sk_hex).unwrap();
+        let sk_set = SecretKeySet::from_bytes(sk_bytes).unwrap();
 
-    let sk_hex = "5528f51154c1ea9b18eab53aabc1d1a478930aaebde47730b51375df02f0076c";
-    dbg!(&sk_hex);
-    let sk_hex: String = strip_0x_prefix!(sk_hex);
-    let sk_bytes = hex::decode(sk_hex).unwrap();
-    let sk_set = SecretKeySet::from_bytes(sk_bytes).unwrap();
+        println!("sk_set: {:?}", sk_set.to_bytes());
 
-    println!("sk_set: {:?}", sk_set.to_bytes());
+        println!("pub_key: {:?}", sk_set.public_keys().public_key().to_hex());
 
-    println!("pub_key: {:?}", sk_set.public_keys().public_key().to_hex());
+        let sig = hex::encode(sk_set.secret_key().sign(&root).to_bytes());
 
-    let sig = hex::encode(sk_set.secret_key().sign(&root).to_bytes());
-
-    println!("signature: {:?}", sig);
-
-  }
+        println!("signature: {:?}", sig);
+    }
 }
 
 #[tokio::test]
