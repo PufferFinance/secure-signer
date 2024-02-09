@@ -161,7 +161,12 @@ where
         };
         let fixed_vector = match FixedVector::<u8, typenum::U48>::new(bytes) {
             Ok(fv) => fv,
-            Err(e) => return Err(de::Error::custom(format!("Failed to create FixedVector: {:?}", e))),
+            Err(e) => {
+                return Err(de::Error::custom(format!(
+                    "Failed to create FixedVector: {:?}",
+                    e
+                )))
+            }
         };
         res.push(fixed_vector);
     }
