@@ -76,10 +76,6 @@ pub fn read_bls_keystore(pk_hex: &String, password: &String) -> Result<Vec<u8>> 
 
 /// Deletes the secret key saved at the specified path
 fn delete_key(file_path: PathBuf) -> Result<()> {
-    use std::os::unix::fs::PermissionsExt;
-    let mut permissions = fs::metadata(file_path.clone())?.permissions();
-    permissions.set_mode(0o755); // Set the desired permissions, e.g., read/write/execute for owner, read/execute for group and others
-    fs::set_permissions(file_path.clone(), permissions)?;
     fs::remove_file(&file_path)
         .with_context(|| format!("failed to delete key at: {:?}", file_path.as_os_str()))
 }
