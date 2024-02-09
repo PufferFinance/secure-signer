@@ -159,7 +159,11 @@ where
             Ok(bs) => bs,
             Err(e) => return Err(de::Error::custom(format!("Not valid hex: {:?}", e))),
         };
-        res.push(FixedVector::<u8, typenum::U48>::new(bytes).unwrap());
+        let fixed_vector = match FixedVector::<u8, typenum::U48>::new(bytes) {
+            Ok(fv) => fv,
+            Err(e) => return Err(de::Error::custom(format!("Failed to create FixedVector: {:?}", e))),
+        };
+        res.push(fixed_vector);
     }
     Ok(VariableList::new(res).unwrap())
 }
