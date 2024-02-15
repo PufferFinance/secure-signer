@@ -92,7 +92,7 @@ impl GuardianClientTrait for MockGuardianClient {
 
     async fn validate_custody(
         &self,
-        request: crate::enclave::types::ValidateCustodyRequest,
+        _request: crate::enclave::types::ValidateCustodyRequest,
     ) -> anyhow::Result<crate::enclave::types::ValidateCustodyResponse> {
         match self.validate_custody_responses.lock().unwrap().pop_front() {
             Some(res) => Ok(res),

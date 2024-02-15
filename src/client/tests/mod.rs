@@ -67,6 +67,7 @@ async fn registration_flow_succeeds() {
         mrenclave,
         mrsigner,
         verify_remote_attestation,
+        validator_index: 0
     };
 
     // Guardian validates they received custody
@@ -129,6 +130,7 @@ async fn test_cli_keygen_verified_by_guardians() {
         mrenclave: "".to_string(),
         mrsigner: "".to_string(),
         verify_remote_attestation,
+        validator_index: 0
     };
 
     // Guardian validates they received custody
