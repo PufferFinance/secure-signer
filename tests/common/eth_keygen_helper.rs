@@ -74,7 +74,7 @@ pub async fn register_new_eth_key(
 async fn test_register_new_eth_key() {
     let port = read_secure_signer_port();
     let resp = register_new_eth_key(port).await;
-    let _pk = eth_keys::eth_pk_from_hex(&resp.pk_hex).unwrap();
+    let _pk = eth_keys::eth_pk_from_hex_uncompressed(&resp.pk_hex).unwrap();
     dbg!(resp.pk_hex);
 }
 
@@ -90,7 +90,7 @@ async fn test_eth_key_in_remote_attestation_evidence() {
         resp.evidence.verify_intel_signing_certificate().unwrap();
 
         // Verify the payload
-        let pk = eth_keys::eth_pk_from_hex(&resp.pk_hex).unwrap();
+        let pk = eth_keys::eth_pk_from_hex_uncompressed(&resp.pk_hex).unwrap();
 
         let got_payload: [u8; 64] = resp.evidence.get_report_data().unwrap();
         assert_eq!(

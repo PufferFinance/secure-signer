@@ -1,6 +1,6 @@
 use num_bigint::BigUint;
 use serde::de::{self, Deserializer};
-use serde::ser::{self, Serializer};
+use serde::ser::{self, SerializeSeq, Serializer};
 use serde::{Deserialize, Serialize};
 use serde_hex::{SerHex, StrictPfx};
 use serde_utils::quoted_u64;
@@ -32,6 +32,7 @@ pub type Gwei = u64;
 pub type DomainType = Bytes4;
 pub type Domain = Bytes32;
 pub type ExecutionAddress = Bytes20;
+pub type KZGCommitment = Bytes48;
 
 // typenums for specifying the length of FixedVector
 #[allow(non_camel_case_types)]
@@ -92,6 +93,10 @@ pub type MAX_BLS_TO_EXECUTION_CHANGES = typenum::U16;
 #[allow(non_camel_case_types)]
 pub type MAX_WITHDRAWALS_PER_PAYLOAD = typenum::U16;
 
+// deneb
+#[allow(non_camel_case_types)]
+pub type MAX_BLOB_COMMITMENTS_PER_BLOCK = typenum::U4096;
+
 // Custom deserializers
 pub fn from_hex_to_ssz_type<'de, D, T>(deserializer: D) -> Result<T, D::Error>
 where
@@ -136,6 +141,55 @@ where
             )))
         }
     }
+}
+
+pub fn from_hex_vec_to_ssz_type<'de, D, N>(
+    deserializer: D,
+) -> Result<VariableList<FixedVector<u8, typenum::U48>, N>, D::Error>
+where
+    D: Deserializer<'de>,
+    N: typenum::Unsigned,
+{
+    let mut res: Vec<FixedVector<u8, typenum::U48>> = Vec::new();
+    let hex_string_vec: Vec<String> =
+        Vec::deserialize(deserializer).expect("Failed to deserialize");
+    for hex_str in hex_string_vec {
+        let hex_str: &str = strip_0x_prefix!(hex_str);
+        let bytes = match hex::decode(hex_str) {
+            Ok(bs) => bs,
+            Err(e) => return Err(de::Error::custom(format!("Not valid hex: {:?}", e))),
+        };
+        let fixed_vector = match FixedVector::<u8, typenum::U48>::new(bytes) {
+            Ok(fv) => fv,
+            Err(e) => {
+                return Err(de::Error::custom(format!(
+                    "Failed to create FixedVector: {:?}",
+                    e
+                )))
+            }
+        };
+        res.push(fixed_vector);
+    }
+    Ok(VariableList::new(res).unwrap())
+}
+
+pub fn to_hex_vec_from_ssz_type<S>(
+    data: &VariableList<FixedVector<u8, typenum::U48>, typenum::U4096>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let mut res: Vec<String> = Vec::new();
+    for d in data {
+        let hex_string = "0x".to_string() + &hex::encode(d.as_ssz_bytes());
+        res.push(hex_string);
+    }
+    let mut seq = serializer.serialize_seq(Some(res.len()))?;
+    for element in res {
+        seq.serialize_element(&element)?;
+    }
+    seq.end()
 }
 
 pub fn from_u256_string<'de, D>(deserializer: D) -> Result<U256, D::Error>
@@ -450,12 +504,19 @@ pub struct BeaconBlockBody {
     pub voluntary_exits: VariableList<SignedVoluntaryExit, MAX_VOLUNTARY_EXITS>,
     pub sync_aggregate: SyncAggregate, // # [New in Altair]
 
-    // https://github.com/ethereum/consensus-specs/blob/dev/specs/bellatrix/beacon-chain.md#beaconblockbody
-    pub execution_payload: ExecutionPayload, //   # [New in Bellatrix]
+    // https://github.com/ethereum/consensus-specs/blob/dev/specs/deneb/beacon-chain.md#beaconblockbody
+    pub execution_payload: ExecutionPayload, //    # [Modified in Deneb:EIP4844]
 
     // https://github.com/ethereum/consensus-specs/blob/dev/specs/capella/beacon-chain.md#beaconblockbody
     pub bls_to_execution_changes:
         VariableList<SignedBLSToExecutionChange, MAX_BLS_TO_EXECUTION_CHANGES>, // [New in Capella]
+
+    // https://github.com/ethereum/consensus-specs/blob/dev/specs/deneb/beacon-chain.md#beaconblockbody
+    #[serde(
+        deserialize_with = "from_hex_vec_to_ssz_type",
+        serialize_with = "to_hex_vec_from_ssz_type"
+    )]
+    pub blob_kzg_commitments: VariableList<KZGCommitment, MAX_BLOB_COMMITMENTS_PER_BLOCK>, // [New in Deneb:EIP4844]
 }
 
 #[derive(Debug, Deserialize, Serialize, Encode, Decode, TreeHash, Clone)]
@@ -502,6 +563,11 @@ pub struct ExecutionPayload {
     pub block_hash: Root, // Hash of execution block
     pub transactions: VariableList<Transaction, MAX_TRANSACTIONS_PER_PAYLOAD>,
     pub withdrawals: VariableList<Withdrawal, MAX_WITHDRAWALS_PER_PAYLOAD>, // [New in Capella]
+    #[serde(
+        deserialize_with = "from_u256_string",
+        serialize_with = "to_u256_string"
+    )]
+    pub excess_data_gas: U256, // according to the downloaded spec test vectors but not official ethereum specs.
 }
 
 #[derive(Debug, Deserialize, Serialize, Encode, Decode, TreeHash, Clone)]
