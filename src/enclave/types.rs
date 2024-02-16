@@ -4,6 +4,7 @@ use crate::eth2::eth_types::ValidatorIndex;
 use anyhow::{bail, Result};
 use blsttc::{PublicKey as BlsPublicKey, PublicKeySet};
 use ecies::{PublicKey as EthPublicKey, SecretKey as EthSecretKey};
+use ethers::types::U256;
 use serde::ser::SerializeSeq;
 use serde::{Deserialize, Serialize};
 use tree_hash::TreeHash;
@@ -138,7 +139,8 @@ pub struct ValidateCustodyRequest {
     pub mrenclave: String,
     pub mrsigner: String,
     pub verify_remote_attestation: bool,
-    pub validator_index: ValidatorIndex
+    pub validator_index: ValidatorIndex,
+    pub vt_burn_offset: U256
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
