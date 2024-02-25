@@ -242,8 +242,8 @@ pub fn sign_voluntary_exit_message(
     );
     let sk = crate::crypto::bls_keys::fetch_bls_sk(&pk_hex)?.secret_key();
 
-    // Sign a VoluntaryExitMessage with Epoch 0
-    let (sig, _root) = sign_vem(sk, 0, req.validator_index, req.fork_info)?;
+    // Sign a VoluntaryExitMessage
+    let (sig, _root) = sign_vem(sk, req.fork_info.epoch, req.validator_index, req.fork_info)?;
 
     Ok(crate::enclave::types::SignExitResponse {
         signature: hex::encode(sig.as_ssz_bytes()),
@@ -471,7 +471,11 @@ mod tests {
         let (resp, g_sks, _mre, _mrs) = setup();
 
         for g_sk in g_sks {
-            assert!(approve_custody(&resp, &g_sk, &0, U256::from_dec_str("1000").unwrap()).await.is_ok());
+            assert!(
+                approve_custody(&resp, &g_sk, &0, U256::from_dec_str("1000").unwrap())
+                    .await
+                    .is_ok()
+            );
         }
     }
 

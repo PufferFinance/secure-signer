@@ -1,6 +1,6 @@
+use crate::eth2::eth_types::ValidatorIndex;
 use crate::io::remote_attestation::AttestationEvidence;
 use crate::{crypto::eth_keys, strip_0x_prefix};
-use crate::eth2::eth_types::ValidatorIndex;
 use anyhow::{bail, Result};
 use blsttc::{PublicKey as BlsPublicKey, PublicKeySet};
 use ecies::{PublicKey as EthPublicKey, SecretKey as EthSecretKey};
@@ -140,7 +140,7 @@ pub struct ValidateCustodyRequest {
     pub mrsigner: String,
     pub verify_remote_attestation: bool,
     pub validator_index: ValidatorIndex,
-    pub vt_burn_offset: U256
+    pub vt_burn_offset: U256,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
