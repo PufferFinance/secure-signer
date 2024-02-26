@@ -35,19 +35,32 @@ impl ValidatorClientTrait for ValidatorClient {
             .json(payload)
             .send()
             .await?;
-        Ok(resp
-            .json::<crate::enclave::types::BlsKeygenPayload>()
-            .await?)
+
+        let resp_status = resp.status();
+        if !resp_status.is_success() {
+            let body = resp.text().await?;
+            return Err(anyhow::anyhow!(body));
+        }
+
+        let resp_json = resp.json().await?;
+        Ok(resp_json)
     }
 
     async fn list_bls_keys(&self) -> anyhow::Result<crate::enclave::types::ListKeysResponse> {
-        Ok(self
+        let resp = self
             .client
             .get(format!("{}/eth/v1/keystores", self.url))
             .send()
-            .await?
-            .json::<crate::enclave::types::ListKeysResponse>()
-            .await?)
+            .await?;
+
+        let resp_status = resp.status();
+        if !resp_status.is_success() {
+            let body = resp.text().await?;
+            return Err(anyhow::anyhow!(body));
+        }
+
+        let resp_json = resp.json().await?;
+        Ok(resp_json)
     }
 
     async fn sign_voluntary_exit_message(
@@ -67,13 +80,21 @@ impl ValidatorClientTrait for ValidatorClient {
             },
         };
         let req = crate::eth2::eth_signing::BLSSignMsg::VOLUNTARY_EXIT(vem);
-        Ok(self
+
+        let resp = self
             .client
             .post(format!("{}/api/v1/eth2/sign/{}", self.url, bls_pk_hex))
             .json(&req)
             .send()
-            .await?
-            .json()
-            .await?)
+            .await?;
+
+        let resp_status = resp.status();
+        if !resp_status.is_success() {
+            let body = resp.text().await?;
+            return Err(anyhow::anyhow!(body));
+        }
+
+        let resp_json = resp.json().await?;
+        Ok(resp_json)
     }
 }
