@@ -31,51 +31,79 @@ impl GuardianClientTrait for GuardianClient {
             blockhash: blockhash.to_string(),
         };
 
-        Ok(self
+        let resp = self
             .client
             .post(format!("{}/eth/v1/keygen", self.url))
             .json(&data)
             .send()
-            .await?
-            .json()
-            .await?)
+            .await?;
+
+        let resp_status = resp.status();
+        if !resp_status.is_success() {
+            let body = resp.text().await?;
+            return Err(anyhow::anyhow!(body));
+        }
+
+        let resp_json = resp.json().await?;
+        Ok(resp_json)
     }
 
     async fn list_eth_keys(&self) -> anyhow::Result<crate::enclave::types::ListKeysResponse> {
-        Ok(self
+        let resp = self
             .client
             .get(format!("{}/eth/v1/keygen", self.url))
             .send()
-            .await?
-            .json::<crate::enclave::types::ListKeysResponse>()
-            .await?)
+            .await?;
+
+        let resp_status = resp.status();
+        if !resp_status.is_success() {
+            let body = resp.text().await?;
+            return Err(anyhow::anyhow!(body));
+        }
+
+        let resp_json = resp.json().await?;
+        Ok(resp_json)
     }
 
     async fn validate_custody(
         &self,
         request: crate::enclave::types::ValidateCustodyRequest,
     ) -> anyhow::Result<crate::enclave::types::ValidateCustodyResponse> {
-        Ok(self
+        let resp = self
             .client
             .post(format!("{}/guardian/v1/validate-custody", self.url))
             .json(&request)
             .send()
-            .await?
-            .json()
-            .await?)
+            .await?;
+
+        let resp_status = resp.status();
+        if !resp_status.is_success() {
+            let body = resp.text().await?;
+            return Err(anyhow::anyhow!(body));
+        }
+
+        let resp_json = resp.json().await?;
+        Ok(resp_json)
     }
 
     async fn sign_exit(
         &self,
         request: crate::enclave::types::SignExitRequest,
     ) -> anyhow::Result<crate::enclave::types::SignExitResponse> {
-        Ok(self
+        let resp = self
             .client
             .post(format!("{}/guardian/v1/sign-exit", self.url))
             .json(&request)
             .send()
-            .await?
-            .json()
-            .await?)
+            .await?;
+
+        let resp_status = resp.status();
+        if !resp_status.is_success() {
+            let body = resp.text().await?;
+            return Err(anyhow::anyhow!(body));
+        }
+
+        let resp_json = resp.json().await?;
+        Ok(resp_json)
     }
 }
