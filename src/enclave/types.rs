@@ -295,6 +295,7 @@ impl SignExitRequest {
 #[serde(rename_all = "camelCase")]
 pub struct SignExitResponse {
     pub signature: String,
+    pub msg: String,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]

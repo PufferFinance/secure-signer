@@ -243,10 +243,11 @@ pub fn sign_voluntary_exit_message(
     let sk = crate::crypto::bls_keys::fetch_bls_sk(&pk_hex)?.secret_key();
 
     // Sign a VoluntaryExitMessage with Epoch 0
-    let (sig, _root) = sign_vem(sk, 0, req.validator_index, req.fork_info)?;
+    let (sig, root) = sign_vem(sk, 0, req.validator_index, req.fork_info)?;
 
     Ok(crate::enclave::types::SignExitResponse {
         signature: hex::encode(sig.as_ssz_bytes()),
+        msg: hex::encode(root),
     })
 }
 
