@@ -247,7 +247,7 @@ pub fn sign_voluntary_exit_message(
 
     Ok(crate::enclave::types::SignExitResponse {
         signature: hex::encode(sig.as_ssz_bytes()),
-        msg: hex::encode(root),
+        message: hex::encode(root),
     })
 }
 
