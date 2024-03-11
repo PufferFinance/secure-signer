@@ -468,11 +468,7 @@ mod tests {
         let (resp, g_sks, _mre, _mrs) = setup();
 
         for g_sk in g_sks {
-            assert!(
-                approve_custody(&resp, &g_sk, &0)
-                    .await
-                    .is_ok()
-            );
+            assert!(approve_custody(&resp, &g_sk, &0).await.is_ok());
         }
     }
 

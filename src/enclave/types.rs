@@ -151,7 +151,6 @@ pub struct ValidateCustodyResponse {
     pub deposit_data_root: String,
 }
 
-
 #[allow(dead_code)]
 fn serialize_signature_as_hex<S>(
     signature: &libsecp256k1::Signature,
