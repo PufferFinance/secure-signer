@@ -162,7 +162,7 @@ fn verify_deposit_message(keygen_payload: &crate::enclave::types::BlsKeygenPaylo
     Ok(())
 }
 
-fn verify_custody(
+pub fn verify_custody(
     keygen_payload: &crate::enclave::types::BlsKeygenPayload,
     guardian_enclave_sk: &EthSecretKey,
 ) -> Result<blsttc::SecretKeyShare> {
@@ -251,7 +251,7 @@ pub fn sign_voluntary_exit_message(
     })
 }
 
-fn sign_vem(
+pub fn sign_vem(
     sk_share: blsttc::SecretKey,
     epoch: crate::eth2::eth_types::Epoch,
     validator_index: crate::eth2::eth_types::ValidatorIndex,
