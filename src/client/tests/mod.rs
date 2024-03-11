@@ -2,8 +2,6 @@ mod guardian;
 mod secure_signer;
 mod validator;
 
-use ethers::types::U256;
-
 use crate::client::traits::{GuardianClientTrait, ValidatorClientTrait};
 
 use crate::eth2::eth_types::GENESIS_FORK_VERSION;
@@ -70,7 +68,6 @@ async fn registration_flow_succeeds() {
         mrsigner,
         verify_remote_attestation,
         validator_index: 0,
-        vt_burn_offset: U256::from_dec_str("1000000000000000000").unwrap(),
     };
 
     // Guardian validates they received custody
@@ -134,9 +131,7 @@ async fn test_cli_keygen_verified_by_guardians() {
         mrsigner: "".to_string(),
         verify_remote_attestation,
         validator_index: 0,
-        vt_burn_offset: U256::from_dec_str("1000").unwrap(),
     };
-    println!("req: {:?}", req.vt_burn_offset);
 
     // Guardian validates they received custody
     let resp3: crate::enclave::types::ValidateCustodyResponse =
