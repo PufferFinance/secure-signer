@@ -27,7 +27,7 @@ impl ValidatorClientTrait for MockValidatorClient {
 
     async fn attest_fresh_bls_key(
         &self,
-        payload: &crate::enclave::types::AttestFreshBlsKeyPayload,
+        _payload: &crate::enclave::types::AttestFreshBlsKeyPayload,
     ) -> anyhow::Result<crate::enclave::types::BlsKeygenPayload> {
         match self.fresh_bls_key.as_ref() {
             Some(resp) => Ok(resp.clone()),
@@ -43,10 +43,10 @@ impl ValidatorClientTrait for MockValidatorClient {
 
     async fn sign_voluntary_exit_message(
         &self,
-        bls_pk_hex: String,
-        epoch: crate::eth2::eth_types::Epoch,
-        validator_index: crate::eth2::eth_types::ValidatorIndex,
-        fork_info: crate::eth2::eth_types::ForkInfo,
+        _bls_pk_hex: String,
+        _epoch: crate::eth2::eth_types::Epoch,
+        _validator_index: crate::eth2::eth_types::ValidatorIndex,
+        _fork_info: crate::eth2::eth_types::ForkInfo,
     ) -> anyhow::Result<crate::enclave::types::SignatureResponse> {
         match self.voluntary_exit_message.as_ref() {
             Some(resp) => Ok(resp.clone()),
