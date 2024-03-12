@@ -83,7 +83,6 @@ pub async fn verify_and_sign_custody_received(
         &request.keygen_payload,
         &guardian_enclave_sk,
         &request.validator_index,
-        request.vt_burn_offset.clone(),
     )
     .await?;
 
@@ -197,14 +196,12 @@ async fn approve_custody(
     keygen_payload: &crate::enclave::types::BlsKeygenPayload,
     guardian_enclave_sk: &EthSecretKey,
     validator_index: &ValidatorIndex,
-    vt_burn_offset: U256,
 ) -> Result<String> {
     let mut hasher = sha3::Keccak256::new();
 
-    // validatorIndex, vtBurnOffset, pubKey, withdrawalCredentials, signature, depositDataRoot
+    // validatorIndex, pubKey, withdrawalCredentials, signature, depositDataRoot
     let msg = ethers::abi::encode(&[
         ethers::abi::Token::Uint(U256::from(validator_index.clone())),
-        ethers::abi::Token::Uint(vt_burn_offset),
         ethers::abi::Token::Bytes(
             keygen_payload
                 .public_key_set()?
@@ -471,11 +468,7 @@ mod tests {
         let (resp, g_sks, _mre, _mrs) = setup();
 
         for g_sk in g_sks {
-            assert!(
-                approve_custody(&resp, &g_sk, &0, U256::from_dec_str("1000").unwrap())
-                    .await
-                    .is_ok()
-            );
+            assert!(approve_custody(&resp, &g_sk, &0).await.is_ok());
         }
     }
 

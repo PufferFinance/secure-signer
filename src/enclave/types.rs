@@ -4,7 +4,6 @@ use crate::{crypto::eth_keys, strip_0x_prefix};
 use anyhow::{bail, Result};
 use blsttc::{PublicKey as BlsPublicKey, PublicKeySet};
 use ecies::{PublicKey as EthPublicKey, SecretKey as EthSecretKey};
-use ethers::types::U256;
 use serde::ser::SerializeSeq;
 use serde::{Deserialize, Serialize};
 use tree_hash::TreeHash;
@@ -140,7 +139,6 @@ pub struct ValidateCustodyRequest {
     pub mrsigner: String,
     pub verify_remote_attestation: bool,
     pub validator_index: ValidatorIndex,
-    pub vt_burn_offset: U256,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -153,6 +151,7 @@ pub struct ValidateCustodyResponse {
     pub deposit_data_root: String,
 }
 
+#[allow(dead_code)]
 fn serialize_signature_as_hex<S>(
     signature: &libsecp256k1::Signature,
     serializer: S,
@@ -165,6 +164,7 @@ where
     serializer.serialize_str(&hex_string)
 }
 
+#[allow(dead_code)]
 fn deserialize_signature_from_hex<'de, D>(
     deserializer: D,
 ) -> Result<libsecp256k1::Signature, D::Error>

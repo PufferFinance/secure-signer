@@ -62,7 +62,7 @@ impl GuardianClientTrait for MockGuardianClient {
 
     async fn attest_fresh_eth_key(
         &self,
-        blockhash: &str,
+        _blockhash: &str,
     ) -> anyhow::Result<crate::enclave::types::KeyGenResponse> {
         match self
             .attest_fresh_eth_key_responses
@@ -106,7 +106,7 @@ impl GuardianClientTrait for MockGuardianClient {
 
     async fn sign_exit(
         &self,
-        request: crate::enclave::types::SignExitRequest,
+        _request: crate::enclave::types::SignExitRequest,
     ) -> anyhow::Result<crate::enclave::types::SignExitResponse> {
         match self.sign_exit_responses.lock().unwrap().pop_front() {
             Some(res) => Ok(res),
