@@ -161,7 +161,7 @@ fn verify_deposit_message(keygen_payload: &crate::enclave::types::BlsKeygenPaylo
     Ok(())
 }
 
-fn verify_custody(
+pub fn verify_custody(
     keygen_payload: &crate::enclave::types::BlsKeygenPayload,
     guardian_enclave_sk: &EthSecretKey,
 ) -> Result<blsttc::SecretKeyShare> {
@@ -240,14 +240,15 @@ pub fn sign_voluntary_exit_message(
     let sk = crate::crypto::bls_keys::fetch_bls_sk(&pk_hex)?.secret_key();
 
     // Sign a VoluntaryExitMessage with Epoch 0
-    let (sig, _root) = sign_vem(sk, 0, req.validator_index, req.fork_info)?;
+    let (sig, root) = sign_vem(sk, 0, req.validator_index, req.fork_info)?;
 
     Ok(crate::enclave::types::SignExitResponse {
         signature: hex::encode(sig.as_ssz_bytes()),
+        message: hex::encode(root),
     })
 }
 
-fn sign_vem(
+pub fn sign_vem(
     sk_share: blsttc::SecretKey,
     epoch: crate::eth2::eth_types::Epoch,
     validator_index: crate::eth2::eth_types::ValidatorIndex,
