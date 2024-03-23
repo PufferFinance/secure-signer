@@ -48,6 +48,13 @@ async fn main() {
                 puffersecuresigner::enclave::shared::handlers::list_bls_keys::handler,
             ),
         )
+        // Endpoint to list all bls pubkeys - used by the validator client
+        .route(
+            "/api/v1/eth2/publicKeys",
+            axum::routing::get(
+                puffersecuresigner::enclave::shared::handlers::list_bls_keys_for_vc::handler,
+            ),
+        )
         // Endpoint to request a signature using BLS sk
         .route(
             "/api/v1/eth2/sign/:bls_pk_hex",

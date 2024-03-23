@@ -1,5 +1,6 @@
 pub mod health;
 pub mod list_bls_keys;
+pub mod list_bls_keys_for_vc;
 pub mod list_eth_keys;
 pub mod secure_sign_bls;
 
