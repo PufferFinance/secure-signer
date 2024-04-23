@@ -8,10 +8,13 @@ pub async fn handler() -> axum::response::Response {
     match key_management::list_bls_keys() {
         Ok(list_res) => {
             // safely prepend the response with "0x" to match the expected format
-            let list_res = list_res.iter().map(|x| {
-                let stripped: &str = strip_0x_prefix!(x);
-                format!("0x{}", stripped)
-            }).collect::<Vec<String>>();
+            let list_res = list_res
+                .iter()
+                .map(|x| {
+                    let stripped: &str = strip_0x_prefix!(x);
+                    format!("0x{}", stripped)
+                })
+                .collect::<Vec<String>>();
             (axum::http::status::StatusCode::OK, Json(list_res)).into_response()
         }
         Err(e) => {

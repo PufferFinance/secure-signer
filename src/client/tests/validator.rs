@@ -1,3 +1,8 @@
+use reqwest::StatusCode;
+
+use crate::eth2::eth_types::{
+    BLSPubkey, Bytes32, DepositMessage, DepositRequest, GENESIS_FORK_VERSION,
+};
 use crate::strip_0x_prefix;
 
 use crate::client::traits::ValidatorClientTrait;
@@ -144,4 +149,56 @@ async fn sign_voluntary_exit_message_with_success() {
         .unwrap()
         .public_key()
         .verify(&sig, root));
+}
+
+#[tokio::test]
+async fn sign_message_deposit_message() {
+    let client = crate::client::ClientBuilder::new().build();
+    let payload = crate::enclave::types::AttestFreshBlsKeyPayload {
+        guardian_pubkeys: vec![
+            hex_to_pubkey("04fad76420abd33cfd92f51f31c47fe678922e476281b21aa8a738bcd56e37a776f678c94592d6aefd17af48b508feb1f27e82da4c0c46a253830e4d8637b3fbaf"),
+            hex_to_pubkey("0x04fad76420abd33cfd92f51f31c47fe678922e476281b21aa8a738bcd56e37a776f678c94592d6aefd17af48b508feb1f27e82da4c0c46a253830e4d8637b3fbaf"),
+            hex_to_pubkey("04fad76420abd33cfd92f51f31c47fe678922e476281b21aa8a738bcd56e37a776f678c94592d6aefd17af48b508feb1f27e82da4c0c46a253830e4d8637b3fbaf"),
+            hex_to_pubkey("0x04fad76420abd33cfd92f51f31c47fe678922e476281b21aa8a738bcd56e37a776f678c94592d6aefd17af48b508feb1f27e82da4c0c46a253830e4d8637b3fbaf")
+        ],
+        withdrawal_credentials: [0; 32],
+        threshold: 3,
+        fork_version: crate::eth2::eth_types::GENESIS_FORK_VERSION,
+        do_remote_attestation: true,
+    };
+    let resp = client
+        .validator
+        .attest_fresh_bls_key(&payload)
+        .await
+        .unwrap();
+
+    let deposit_request = DepositRequest {
+        signingRoot: None,
+        deposit: DepositMessage {
+            pubkey: BLSPubkey::from(
+                hex::decode("04fad76420abd33cfd92f51f31c47fe678922e476281b21aa8a738bcd56e37a776f678c94592d6aefd17af48b508feb1f27e82da4c0c46a253830e4d8637b3fbaf")
+                .unwrap()
+            ),
+            withdrawal_credentials: Bytes32::default(),
+            amount: 0,
+        },
+        genesis_fork_version: GENESIS_FORK_VERSION,
+    };
+    let req = crate::eth2::eth_signing::BLSSignMsg::DEPOSIT(deposit_request);
+
+    let resp = client
+        .validator
+        .client
+        .post(format!(
+            "{}/api/v1/eth2/sign/{}",
+            client.validator.url, resp.bls_pub_key
+        ))
+        .json(&req)
+        .send()
+        .await
+        .unwrap();
+
+    let resp_status = resp.status();
+
+    assert_eq!(resp_status, StatusCode::BAD_REQUEST);
 }

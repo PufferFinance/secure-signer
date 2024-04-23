@@ -27,40 +27,43 @@ async fn main() {
         genesis_fork_version,
     };
 
-    let app = axum::Router::new()
-        // Endpoint to check health
-        .route(
-            "/upcheck",
-            axum::routing::get(puffersecuresigner::enclave::shared::handlers::health::handler),
-        )
+    let eth_v1 = axum::Router::new()
         // Endpoint to securely generate and save an ETH sk
         .route(
-            "/eth/v1/keygen/secp256k1",
+            "/keygen/secp256k1",
             axum::routing::post(
                 puffersecuresigner::enclave::secure_signer::handlers::eth_keygen::handler,
             ),
         )
         // Endpoint to securely generate and save a BLS sk
         .route(
-            "/eth/v1/keygen/bls",
+            "/keygen/bls",
             axum::routing::post(
                 puffersecuresigner::enclave::secure_signer::handlers::bls_keygen::handler,
             ),
         )
         // Endpoint to list the pks of all the generated ETH keys
         .route(
-            "/eth/v1/keygen/secp256k1",
+            "/keygen/secp256k1",
             axum::routing::get(
                 puffersecuresigner::enclave::shared::handlers::list_eth_keys::handler,
             ),
         )
         // Endpoint to list all pks of saved bls keys in the enclave
         .route(
-            "/eth/v1/keystores",
+            "/keystores",
             axum::routing::get(
                 puffersecuresigner::enclave::shared::handlers::list_bls_keys::handler,
             ),
+        );
+
+    let app = axum::Router::new()
+        // Endpoint to check health
+        .route(
+            "/upcheck",
+            axum::routing::get(puffersecuresigner::enclave::shared::handlers::health::handler),
         )
+        .nest("/eth/v1", eth_v1)
         // Endpoint to sign DepositData message for registering validator on beacon chain
         .route(
             "/api/v1/eth2/deposit",
