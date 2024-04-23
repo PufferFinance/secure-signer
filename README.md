@@ -9,7 +9,7 @@ Secure-Signer is a remote signing tool for Ethereum PoS validators, with the fol
 Validator keys are safeguarded in SGX's encrypted memory and the hardware enforces that Secure-Signer can only sign non-slashable messages. This reduces validator risk from slashing either from accidents or if their system is compromised.
 
 
-> **SECURE SIGNER IS UNDER DEVELOPMENT AND SHOULD NOT BE USED FOR PRODUCTION**, unless you know what you are doing. 
+> **SECURE SIGNER IS UNDER DEVELOPMENT**, see [DockerHub](https://hub.docker.com/repository/docker/pufferfi/validator/general) for the latest enclave image.
 
 --- 
 ## API
@@ -22,24 +22,8 @@ Validator keys are safeguarded in SGX's encrypted memory and the hardware enforc
 ## Developers
 - [Developer Documentation](https://pufferfinance.github.io/secure-signer/developers/)
 
---- 
-
-## Roadmap
-- [x] Open source the alpha code
-- [ ] Convert modules into their own open source crates
-- [ ] Standardize the remote-signing specs
-- [ ] Port to other LibOs's
-- [ ] Support non-SGX TEEs
-
-### TODO
-- [ ] API endpoint to GET EIP-3076 SlashProtection database
-- [ ] Code review and audit
-- [ ] Support DCAP remote attestation
-
-### Known Limitations / Issues
-- Only one validator key can be imported per API call
-- **footgun**: if you import an existing validator key, you expose yourself to slashing risk either via stale SlashProtection database or if you run the same key across multiple clients. We recommend [generating fresh keys within Secure-Signer](https://pufferfinance.github.io/secure-signer/running/client#generating-a-validator-key-in-secure-signer) to mitigate this.
-
+## Protocols
+- [Puffer Node Operator Documentation](https://docs.puffer.fi/nodes/requirements)
 
 --- 
 

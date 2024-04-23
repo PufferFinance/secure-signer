@@ -8,6 +8,8 @@ use axum::{
 use log::{error, info};
 use sha3::Digest;
 
+use crate::eth2::eth_signing::BLSSignMsg;
+
 /// Signs the specific type of request
 /// Maintains compatibility with https://consensys.github.io/web3signer/web3signer-eth2.html#tag/Signing
 pub fn sign_validator_message(
@@ -16,6 +18,14 @@ pub fn sign_validator_message(
     Json(req): Json<crate::eth2::eth_signing::BLSSignMsg>,
 ) -> axum::response::Response {
     info!("secure_sign_bls()");
+
+    if let BLSSignMsg::DEPOSIT(_) = req {
+        return (
+            axum::http::status::StatusCode::BAD_REQUEST,
+            format!("Signing deposit message not allowed"),
+        )
+            .into_response();
+    }
 
     // Sanitize the input bls_pk_hex
     let bls_pk_hex = match crate::crypto::bls_keys::sanitize_bls_pk_hex(&bls_pk_hex) {
