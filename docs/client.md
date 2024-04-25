@@ -274,7 +274,7 @@ Secure-Signer now safeguards the private key corresponding to the public key `0x
 We can verify that Secure-Signer has custody of the imported and generated BLS keys by running the following:
 <div class="code-example" markdown="1">
 ```bash
-puffer@Puffer-Dev:~$ docker exec -w /home secure_signer_container /bin/bash -c "./client -h"
+puffer@Puffer-Dev:~$ docker exec -w /home secure_signer_container /bin/bash -c "./client -l"
 - Connecting to Secure-Signer on port 9001
 puffer@Puffer-Dev:~$ docker exec -w /home secure_signer_container /bin/bash -c  "cat ss_out/list_bls_keys"
 {
