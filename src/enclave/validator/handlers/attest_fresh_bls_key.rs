@@ -11,7 +11,9 @@ pub async fn handler(
         keygen_payload.threshold,
         keygen_payload.fork_version,
         keygen_payload.do_remote_attestation,
-    ) {
+    )
+    .await
+    {
         Ok(keygen_result) => {
             (axum::http::status::StatusCode::CREATED, Json(keygen_result)).into_response()
         }

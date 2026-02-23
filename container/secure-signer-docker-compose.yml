@@ -1,0 +1,18 @@
+services:
+  secure-signer:
+    platform: linux/amd64
+    image: ghcr.io/pufferfinance/secure-signer:v0.1.0
+    build:
+      context: ..
+      dockerfile: ./container/Dockerfile
+    ports:
+      - "9001:9001"
+    env_file:
+      - ./config/secure-signer.env    # measured config
+      - ./additional-data/env          # operator config (not measured)
+    volumes:
+      - ./config/network_config.json:/config/network_config.json:ro
+      - secure-signer-data:/data
+
+volumes:
+  secure-signer-data:

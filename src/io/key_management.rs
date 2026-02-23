@@ -171,12 +171,12 @@ mod test_key_management {
 
         let written_content = read_file(&file_path).unwrap();
         assert_eq!(written_content, sk_hex);
-        fs::remove_dir_all("./etc").ok();
+        fs::remove_dir_all("./data").ok();
     }
 
     #[test]
     fn test_write_eth_key() {
-        fs::remove_dir_all("./etc").ok();
+        fs::remove_dir_all("./data").ok();
         let pk_hex = "0x1234abcd";
         let sk_hex = "0xabcdef123456";
 
@@ -185,12 +185,12 @@ mod test_key_management {
         let file_path: PathBuf = [ETH_KEYS_DIR, "1234abcd"].iter().collect();
         let written_content = read_file(&file_path).unwrap();
         assert_eq!(written_content, "abcdef123456");
-        fs::remove_dir_all("./etc").ok();
+        fs::remove_dir_all("./data").ok();
     }
 
     #[test]
     fn test_write_bls_key() {
-        fs::remove_dir_all("./etc").ok();
+        fs::remove_dir_all("./data").ok();
         let pk_hex = "0x1234abcd";
         let sk_hex = "0xabcdef123456";
 
@@ -199,12 +199,12 @@ mod test_key_management {
         let file_path: PathBuf = [BLS_KEYS_DIR, "1234abcd"].iter().collect();
         let written_content = read_file(&file_path).unwrap();
         assert_eq!(written_content, "abcdef123456");
-        fs::remove_dir_all("./etc").ok();
+        fs::remove_dir_all("./data").ok();
     }
 
     #[test]
     fn test_write_read_delete_eth_key() {
-        fs::remove_dir_all("./etc").ok();
+        fs::remove_dir_all("./data").ok();
         let pk_hex = "0x1234abcd";
         let sk_hex = "0xabcdef123456";
 
@@ -224,7 +224,7 @@ mod test_key_management {
 
     #[test]
     fn test_write_read_delete_bls_key() {
-        fs::remove_dir_all("./etc").ok();
+        fs::remove_dir_all("./data").ok();
         let pk_hex = "0x1234abcd";
         let sk_hex = "0xabcdef123456";
 
@@ -244,7 +244,7 @@ mod test_key_management {
 
     #[test]
     fn test_write_read_delete_bls_keystore() {
-        fs::remove_dir_all("./etc").ok();
+        fs::remove_dir_all("./data").ok();
         let pk_hex = "a8a1580a80406ccb0a89e1115c92ec1a09994e2ac6341cfddcad5daf75f587244aa6d722b3449a17b0b0b482c1d13215";
         let sk_hex = "4c627588f8040116b75f14fdb55b552612a46a2cd91e65b516defe39d81fc08f";
         let sk_bytes_in = hex::decode(sk_hex).unwrap();
@@ -267,7 +267,7 @@ mod test_key_management {
 
     #[test]
     fn test_list_eth_keys() {
-        fs::remove_dir_all("./etc").ok();
+        fs::remove_dir_all("./data").ok();
         let pk_hex1 = "0x1234abcd";
         let sk_hex1 = "0xabcdef123456";
         let pk_hex2 = "0x5678ef01";
@@ -297,7 +297,7 @@ mod test_key_management {
 
     #[test]
     fn test_list_bls_keys() {
-        fs::remove_dir_all("./etc").ok();
+        fs::remove_dir_all("./data").ok();
         let pk_hex1 = "0x1234abcd";
         let sk_hex1 = "0xabcdef123456";
         let pk_hex2 = "0x5678ef01";

@@ -15,6 +15,7 @@ Cargo.lock
 
 build/
 deps/
+data/
 etc/
 keys/
 keystores/

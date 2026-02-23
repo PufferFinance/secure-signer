@@ -1,0 +1,27 @@
+{
+    "workloads": [
+        {
+            "name": "secure-signer",
+            "docker_compose": "./container/secure-signer-docker-compose.yml"
+        }
+    ],
+    "platforms": ["gcp"],
+    "disks": [
+        {
+            "name": "secure-signer-data",
+            "size": "10GB",
+            "encryption": {
+                "enable": true,
+                "encryption_key_security": "standard"
+            }
+        }
+    ],
+    "deployment": {
+        "secure-signer-tdx": {
+            "workload": "secure-signer",
+            "platforms": {
+                "gcp": { "vmtype": "c3-standard-4" }
+            }
+        }
+    }
+}

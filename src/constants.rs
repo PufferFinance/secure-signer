@@ -1,7 +1,7 @@
-pub const KEYS_DIR: &str = "./etc/keys/";
-pub const BLS_KEYS_DIR: &str = "./etc/keys/bls_keys/";
-pub const ETH_KEYS_DIR: &str = "./etc/keys/eth_keys/";
-pub const SLASHING_PROTECTION_DIR: &str = "./etc/slashing/";
+pub const KEYS_DIR: &str = "./data/keys/";
+pub const BLS_KEYS_DIR: &str = "./data/keys/bls_keys/";
+pub const ETH_KEYS_DIR: &str = "./data/keys/eth_keys/";
+pub const SLASHING_PROTECTION_DIR: &str = "./data/slashing/";
 
 pub const BLS_SIG_BYTES: usize = 96;
 pub const BLS_PUB_KEY_BYTES: usize = 48;

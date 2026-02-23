@@ -1,6 +1,6 @@
 use crate::eth2::eth_types::ValidatorIndex;
 use crate::io::remote_attestation::AttestationEvidence;
-use crate::{crypto::eth_keys, strip_0x_prefix};
+use crate::strip_0x_prefix;
 use anyhow::{bail, Result};
 use blsttc::{PublicKey as BlsPublicKey, PublicKeySet};
 use ecies::{PublicKey as EthPublicKey, SecretKey as EthSecretKey};
@@ -28,56 +28,6 @@ impl KeyGenResponse {
             pk_hex: format!("0x{}", &pk.to_hex()),
             evidence,
         }
-    }
-
-    pub fn validate_eth_ra(&self, mrenclave: &String) -> Result<EthPublicKey> {
-        // Verify the report is valid
-        self.evidence.verify_intel_signing_certificate()?;
-
-        // Verify the MRENCLAVE measurement is valid
-        let mrenclave: String = strip_0x_prefix!(mrenclave);
-        let got_mrenclave = self.evidence.get_mrenclave()?;
-        if mrenclave != got_mrenclave {
-            bail!("Received MRENCLAVE {got_mrenclave} does not match expected {mrenclave}")
-        }
-
-        // Get the expected public key from payload
-        let pk = eth_keys::eth_pk_from_hex(&self.pk_hex)?;
-
-        // Read the 64B payload from RA report
-        let got_payload: [u8; 64] = self.evidence.get_report_data()?;
-
-        // Verify the first ETH_COMPRESSED_PK_BYTES of report contains the expected ETH comporessed public key
-        // TODO: Ideally this should be uncompressed
-        if &got_payload[0..crate::constants::ETH_COMPRESSED_PK_BYTES] != pk.serialize_compressed() {
-            bail!("Remote attestation payload does not match the expected")
-        }
-        Ok(pk)
-    }
-
-    pub fn validate_bls_ra(&self, mrenclave: &String) -> Result<BlsPublicKey> {
-        // Verify the report is valid
-        self.evidence.verify_intel_signing_certificate()?;
-
-        // Verify the MRENCLAVE measurement is valid
-        let mrenclave: String = strip_0x_prefix!(mrenclave);
-        let got_mrenclave = self.evidence.get_mrenclave()?;
-        if mrenclave != got_mrenclave {
-            bail!("Received MRENCLAVE {got_mrenclave} does not match expected {mrenclave}")
-        }
-
-        // Verify the payload
-        let pk_hex: String = strip_0x_prefix!(&self.pk_hex);
-        let pk = BlsPublicKey::from_hex(&pk_hex)?;
-
-        // Read the 64B payload from RA report
-        let got_payload: [u8; 64] = self.evidence.get_report_data()?;
-
-        // Verify the first BLS_PUB_KEY_BYTES of report contains the expected BLS comporessed public key
-        if &got_payload[0..crate::constants::BLS_PUB_KEY_BYTES] != pk.to_bytes() {
-            bail!("Remote attestation payload does not match the expected")
-        }
-        Ok(pk)
     }
 }
 
@@ -135,9 +85,8 @@ impl SignatureResponse {
 pub struct ValidateCustodyRequest {
     pub keygen_payload: BlsKeygenPayload,
     pub guardian_enclave_public_key: EthPublicKey,
-    pub mrenclave: String,
-    pub mrsigner: String,
-    pub verify_remote_attestation: bool,
+    pub workload_id: String,
+    pub verify_session: bool,
     pub validator_index: ValidatorIndex,
 }
 
@@ -187,9 +136,9 @@ pub struct BlsKeygenPayload {
     pub signature: String,
     pub deposit_data_root: String,
     pub bls_enc_priv_key_shares: Vec<String>,
-    pub intel_sig: String,
-    pub intel_report: String,
-    pub intel_x509: String,
+    pub session_id: String,
+    pub attestation_signature: String,
+    pub session_public_key: String,
     pub guardian_eth_pub_keys: Vec<String>,
     pub withdrawal_credentials: String,
     pub fork_version: crate::eth2::eth_types::Version,

@@ -48,7 +48,7 @@ impl RecipientKeys {
     }
 }
 
-pub fn attest_fresh_bls_key(
+pub async fn attest_fresh_bls_key(
     withdrawal_credentials: [u8; 32],
     guardian_public_keys: Vec<EthPublicKey>,
     threshold: usize,
@@ -109,7 +109,7 @@ pub fn attest_fresh_bls_key(
 
     // do remote attestation
     let evidence = if do_remote_attestation {
-        AttestationEvidence::new(&payload)?
+        AttestationEvidence::new(&payload).await?
     } else {
         AttestationEvidence::default()
     };
@@ -123,9 +123,9 @@ pub fn attest_fresh_bls_key(
             .iter()
             .map(|encrypted_key| encrypted_key.encrypted_secret_key_share_hex.clone())
             .collect(),
-        intel_report: evidence.raw_report,
-        intel_sig: evidence.signed_report,
-        intel_x509: evidence.signing_cert,
+        session_id: evidence.session_id,
+        attestation_signature: evidence.signature,
+        session_public_key: evidence.session_public_key,
         guardian_eth_pub_keys: recipient_keys
             .iter()
             .map(|k| crate::crypto::eth_keys::eth_pk_to_hex_uncompressed(&k.guardian_public_key))

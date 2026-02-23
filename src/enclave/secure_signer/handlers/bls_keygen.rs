@@ -5,7 +5,7 @@ use log::{error, info};
 /// Generates, saves, and performs remote attestation on a new ETH key. Returns a `KeyGenResponse` on success.
 pub async fn handler() -> axum::response::Response {
     info!("eth_bls_gen_service()");
-    match crate::enclave::secure_signer::attest_new_bls_key() {
+    match crate::enclave::secure_signer::attest_new_bls_key().await {
         Ok((evidence, eth_pk)) => {
             let resp = crate::enclave::types::KeyGenResponse::from_bls_key(eth_pk, evidence);
             (axum::http::status::StatusCode::CREATED, Json(resp)).into_response()

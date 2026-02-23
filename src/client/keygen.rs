@@ -65,9 +65,9 @@ fn generate_bls_keystore(
             .iter()
             .map(|encrypted_key| encrypted_key.encrypted_secret_key_share_hex.clone())
             .collect(),
-        intel_report: "".to_string(),
-        intel_sig: "".to_string(),
-        intel_x509: "".to_string(),
+        session_id: "".to_string(),
+        attestation_signature: "".to_string(),
+        session_public_key: "".to_string(),
         guardian_eth_pub_keys: recipient_keys
             .iter()
             .map(|k| crate::crypto::eth_keys::eth_pk_to_hex_uncompressed(&k.guardian_public_key))

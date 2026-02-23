@@ -5,13 +5,19 @@ use puffersecuresigner::{eth2::eth_types::Version, strip_0x_prefix};
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    let port = std::env::args()
-        .nth(1)
-        .unwrap_or("3031".into())
+    // Port: env var > CLI arg > default 9001
+    let port = std::env::var("SECURE_SIGNER_PORT")
+        .ok()
+        .or_else(|| std::env::args().nth(1))
+        .unwrap_or("9001".into())
         .parse::<u16>()
         .expect("BAD PORT");
-    let genesis_fork_version_str: String =
-        std::env::args().nth(2).unwrap_or("00000000".to_string());
+
+    // Genesis fork version: env var > CLI arg > default 00000000
+    let genesis_fork_version_str: String = std::env::var("GENESIS_FORK_VERSION")
+        .ok()
+        .or_else(|| std::env::args().nth(2))
+        .unwrap_or("00000000".to_string());
     let genesis_fork_version_str: String = strip_0x_prefix!(genesis_fork_version_str);
     let mut genesis_fork_version = Version::default();
     genesis_fork_version.copy_from_slice(
@@ -19,7 +25,7 @@ async fn main() {
     );
 
     println!(
-        "Starting SGX Secure-Signer: localhost:{}, using genesis_fork_version: {:?}",
+        "Starting Secure-Signer: localhost:{}, using genesis_fork_version: {:?}",
         port, genesis_fork_version
     );
 

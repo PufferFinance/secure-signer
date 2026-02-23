@@ -78,23 +78,16 @@ async fn test_register_new_bls_key() {
 }
 
 #[tokio::test]
-async fn test_bls_key_in_remote_attestation_evidence() {
+async fn test_bls_key_in_attestation_evidence() {
     if env::var("SECURE_SIGNER_PORT").is_ok() {
-        // Local dev is not set so use SGX.
-
         let port = read_secure_signer_port();
         let resp = register_new_bls_key(port).await;
         dbg!(&resp.pk_hex);
         dbg!(&port);
 
-        // Verify the report is valid
-        resp.evidence.verify_intel_signing_certificate().unwrap();
-
-        // Verify the payload
-        let pk_hex: String = strip_0x_prefix!(&resp.pk_hex);
-        let pk = PublicKey::from_hex(&pk_hex).unwrap();
-
-        let got_payload: [u8; 64] = resp.evidence.get_report_data().unwrap();
-        assert_eq!(hex::encode(&got_payload[0..BLS_PUB_KEY_BYTES]), pk.to_hex());
+        // Verify session evidence fields are present
+        assert!(!resp.evidence.session_id.is_empty());
+        assert!(!resp.evidence.signature.is_empty());
+        assert!(!resp.evidence.session_public_key.is_empty());
     }
 }

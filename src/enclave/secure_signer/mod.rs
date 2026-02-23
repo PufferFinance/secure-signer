@@ -1,20 +1,20 @@
 pub mod handlers;
 use anyhow::{Context, Result};
 
-fn attest_new_eth_key() -> Result<(
+pub(crate) async fn attest_new_eth_key() -> Result<(
     crate::io::remote_attestation::AttestationEvidence,
     ecies::PublicKey,
 )> {
     // Generate a fresh SECP256K1 ETH keypair (saving ETH private key)
     let pk = crate::crypto::eth_keys::eth_key_gen()?;
 
-    // Commit to the payload
+    // Sign the public key with CVM Agent session key
     let proof =
-        crate::io::remote_attestation::AttestationEvidence::new(&pk.serialize_compressed())?;
+        crate::io::remote_attestation::AttestationEvidence::new(&pk.serialize_compressed()).await?;
     Ok((proof, pk))
 }
 
-fn attest_new_bls_key() -> Result<(
+pub(crate) async fn attest_new_bls_key() -> Result<(
     crate::io::remote_attestation::AttestationEvidence,
     blsttc::PublicKey,
 )> {
@@ -26,7 +26,7 @@ fn attest_new_bls_key() -> Result<(
     // Create a new slashing protection database
     crate::eth2::slash_protection::SlashingProtectionData::from_pk_hex(&pk.to_hex())?.write()?;
 
-    // Commit to the payload
-    let proof = crate::io::remote_attestation::AttestationEvidence::new(&pk.to_bytes())?;
+    // Sign the public key with CVM Agent session key
+    let proof = crate::io::remote_attestation::AttestationEvidence::new(&pk.to_bytes()).await?;
     Ok((proof, pk))
 }

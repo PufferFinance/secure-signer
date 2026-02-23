@@ -1,7 +1,6 @@
 // #[macro_use]
 extern crate anyhow;
 extern crate env_logger;
-extern crate libc;
 
 pub mod constants;
 pub mod crypto;

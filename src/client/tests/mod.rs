@@ -16,12 +16,10 @@ fn build_client() -> super::Client {
 
 #[tokio::test]
 async fn registration_flow_succeeds() {
-    // let verify_remote_attestation = true;
-    let verify_remote_attestation = false;
+    let verify_session = false;
     let withdrawal_credentials = [1; 32];
     let threshold = 1;
-    let mrenclave = "758d532c6bd0a4297431623183e4d5dd5bbe274ebd8bdf9cecfcb8bffefaf186".into();
-    let mrsigner = "83d719e77deaca1470f6baf62a4d774303c899db69020f9c70ee1dfc08c7ce9e".into();
+    let workload_id = "test-workload-id".to_string();
 
     let client = build_client();
 
@@ -49,7 +47,7 @@ async fn registration_flow_succeeds() {
         withdrawal_credentials: withdrawal_credentials.clone(),
         threshold: threshold,
         fork_version: GENESIS_FORK_VERSION,
-        do_remote_attestation: verify_remote_attestation,
+        do_remote_attestation: verify_session,
     };
 
     let resp2: crate::enclave::types::BlsKeygenPayload = client
@@ -64,9 +62,8 @@ async fn registration_flow_succeeds() {
     let req = crate::enclave::types::ValidateCustodyRequest {
         keygen_payload: resp2.clone(),
         guardian_enclave_public_key: guardian_pk,
-        mrenclave,
-        mrsigner,
-        verify_remote_attestation,
+        workload_id,
+        verify_session,
         validator_index: 0,
     };
 
@@ -92,7 +89,7 @@ async fn registration_flow_succeeds() {
 #[tokio::test]
 async fn test_cli_keygen_verified_by_guardians() {
     let client = build_client();
-    let verify_remote_attestation = false;
+    let verify_session = false;
     let withdrawal_credentials = [1; 32];
     let threshold = 1;
     let password = "password".to_string();
@@ -115,7 +112,7 @@ async fn test_cli_keygen_verified_by_guardians() {
         withdrawal_credentials: withdrawal_credentials.clone(),
         threshold: threshold,
         fork_version: GENESIS_FORK_VERSION,
-        do_remote_attestation: verify_remote_attestation,
+        do_remote_attestation: verify_session,
     };
     let bls_keygen_payload = dbg!(crate::client::keygen::generate_bls_keystore_handler(
         bls_keygen_input,
@@ -127,9 +124,8 @@ async fn test_cli_keygen_verified_by_guardians() {
     let req = crate::enclave::types::ValidateCustodyRequest {
         keygen_payload: bls_keygen_payload.clone(),
         guardian_enclave_public_key: guardian_pk,
-        mrenclave: "".to_string(),
-        mrsigner: "".to_string(),
-        verify_remote_attestation,
+        workload_id: "".to_string(),
+        verify_session,
         validator_index: 0,
     };
 

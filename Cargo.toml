@@ -4,15 +4,7 @@ version = "0.1.0"
 authors = ["Jason Vranek <jason@pufferi.fi>"]
 edition = "2021"
 
-[build]
-target = "x86_64-unknown-linux-musl"
-
-[build-dependencies]
-cc = "1.0"
-
 [dependencies]
-libc = "0.2"
-
 # io deps
 serde = "1.0"
 serde_json = "1.0"
@@ -29,7 +21,6 @@ rand = "0.8.4"
 rand_chacha = "0.2"
 hex = "0.4.3"
 ecies = { version = "0.2.2", default-features = false, features = ["pure"] }
-openssl = "0.10.42"
 bytes = "1"
 sha3 = "0.10.6"
 
@@ -63,10 +54,7 @@ reqwest = { version = "0.11.16", features = ["json"] }
 snap = "1.0.1"
 serde_yaml = "0.8.13"
 
-[features]
-sgx = []
-
-[[bin]] # Bin to run the sgx-signer rpc
+[[bin]] # Bin to run the secure-signer rpc
 name = "secure-signer"
 path = "src/bin/secure-signer.rs"
 
