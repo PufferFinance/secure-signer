@@ -1,0 +1,20 @@
+services:
+  guardian:
+    platform: linux/amd64
+    image: ghcr.io/pufferfinance/guardian:v0.1.0
+    build:
+      context: ..
+      dockerfile: ./container/Dockerfile
+      args:
+        BINARY_NAME: guardian
+    ports:
+      - "9001:9001"
+    env_file:
+      - ./config/guardian.env
+      - ./additional-data/env
+    volumes:
+      - ./config/network_config.json:/config/network_config.json:ro
+      - guardian-data:/data
+
+volumes:
+  guardian-data:

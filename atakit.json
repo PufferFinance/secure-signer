@@ -3,6 +3,14 @@
         {
             "name": "secure-signer",
             "docker_compose": "./container/secure-signer-docker-compose.yml"
+        },
+        {
+            "name": "validator",
+            "docker_compose": "./container/validator-docker-compose.yml"
+        },
+        {
+            "name": "guardian",
+            "docker_compose": "./container/guardian-docker-compose.yml"
         }
     ],
     "platforms": ["gcp"],
@@ -14,11 +22,39 @@
                 "enable": true,
                 "encryption_key_security": "standard"
             }
+        },
+        {
+            "name": "validator-data",
+            "size": "10GB",
+            "encryption": {
+                "enable": true,
+                "encryption_key_security": "standard"
+            }
+        },
+        {
+            "name": "guardian-data",
+            "size": "10GB",
+            "encryption": {
+                "enable": true,
+                "encryption_key_security": "standard"
+            }
         }
     ],
     "deployment": {
         "secure-signer-tdx": {
             "workload": "secure-signer",
+            "platforms": {
+                "gcp": { "vmtype": "c3-standard-4" }
+            }
+        },
+        "validator-tdx": {
+            "workload": "validator",
+            "platforms": {
+                "gcp": { "vmtype": "c3-standard-4" }
+            }
+        },
+        "guardian-tdx": {
+            "workload": "guardian",
             "platforms": {
                 "gcp": { "vmtype": "c3-standard-4" }
             }
