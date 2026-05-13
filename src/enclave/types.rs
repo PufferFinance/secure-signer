@@ -139,6 +139,8 @@ pub struct ValidateCustodyRequest {
     pub mrsigner: String,
     pub verify_remote_attestation: bool,
     pub validator_index: ValidatorIndex,
+    pub chain_id: u64,
+    pub guardian_module_address: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

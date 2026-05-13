@@ -22,6 +22,8 @@ async fn registration_flow_succeeds() {
     let threshold = 1;
     let mrenclave = "758d532c6bd0a4297431623183e4d5dd5bbe274ebd8bdf9cecfcb8bffefaf186".into();
     let mrsigner = "83d719e77deaca1470f6baf62a4d774303c899db69020f9c70ee1dfc08c7ce9e".into();
+    let chain_id = 1u64;
+    let guardian_module_address = "0x628b183F248a142A598AA2dcCCD6f7E480a7CcF2".to_string();
 
     let client = build_client();
 
@@ -68,6 +70,8 @@ async fn registration_flow_succeeds() {
         mrsigner,
         verify_remote_attestation,
         validator_index: 0,
+        chain_id,
+        guardian_module_address,
     };
 
     // Guardian validates they received custody
@@ -96,6 +100,8 @@ async fn test_cli_keygen_verified_by_guardians() {
     let withdrawal_credentials = [1; 32];
     let threshold = 1;
     let password = "password".to_string();
+    let chain_id = 1u64;
+    let guardian_module_address = "0x628b183F248a142A598AA2dcCCD6f7E480a7CcF2".to_string();
 
     // Guardian generates fresh key
     let resp1: crate::enclave::types::KeyGenResponse = client
@@ -131,6 +137,8 @@ async fn test_cli_keygen_verified_by_guardians() {
         mrsigner: "".to_string(),
         verify_remote_attestation,
         validator_index: 0,
+        chain_id,
+        guardian_module_address,
     };
 
     // Guardian validates they received custody
